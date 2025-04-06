@@ -39,11 +39,11 @@ const Navbar = () => {
           {/* My Team Dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="nav-link inline-flex items-center h-10">
+              <button className="nav-link inline-flex items-center justify-center h-10 px-3 box-border">
                 My Team <ChevronDown size={16} className="ml-1" />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56 bg-card/95 backdrop-blur-sm">
+            <DropdownMenuContent align="end" className="w-56 bg-background shadow-md">
               <DropdownMenuItem>
                 <a href="#roster" className="w-full">Roster</a>
               </DropdownMenuItem>
@@ -59,11 +59,11 @@ const Navbar = () => {
           {/* League Dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="nav-link inline-flex items-center h-10">
+              <button className="nav-link inline-flex items-center justify-center h-10 px-3 box-border">
                 League <ChevronDown size={16} className="ml-1" />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56 bg-card/95 backdrop-blur-sm">
+            <DropdownMenuContent align="end" className="w-56 bg-background shadow-md">
               <DropdownMenuItem>
                 <a href="#matchup" className="w-full">Matchup</a>
               </DropdownMenuItem>
@@ -79,11 +79,11 @@ const Navbar = () => {
           {/* Resources Dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="nav-link inline-flex items-center h-10">
+              <button className="nav-link inline-flex items-center justify-center h-10 px-3 box-border">
                 Resources <ChevronDown size={16} className="ml-1" />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56 bg-card/95 backdrop-blur-sm">
+            <DropdownMenuContent align="end" className="w-56 bg-background shadow-md">
               <DropdownMenuItem>
                 <a href="#blog" className="w-full">Blog</a>
               </DropdownMenuItem>
@@ -96,7 +96,7 @@ const Navbar = () => {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <a href="#contact" className="nav-link inline-flex items-center h-10">Contact</a>
+          <a href="#contact" className="nav-link inline-flex items-center justify-center h-10 px-3 box-border">Contact</a>
         </nav>
 
         <div className="hidden lg:flex items-center space-x-4">
