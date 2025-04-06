@@ -39,7 +39,7 @@ const Navbar = () => {
           {/* My Team Dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="nav-link flex items-center">
+              <button className="nav-link inline-flex items-center h-10">
                 My Team <ChevronDown size={16} className="ml-1" />
               </button>
             </DropdownMenuTrigger>
@@ -59,7 +59,7 @@ const Navbar = () => {
           {/* League Dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="nav-link flex items-center">
+              <button className="nav-link inline-flex items-center h-10">
                 League <ChevronDown size={16} className="ml-1" />
               </button>
             </DropdownMenuTrigger>
@@ -79,7 +79,7 @@ const Navbar = () => {
           {/* Resources Dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="nav-link flex items-center">
+              <button className="nav-link inline-flex items-center h-10">
                 Resources <ChevronDown size={16} className="ml-1" />
               </button>
             </DropdownMenuTrigger>
@@ -96,7 +96,7 @@ const Navbar = () => {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <a href="#contact" className="nav-link">Contact</a>
+          <a href="#contact" className="nav-link inline-flex items-center h-10">Contact</a>
         </nav>
 
         <div className="hidden lg:flex items-center space-x-4">
