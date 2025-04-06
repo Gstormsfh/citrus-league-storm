@@ -1,10 +1,13 @@
+
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Menu, X, ChevronDown } from 'lucide-react';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
+
 const Navbar = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  
   useEffect(() => {
     const handleScroll = () => {
       if (window.scrollY > 20) {
@@ -13,12 +16,16 @@ const Navbar = () => {
         setIsScrolled(false);
       }
     };
+    
     window.addEventListener('scroll', handleScroll);
+    
     return () => {
       window.removeEventListener('scroll', handleScroll);
     };
   }, []);
-  return <header className={`fixed w-full z-50 transition-all duration-300 ${isScrolled ? 'bg-background/95 backdrop-blur-sm shadow-md py-3' : 'bg-transparent py-5'}`}>
+  
+  return (
+    <header className={`fixed w-full z-50 transition-all duration-300 ${isScrolled ? 'bg-background/95 backdrop-blur-sm shadow-md py-3' : 'bg-transparent py-5'}`}>
       <div className="container mx-auto px-4 flex items-center justify-between">
         <a href="#" className="flex items-center gap-2">
           <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center">
@@ -29,11 +36,47 @@ const Navbar = () => {
 
         {/* Desktop Navigation */}
         <nav className="hidden lg:flex items-center space-x-1">
-          <a href="#features" className="nav-link">Features</a>
-          <a href="#leagues" className="nav-link">Leagues</a>
+          {/* My Team Dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="nav-link flex items-center">
+                My Team <ChevronDown size={16} className="ml-1" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56 bg-card/95 backdrop-blur-sm">
+              <DropdownMenuItem>
+                <a href="#roster" className="w-full">Roster</a>
+              </DropdownMenuItem>
+              <DropdownMenuItem>
+                <a href="#gm-office" className="w-full">GM's Office</a>
+              </DropdownMenuItem>
+              <DropdownMenuItem>
+                <a href="#team-settings" className="w-full">Team Settings</a>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           
-          <a href="#news" className="nav-link">News</a>
+          {/* League Dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="nav-link flex items-center">
+                League <ChevronDown size={16} className="ml-1" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56 bg-card/95 backdrop-blur-sm">
+              <DropdownMenuItem>
+                <a href="#matchup" className="w-full">Matchup</a>
+              </DropdownMenuItem>
+              <DropdownMenuItem>
+                <a href="#standings" className="w-full">Standings</a>
+              </DropdownMenuItem>
+              <DropdownMenuItem>
+                <a href="#free-agents" className="w-full">Free Agents</a>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           
+          {/* Resources Dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button className="nav-link flex items-center">
@@ -68,12 +111,11 @@ const Navbar = () => {
       </div>
 
       {/* Mobile Navigation */}
-      {mobileMenuOpen && <div className="lg:hidden bg-background/95 backdrop-blur-sm animate-slide-down">
+      {mobileMenuOpen && (
+        <div className="lg:hidden bg-background/95 backdrop-blur-sm animate-slide-down">
           <div className="container mx-auto px-4 py-4 flex flex-col space-y-3">
-            <a href="#features" className="nav-link" onClick={() => setMobileMenuOpen(false)}>Features</a>
-            <a href="#leagues" className="nav-link" onClick={() => setMobileMenuOpen(false)}>Leagues</a>
-            <a href="#players" className="nav-link" onClick={() => setMobileMenuOpen(false)}>Players</a>
-            <a href="#news" className="nav-link" onClick={() => setMobileMenuOpen(false)}>News</a>
+            <a href="#my-team" className="nav-link" onClick={() => setMobileMenuOpen(false)}>My Team</a>
+            <a href="#league" className="nav-link" onClick={() => setMobileMenuOpen(false)}>League</a>
             <a href="#resources" className="nav-link" onClick={() => setMobileMenuOpen(false)}>Resources</a>
             <a href="#contact" className="nav-link" onClick={() => setMobileMenuOpen(false)}>Contact</a>
             <div className="flex flex-col space-y-2 pt-2">
@@ -81,7 +123,10 @@ const Navbar = () => {
               <Button className="w-full rounded-full">Sign up free</Button>
             </div>
           </div>
-        </div>}
-    </header>;
+        </div>
+      )}
+    </header>
+  );
 };
+
 export default Navbar;
