@@ -1,3 +1,4 @@
+
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Montserrat:wght@400;500;600;700;800&display=swap');
 
 @tailwind base;
@@ -106,22 +107,6 @@
 @layer components {
   .nav-link {
     @apply relative font-medium text-foreground transition-colors hover:text-primary box-border;
-  }
-  
-  .nav-link-button {
-    @apply h-10 w-[100px] flex items-center justify-center relative font-medium text-foreground transition-colors hover:text-primary;
-  }
-  
-  .nav-link-text {
-    @apply relative;
-  }
-  
-  .nav-link-text::after {
-    @apply content-[''] absolute bottom-[-5px] left-1/2 -translate-x-1/2 w-0 h-0.5 bg-primary transition-all duration-300;
-  }
-  
-  .nav-link-button:hover .nav-link-text::after {
-    @apply w-1/2;
   }
   
   .nav-link::after {

@@ -39,8 +39,8 @@ const Navbar = () => {
           {/* My Team Dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="nav-link-button">
-                <span className="nav-link-text">My Team</span> <ChevronDown size={16} className="ml-1" />
+              <button className="nav-link inline-flex items-center justify-center h-10 px-3 box-border">
+                My Team <ChevronDown size={16} className="ml-1" />
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56 bg-background shadow-md">
@@ -59,8 +59,8 @@ const Navbar = () => {
           {/* League Dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="nav-link-button">
-                <span className="nav-link-text">League</span> <ChevronDown size={16} className="ml-1" />
+              <button className="nav-link inline-flex items-center justify-center h-10 px-3 box-border">
+                League <ChevronDown size={16} className="ml-1" />
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56 bg-background shadow-md">
@@ -79,8 +79,8 @@ const Navbar = () => {
           {/* Resources Dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="nav-link-button">
-                <span className="nav-link-text">Resources</span> <ChevronDown size={16} className="ml-1" />
+              <button className="nav-link inline-flex items-center justify-center h-10 px-3 box-border">
+                Resources <ChevronDown size={16} className="ml-1" />
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56 bg-background shadow-md">
@@ -96,9 +96,7 @@ const Navbar = () => {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <a href="#contact" className="nav-link-button">
-            <span className="nav-link-text">Contact</span>
-          </a>
+          <a href="#contact" className="nav-link inline-flex items-center justify-center h-10 px-3 box-border">Contact</a>
         </nav>
 
         <div className="hidden lg:flex items-center space-x-4">
