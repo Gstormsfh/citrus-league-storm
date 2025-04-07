@@ -1,3 +1,4 @@
+
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Montserrat:wght@400;500;600;700;800&display=swap');
 
 @tailwind base;
@@ -211,13 +212,13 @@
     @apply bg-gradient-to-r from-[hsl(var(--vibrant-orange))] to-[hsl(var(--vibrant-yellow))];
   }
 
-  /* Fix for dropdown positioning to prevent layout shifts */
+  /* Global fix for all dropdown positioning to prevent layout shifts */
   [data-radix-popper-content-wrapper] {
     position: fixed !important;
-    top: var(--radix-popper-available-height) !important;
-    left: var(--radix-popper-available-width) !important;
-    width: var(--radix-popper-anchor-width) !important;
     transform: none !important;
+    top: var(--radix-popper-anchor-top, 0) !important;
+    left: var(--radix-popper-anchor-left, 0) !important;
+    width: var(--radix-popper-anchor-width, auto) !important;
     z-index: 9999 !important;
   }
 }

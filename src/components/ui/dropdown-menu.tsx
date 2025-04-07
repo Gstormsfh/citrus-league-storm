@@ -1,4 +1,3 @@
-
 import * as React from "react"
 import * as DropdownMenuPrimitive from "@radix-ui/react-dropdown-menu"
 import { Check, ChevronRight, Circle } from "lucide-react"
@@ -50,10 +49,6 @@ const DropdownMenuSubContent = React.forwardRef<
       className
     )}
     {...props}
-    style={{
-      position: "fixed",
-      ...props.style
-    }}
   />
 ))
 DropdownMenuSubContent.displayName =
@@ -72,10 +67,6 @@ const DropdownMenuContent = React.forwardRef<
         className
       )}
       {...props}
-      style={{
-        position: "fixed",
-        ...props.style
-      }}
     />
   </DropdownMenuPrimitive.Portal>
 ))
