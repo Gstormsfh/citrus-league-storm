@@ -47,11 +47,11 @@
     --sidebar-ring: 142 32% 59%;
     
     /* Vibrant accent colors */
-    --vibrant-purple: 267 68% 63%;
-    --vibrant-magenta: 322 65% 60%;
     --vibrant-orange: 27 96% 61%;
     --vibrant-peach: 23 100% 73%;
     --vibrant-green: 142 55% 60%;
+    --vibrant-yellow: 39 96% 67%;
+    --vibrant-lime: 78 70% 62%;
   }
 
   .dark {
@@ -93,11 +93,11 @@
     --sidebar-ring: 142 32% 59%;
     
     /* Dark mode vibrant accent colors */
-    --vibrant-purple: 267 75% 73%;
-    --vibrant-magenta: 322 75% 70%;
     --vibrant-orange: 27 100% 71%;
     --vibrant-peach: 23 100% 78%;
     --vibrant-green: 142 65% 70%;
+    --vibrant-yellow: 39 96% 77%;
+    --vibrant-lime: 78 70% 72%;
   }
 }
 
@@ -117,7 +117,7 @@
     scroll-behavior: smooth;
   }
 
-  /* Override any blue focus rings with our theme colors */
+  /* Override any focus rings with our theme colors */
   *:focus-visible {
     @apply outline-none ring-2 ring-primary/70;
   }
@@ -167,10 +167,6 @@
     @apply px-6 py-3 font-medium rounded-full bg-secondary text-secondary-foreground hover:bg-secondary/90 transition-colors shadow-md hover:shadow-lg;
   }
   
-  .btn-vibrant-purple {
-    @apply px-6 py-3 font-medium rounded-full bg-[hsl(var(--vibrant-purple))] text-white hover:bg-[hsl(var(--vibrant-purple))]/90 transition-colors shadow-md hover:shadow-lg;
-  }
-  
   .btn-vibrant-orange {
     @apply px-6 py-3 font-medium rounded-full bg-[hsl(var(--vibrant-orange))] text-white hover:bg-[hsl(var(--vibrant-orange))]/90 transition-colors shadow-md hover:shadow-lg;
   }
@@ -196,7 +192,7 @@
   }
   
   .citrus-gradient {
-    @apply bg-gradient-to-br from-citrus-green to-citrus-yellow;
+    @apply bg-gradient-to-br from-[hsl(var(--vibrant-green))] to-[hsl(var(--vibrant-yellow))];
   }
   
   .citrus-gradient-text {
@@ -205,7 +201,7 @@
   
   /* Vibrant gradients */
   .vibrant-gradient-1 {
-    @apply bg-gradient-to-r from-[hsl(var(--vibrant-purple))] to-[hsl(var(--vibrant-magenta))];
+    @apply bg-gradient-to-r from-[hsl(var(--vibrant-green))] to-[hsl(var(--vibrant-yellow))];
   }
   
   .vibrant-gradient-2 {
@@ -213,14 +209,16 @@
   }
   
   .vibrant-gradient-3 {
-    @apply bg-gradient-to-r from-[hsl(var(--vibrant-orange))] to-[hsl(var(--vibrant-magenta))];
+    @apply bg-gradient-to-r from-[hsl(var(--vibrant-orange))] to-[hsl(var(--vibrant-yellow))];
   }
 
-  /* Prevent layout shifts by using fixed position for all dropdowns */
+  /* Fix for dropdown positioning to prevent layout shifts */
   [data-radix-popper-content-wrapper] {
     position: fixed !important;
+    top: var(--radix-popper-available-height) !important;
+    left: var(--radix-popper-available-width) !important;
+    width: var(--radix-popper-anchor-width) !important;
     transform: none !important;
-    top: var(--popper-y) !important;
-    left: var(--popper-x) !important;
+    z-index: 9999 !important;
   }
 }

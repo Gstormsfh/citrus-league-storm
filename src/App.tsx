@@ -18,13 +18,20 @@ import GMOffice from "./pages/GMOffice";
 import TeamSettings from "./pages/TeamSettings";
 import "./App.css";
 
-const queryClient = new QueryClient();
+// Configure with a higher stale time to prevent unnecessary refetches
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60 * 5, // 5 minutes
+    },
+  },
+});
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <Toaster />
-      <Sonner />
+      <Sonner position="top-right" closeButton />
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Index />} />

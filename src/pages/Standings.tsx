@@ -145,10 +145,10 @@ const Standings = () => {
             <div className="flex items-center space-x-4 animated-element">
               <div className="w-36">
                 <Select defaultValue={season} onValueChange={setSeason}>
-                  <SelectTrigger className="w-36 bg-background">
+                  <SelectTrigger className="w-36 bg-background select-width-fixed">
                     <SelectValue placeholder="Select Season" />
                   </SelectTrigger>
-                  <SelectContent className="w-36 bg-background">
+                  <SelectContent className="w-36 bg-background z-[9999]">
                     <SelectItem value="2023">2023 Season</SelectItem>
                     <SelectItem value="2024">2024 Season</SelectItem>
                     <SelectItem value="2025">2025 Season</SelectItem>

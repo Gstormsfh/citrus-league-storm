@@ -1,14 +1,10 @@
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Menu, X, ChevronDown } from 'lucide-react';
+import { Menu, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger
-} from "@/components/ui/dropdown-menu";
+import { NavigationMenu, NavigationMenuContent, NavigationMenuItem, NavigationMenuLink, NavigationMenuList, NavigationMenuTrigger } from "@/components/ui/navigation-menu";
+import { cn } from '@/lib/utils';
 
 const Navbar = () => {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -45,66 +41,70 @@ const Navbar = () => {
         </Link>
 
         {/* Desktop Navigation */}
-        <nav className="hidden lg:flex items-center space-x-4">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button className="nav-button">
-                My Team <ChevronDown size={16} className="ml-1" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="center" className="w-56">
-              <Link to="/roster">
-                <DropdownMenuItem className="cursor-pointer">Roster</DropdownMenuItem>
+        <NavigationMenu className="hidden lg:flex">
+          <NavigationMenuList>
+            <NavigationMenuItem>
+              <NavigationMenuTrigger className="bg-transparent hover:bg-primary/10 focus:bg-primary/10">My Team</NavigationMenuTrigger>
+              <NavigationMenuContent className="bg-background/95 backdrop-blur-sm border border-border">
+                <div className="grid gap-3 p-4 w-[200px]">
+                  <Link to="/roster" className="block p-2 hover:bg-primary/10 rounded-md">
+                    Roster
+                  </Link>
+                  <Link to="/gm-office" className="block p-2 hover:bg-primary/10 rounded-md">
+                    GM's Office
+                  </Link>
+                  <Link to="/team-settings" className="block p-2 hover:bg-primary/10 rounded-md">
+                    Team Settings
+                  </Link>
+                </div>
+              </NavigationMenuContent>
+            </NavigationMenuItem>
+            
+            <NavigationMenuItem>
+              <NavigationMenuTrigger className="bg-transparent hover:bg-primary/10 focus:bg-primary/10">League</NavigationMenuTrigger>
+              <NavigationMenuContent className="bg-background/95 backdrop-blur-sm border border-border">
+                <div className="grid gap-3 p-4 w-[200px]">
+                  <Link to="/matchup" className="block p-2 hover:bg-primary/10 rounded-md">
+                    Matchup
+                  </Link>
+                  <Link to="/standings" className="block p-2 hover:bg-primary/10 rounded-md">
+                    Standings
+                  </Link>
+                  <Link to="/free-agents" className="block p-2 hover:bg-primary/10 rounded-md">
+                    Free Agents
+                  </Link>
+                </div>
+              </NavigationMenuContent>
+            </NavigationMenuItem>
+            
+            <NavigationMenuItem>
+              <NavigationMenuTrigger className="bg-transparent hover:bg-primary/10 focus:bg-primary/10">Resources</NavigationMenuTrigger>
+              <NavigationMenuContent className="bg-background/95 backdrop-blur-sm border border-border">
+                <div className="grid gap-3 p-4 w-[200px]">
+                  <Link to="/blog" className="block p-2 hover:bg-primary/10 rounded-md">
+                    Blog
+                  </Link>
+                  <Link to="/podcasts" className="block p-2 hover:bg-primary/10 rounded-md">
+                    Podcasts
+                  </Link>
+                  <Link to="/guides" className="block p-2 hover:bg-primary/10 rounded-md">
+                    Strategy Guides
+                  </Link>
+                </div>
+              </NavigationMenuContent>
+            </NavigationMenuItem>
+            
+            <NavigationMenuItem>
+              <Link to="/contact" legacyBehavior passHref>
+                <NavigationMenuLink className={cn(
+                  "group inline-flex h-10 w-max items-center justify-center rounded-md bg-transparent px-4 py-2 text-sm font-medium transition-colors hover:bg-primary/10 focus:bg-primary/10 focus:outline-none"
+                )}>
+                  Contact
+                </NavigationMenuLink>
               </Link>
-              <Link to="/gm-office">
-                <DropdownMenuItem className="cursor-pointer">GM's Office</DropdownMenuItem>
-              </Link>
-              <Link to="/team-settings">
-                <DropdownMenuItem className="cursor-pointer">Team Settings</DropdownMenuItem>
-              </Link>
-            </DropdownMenuContent>
-          </DropdownMenu>
-          
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button className="nav-button">
-                League <ChevronDown size={16} className="ml-1" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="center" className="w-56">
-              <Link to="/matchup">
-                <DropdownMenuItem className="cursor-pointer">Matchup</DropdownMenuItem>
-              </Link>
-              <Link to="/standings">
-                <DropdownMenuItem className="cursor-pointer">Standings</DropdownMenuItem>
-              </Link>
-              <Link to="/free-agents">
-                <DropdownMenuItem className="cursor-pointer">Free Agents</DropdownMenuItem>
-              </Link>
-            </DropdownMenuContent>
-          </DropdownMenu>
-          
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button className="nav-button">
-                Resources <ChevronDown size={16} className="ml-1" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="center" className="w-56">
-              <Link to="/blog">
-                <DropdownMenuItem className="cursor-pointer">Blog</DropdownMenuItem>
-              </Link>
-              <Link to="/podcasts">
-                <DropdownMenuItem className="cursor-pointer">Podcasts</DropdownMenuItem>
-              </Link>
-              <Link to="/guides">
-                <DropdownMenuItem className="cursor-pointer">Strategy Guides</DropdownMenuItem>
-              </Link>
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          <Link to="/contact" className="nav-button">Contact</Link>
-        </nav>
+            </NavigationMenuItem>
+          </NavigationMenuList>
+        </NavigationMenu>
 
         <div className="hidden lg:flex items-center space-x-4">
           <Button variant="outline" className="rounded-full border-primary text-primary hover:bg-primary/10">Log in</Button>
@@ -163,7 +163,20 @@ const MobileNavSection = ({ title, children }: { title: string, children: React.
         onClick={() => setIsOpen(!isOpen)}
       >
         {title}
-        <ChevronDown size={18} className={`transform transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="24"
+          height="24"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className={`h-4 w-4 transition-transform ${isOpen ? "transform rotate-180" : ""}`}
+        >
+          <path d="m6 9 6 6 6-6" />
+        </svg>
       </button>
       {isOpen && (
         <div className="pl-4 py-2 space-y-2 bg-muted/30 rounded-md my-2">
