@@ -45,6 +45,12 @@
     --sidebar-accent-foreground: 142 24% 20%;
     --sidebar-border: 142 10% 80%;
     --sidebar-ring: 142 32% 59%;
+    
+    /* Vibrant accent colors */
+    --vibrant-purple: 267 68% 63%;
+    --vibrant-magenta: 322 65% 60%;
+    --vibrant-orange: 27 96% 61%;
+    --vibrant-blue: 199 89% 48%;
   }
 
   .dark {
@@ -84,6 +90,12 @@
     --sidebar-accent-foreground: 142 24% 20%;
     --sidebar-border: 142 14% 30%;
     --sidebar-ring: 142 32% 59%;
+    
+    /* Dark mode vibrant accent colors */
+    --vibrant-purple: 267 75% 73%;
+    --vibrant-magenta: 322 75% 70%;
+    --vibrant-orange: 27 100% 71%;
+    --vibrant-blue: 199 95% 58%;
   }
 }
 
@@ -105,18 +117,29 @@
 }
 
 @layer components {
-  .nav-link {
-    @apply relative font-medium text-foreground transition-colors hover:text-primary box-border;
+  /* Fixed width navigation buttons to prevent shifting */
+  .nav-button {
+    @apply relative inline-block box-border font-medium text-foreground transition-colors hover:text-primary;
   }
   
-  .nav-link::after {
+  .nav-button::after {
     @apply content-[''] absolute bottom-0 left-1/2 -translate-x-1/2 w-0 h-0.5 bg-primary transition-all duration-300;
   }
   
-  .nav-link:hover::after {
+  .nav-button:hover::after {
     @apply w-1/2;
   }
   
+  /* Dropdown styling */
+  .dropdown-menu {
+    @apply absolute top-full left-0 mt-1 w-56 rounded-md bg-background/95 backdrop-blur-sm shadow-lg border border-border overflow-hidden z-50;
+  }
+  
+  .dropdown-item {
+    @apply block w-full text-left px-4 py-2 hover:bg-accent/20 transition-colors;
+  }
+  
+  /* Vibrant button styles */
   .btn-citrus {
     @apply px-6 py-3 font-medium rounded-full bg-primary text-white hover:bg-primary/90 transition-colors shadow-md hover:shadow-lg;
   }
@@ -127,6 +150,14 @@
   
   .btn-citrus-secondary {
     @apply px-6 py-3 font-medium rounded-full bg-secondary text-secondary-foreground hover:bg-secondary/90 transition-colors shadow-md hover:shadow-lg;
+  }
+  
+  .btn-vibrant-purple {
+    @apply px-6 py-3 font-medium rounded-full bg-[hsl(var(--vibrant-purple))] text-white hover:bg-[hsl(var(--vibrant-purple))]/90 transition-colors shadow-md hover:shadow-lg;
+  }
+  
+  .btn-vibrant-blue {
+    @apply px-6 py-3 font-medium rounded-full bg-[hsl(var(--vibrant-blue))] text-white hover:bg-[hsl(var(--vibrant-blue))]/90 transition-colors shadow-md hover:shadow-lg;
   }
   
   .card-citrus {
@@ -151,5 +182,18 @@
   
   .citrus-gradient-text {
     @apply bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent;
+  }
+  
+  /* Vibrant gradients */
+  .vibrant-gradient-1 {
+    @apply bg-gradient-to-r from-[hsl(var(--vibrant-purple))] to-[hsl(var(--vibrant-magenta))];
+  }
+  
+  .vibrant-gradient-2 {
+    @apply bg-gradient-to-r from-[hsl(var(--vibrant-blue))] to-[hsl(var(--vibrant-purple))];
+  }
+  
+  .vibrant-gradient-3 {
+    @apply bg-gradient-to-r from-[hsl(var(--vibrant-orange))] to-[hsl(var(--vibrant-magenta))];
   }
 }
