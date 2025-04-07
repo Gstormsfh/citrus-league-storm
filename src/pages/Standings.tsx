@@ -132,7 +132,7 @@ const Standings = () => {
       <main className="pt-24 pb-16">
         <div className="container mx-auto px-4">
           <div className="max-w-3xl mx-auto text-center mb-10 animated-element">
-            <h1 className="text-4xl md:text-5xl font-bold mb-4 vibrant-gradient-2 bg-clip-text text-transparent">League Standings</h1>
+            <h1 className="text-4xl md:text-5xl font-bold mb-4 vibrant-gradient-3 bg-clip-text text-transparent">League Standings</h1>
             <p className="text-lg text-muted-foreground">Track your team's position in the league rankings.</p>
           </div>
           
@@ -143,18 +143,20 @@ const Standings = () => {
             </div>
             
             <div className="flex items-center space-x-4 animated-element">
-              <Select defaultValue={season} onValueChange={setSeason}>
-                <SelectTrigger className="w-36">
-                  <SelectValue placeholder="Select Season" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="2023">2023 Season</SelectItem>
-                  <SelectItem value="2024">2024 Season</SelectItem>
-                  <SelectItem value="2025">2025 Season</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="w-36">
+                <Select defaultValue={season} onValueChange={setSeason}>
+                  <SelectTrigger className="w-36 bg-background">
+                    <SelectValue placeholder="Select Season" />
+                  </SelectTrigger>
+                  <SelectContent className="w-36 bg-background">
+                    <SelectItem value="2023">2023 Season</SelectItem>
+                    <SelectItem value="2024">2024 Season</SelectItem>
+                    <SelectItem value="2025">2025 Season</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
               
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" className="bg-background">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 mr-1">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
                 </svg>

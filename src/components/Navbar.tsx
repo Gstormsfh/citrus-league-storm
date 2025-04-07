@@ -1,82 +1,18 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Menu, X, ChevronDown } from 'lucide-react';
 import { Link } from 'react-router-dom';
-
-// Create dedicated dropdown components for each section
-const TeamDropdown = ({ isOpen, setIsOpen }: { isOpen: boolean, setIsOpen: (open: boolean) => void }) => {
-  return (
-    <div 
-      className={`absolute top-full left-0 w-56 bg-background/95 backdrop-blur-sm shadow-lg rounded-md overflow-hidden transition-all duration-200 ${isOpen ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-2 pointer-events-none'}`}
-      onMouseEnter={() => setIsOpen(true)}
-      onMouseLeave={() => setIsOpen(false)}
-    >
-      <div className="py-2 px-1">
-        <Link to="/roster" className="block w-full text-left px-4 py-2 hover:bg-primary/10 rounded-md transition-colors">
-          Roster
-        </Link>
-        <Link to="/gm-office" className="block w-full text-left px-4 py-2 hover:bg-primary/10 rounded-md transition-colors">
-          GM's Office
-        </Link>
-        <Link to="/team-settings" className="block w-full text-left px-4 py-2 hover:bg-primary/10 rounded-md transition-colors">
-          Team Settings
-        </Link>
-      </div>
-    </div>
-  )
-}
-
-const LeagueDropdown = ({ isOpen, setIsOpen }: { isOpen: boolean, setIsOpen: (open: boolean) => void }) => {
-  return (
-    <div 
-      className={`absolute top-full left-0 w-56 bg-background/95 backdrop-blur-sm shadow-lg rounded-md overflow-hidden transition-all duration-200 ${isOpen ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-2 pointer-events-none'}`}
-      onMouseEnter={() => setIsOpen(true)}
-      onMouseLeave={() => setIsOpen(false)}
-    >
-      <div className="py-2 px-1">
-        <Link to="/matchup" className="block w-full text-left px-4 py-2 hover:bg-primary/10 rounded-md transition-colors">
-          Matchup
-        </Link>
-        <Link to="/standings" className="block w-full text-left px-4 py-2 hover:bg-primary/10 rounded-md transition-colors">
-          Standings
-        </Link>
-        <Link to="/free-agents" className="block w-full text-left px-4 py-2 hover:bg-primary/10 rounded-md transition-colors">
-          Free Agents
-        </Link>
-      </div>
-    </div>
-  )
-}
-
-const ResourcesDropdown = ({ isOpen, setIsOpen }: { isOpen: boolean, setIsOpen: (open: boolean) => void }) => {
-  return (
-    <div 
-      className={`absolute top-full left-0 w-56 bg-background/95 backdrop-blur-sm shadow-lg rounded-md overflow-hidden transition-all duration-200 ${isOpen ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-2 pointer-events-none'}`}
-      onMouseEnter={() => setIsOpen(true)}
-      onMouseLeave={() => setIsOpen(false)}
-    >
-      <div className="py-2 px-1">
-        <Link to="/blog" className="block w-full text-left px-4 py-2 hover:bg-primary/10 rounded-md transition-colors">
-          Blog
-        </Link>
-        <Link to="/podcasts" className="block w-full text-left px-4 py-2 hover:bg-primary/10 rounded-md transition-colors">
-          Podcasts
-        </Link>
-        <Link to="/guides" className="block w-full text-left px-4 py-2 hover:bg-primary/10 rounded-md transition-colors">
-          Strategy Guides
-        </Link>
-      </div>
-    </div>
-  )
-}
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger
+} from "@/components/ui/dropdown-menu";
 
 const Navbar = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [teamDropdownOpen, setTeamDropdownOpen] = useState(false);
-  const [leagueDropdownOpen, setLeagueDropdownOpen] = useState(false);
-  const [resourcesDropdownOpen, setResourcesDropdownOpen] = useState(false);
   
   useEffect(() => {
     const handleScroll = () => {
@@ -109,47 +45,65 @@ const Navbar = () => {
         </Link>
 
         {/* Desktop Navigation */}
-        <nav className="hidden lg:flex items-center space-x-6">
-          <div className="relative">
-            <button 
-              className="nav-button flex items-center px-3 py-2 font-medium text-foreground"
-              onMouseEnter={() => setTeamDropdownOpen(true)}
-              onMouseLeave={() => setTeamDropdownOpen(false)}
-              onClick={(e) => {e.preventDefault(); setTeamDropdownOpen(!teamDropdownOpen)}}
-            >
-              My Team <ChevronDown size={16} className="ml-1" />
-              <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-0 h-0.5 bg-accent transition-all duration-300 group-hover:w-1/2"></div>
-            </button>
-            <TeamDropdown isOpen={teamDropdownOpen} setIsOpen={setTeamDropdownOpen} />
-          </div>
+        <nav className="hidden lg:flex items-center space-x-4">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="nav-button">
+                My Team <ChevronDown size={16} className="ml-1" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="center" className="w-56">
+              <Link to="/roster">
+                <DropdownMenuItem className="cursor-pointer">Roster</DropdownMenuItem>
+              </Link>
+              <Link to="/gm-office">
+                <DropdownMenuItem className="cursor-pointer">GM's Office</DropdownMenuItem>
+              </Link>
+              <Link to="/team-settings">
+                <DropdownMenuItem className="cursor-pointer">Team Settings</DropdownMenuItem>
+              </Link>
+            </DropdownMenuContent>
+          </DropdownMenu>
           
-          <div className="relative">
-            <button 
-              className="nav-button flex items-center px-3 py-2 font-medium text-foreground"
-              onMouseEnter={() => setLeagueDropdownOpen(true)}
-              onMouseLeave={() => setLeagueDropdownOpen(false)}
-              onClick={(e) => {e.preventDefault(); setLeagueDropdownOpen(!leagueDropdownOpen)}}
-            >
-              League <ChevronDown size={16} className="ml-1" />
-              <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-0 h-0.5 bg-accent transition-all duration-300 group-hover:w-1/2"></div>
-            </button>
-            <LeagueDropdown isOpen={leagueDropdownOpen} setIsOpen={setLeagueDropdownOpen} />
-          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="nav-button">
+                League <ChevronDown size={16} className="ml-1" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="center" className="w-56">
+              <Link to="/matchup">
+                <DropdownMenuItem className="cursor-pointer">Matchup</DropdownMenuItem>
+              </Link>
+              <Link to="/standings">
+                <DropdownMenuItem className="cursor-pointer">Standings</DropdownMenuItem>
+              </Link>
+              <Link to="/free-agents">
+                <DropdownMenuItem className="cursor-pointer">Free Agents</DropdownMenuItem>
+              </Link>
+            </DropdownMenuContent>
+          </DropdownMenu>
           
-          <div className="relative">
-            <button 
-              className="nav-button flex items-center px-3 py-2 font-medium text-foreground"
-              onMouseEnter={() => setResourcesDropdownOpen(true)}
-              onMouseLeave={() => setResourcesDropdownOpen(false)}
-              onClick={(e) => {e.preventDefault(); setResourcesDropdownOpen(!resourcesDropdownOpen)}}
-            >
-              Resources <ChevronDown size={16} className="ml-1" />
-              <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-0 h-0.5 bg-accent transition-all duration-300 group-hover:w-1/2"></div>
-            </button>
-            <ResourcesDropdown isOpen={resourcesDropdownOpen} setIsOpen={setResourcesDropdownOpen} />
-          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="nav-button">
+                Resources <ChevronDown size={16} className="ml-1" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="center" className="w-56">
+              <Link to="/blog">
+                <DropdownMenuItem className="cursor-pointer">Blog</DropdownMenuItem>
+              </Link>
+              <Link to="/podcasts">
+                <DropdownMenuItem className="cursor-pointer">Podcasts</DropdownMenuItem>
+              </Link>
+              <Link to="/guides">
+                <DropdownMenuItem className="cursor-pointer">Strategy Guides</DropdownMenuItem>
+              </Link>
+            </DropdownMenuContent>
+          </DropdownMenu>
 
-          <Link to="/contact" className="nav-button px-3 py-2 font-medium text-foreground">Contact</Link>
+          <Link to="/contact" className="nav-button">Contact</Link>
         </nav>
 
         <div className="hidden lg:flex items-center space-x-4">
@@ -167,50 +121,23 @@ const Navbar = () => {
       {mobileMenuOpen && (
         <div className="lg:hidden bg-background/95 backdrop-blur-sm border-t border-border animate-slide-down">
           <div className="container mx-auto px-4 py-4 flex flex-col space-y-3">
-            <div className="border-b border-border pb-2">
-              <button className="w-full text-left py-2 flex justify-between items-center" 
-                      onClick={() => setTeamDropdownOpen(!teamDropdownOpen)}>
-                My Team
-                <ChevronDown size={18} className={`transform transition-transform ${teamDropdownOpen ? 'rotate-180' : ''}`} />
-              </button>
-              {teamDropdownOpen && (
-                <div className="pl-4 py-2 space-y-2 bg-muted/30 rounded-md my-2">
-                  <Link to="/roster" className="block py-1" onClick={closeMobileMenu}>Roster</Link>
-                  <Link to="/gm-office" className="block py-1" onClick={closeMobileMenu}>GM's Office</Link>
-                  <Link to="/team-settings" className="block py-1" onClick={closeMobileMenu}>Team Settings</Link>
-                </div>
-              )}
-            </div>
+            <MobileNavSection title="My Team">
+              <Link to="/roster" className="block py-1" onClick={closeMobileMenu}>Roster</Link>
+              <Link to="/gm-office" className="block py-1" onClick={closeMobileMenu}>GM's Office</Link>
+              <Link to="/team-settings" className="block py-1" onClick={closeMobileMenu}>Team Settings</Link>
+            </MobileNavSection>
             
-            <div className="border-b border-border pb-2">
-              <button className="w-full text-left py-2 flex justify-between items-center" 
-                      onClick={() => setLeagueDropdownOpen(!leagueDropdownOpen)}>
-                League
-                <ChevronDown size={18} className={`transform transition-transform ${leagueDropdownOpen ? 'rotate-180' : ''}`} />
-              </button>
-              {leagueDropdownOpen && (
-                <div className="pl-4 py-2 space-y-2 bg-muted/30 rounded-md my-2">
-                  <Link to="/matchup" className="block py-1" onClick={closeMobileMenu}>Matchup</Link>
-                  <Link to="/standings" className="block py-1" onClick={closeMobileMenu}>Standings</Link>
-                  <Link to="/free-agents" className="block py-1" onClick={closeMobileMenu}>Free Agents</Link>
-                </div>
-              )}
-            </div>
+            <MobileNavSection title="League">
+              <Link to="/matchup" className="block py-1" onClick={closeMobileMenu}>Matchup</Link>
+              <Link to="/standings" className="block py-1" onClick={closeMobileMenu}>Standings</Link>
+              <Link to="/free-agents" className="block py-1" onClick={closeMobileMenu}>Free Agents</Link>
+            </MobileNavSection>
             
-            <div className="border-b border-border pb-2">
-              <button className="w-full text-left py-2 flex justify-between items-center" 
-                      onClick={() => setResourcesDropdownOpen(!resourcesDropdownOpen)}>
-                Resources
-                <ChevronDown size={18} className={`transform transition-transform ${resourcesDropdownOpen ? 'rotate-180' : ''}`} />
-              </button>
-              {resourcesDropdownOpen && (
-                <div className="pl-4 py-2 space-y-2 bg-muted/30 rounded-md my-2">
-                  <Link to="/blog" className="block py-1" onClick={closeMobileMenu}>Blog</Link>
-                  <Link to="/podcasts" className="block py-1" onClick={closeMobileMenu}>Podcasts</Link>
-                  <Link to="/guides" className="block py-1" onClick={closeMobileMenu}>Strategy Guides</Link>
-                </div>
-              )}
-            </div>
+            <MobileNavSection title="Resources">
+              <Link to="/blog" className="block py-1" onClick={closeMobileMenu}>Blog</Link>
+              <Link to="/podcasts" className="block py-1" onClick={closeMobileMenu}>Podcasts</Link>
+              <Link to="/guides" className="block py-1" onClick={closeMobileMenu}>Strategy Guides</Link>
+            </MobileNavSection>
             
             <Link to="/contact" className="py-2 border-b border-border" onClick={closeMobileMenu}>Contact</Link>
             
@@ -222,6 +149,28 @@ const Navbar = () => {
         </div>
       )}
     </header>
+  );
+};
+
+// Helper component for mobile navigation sections
+const MobileNavSection = ({ title, children }: { title: string, children: React.ReactNode }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  
+  return (
+    <div className="border-b border-border pb-2">
+      <button 
+        className="w-full text-left py-2 flex justify-between items-center" 
+        onClick={() => setIsOpen(!isOpen)}
+      >
+        {title}
+        <ChevronDown size={18} className={`transform transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+      {isOpen && (
+        <div className="pl-4 py-2 space-y-2 bg-muted/30 rounded-md my-2">
+          {children}
+        </div>
+      )}
+    </div>
   );
 };
 
