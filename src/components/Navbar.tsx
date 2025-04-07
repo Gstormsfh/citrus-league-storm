@@ -95,13 +95,14 @@ const Navbar = () => {
             </NavigationMenuItem>
             
             <NavigationMenuItem>
-              <Link to="/contact" legacyBehavior passHref>
-                <NavigationMenuLink className={cn(
+              {/* Fix: Remove legacyBehavior and passHref props as they're not supported in react-router-dom Link */}
+              <NavigationMenuLink asChild>
+                <Link to="/contact" className={cn(
                   "group inline-flex h-10 w-max items-center justify-center rounded-md bg-transparent px-4 py-2 text-sm font-medium transition-colors hover:bg-primary/10 focus:bg-primary/10 focus:outline-none"
                 )}>
                   Contact
-                </NavigationMenuLink>
-              </Link>
+                </Link>
+              </NavigationMenuLink>
             </NavigationMenuItem>
           </NavigationMenuList>
         </NavigationMenu>
