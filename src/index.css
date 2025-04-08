@@ -212,16 +212,19 @@
     @apply bg-gradient-to-r from-[hsl(var(--vibrant-orange))] to-[hsl(var(--vibrant-yellow))];
   }
 
-  /* Global fix for all dropdown positioning to prevent layout shifts */
-  [data-radix-popper-content-wrapper] {
-    position: fixed !important;
-    top: var(--radix-popper-anchor-top, 0) !important; 
-    left: var(--radix-popper-anchor-left, 0) !important;
-    width: var(--radix-popper-anchor-width, auto) !important;
-    transform: translate3d(var(--radix-popper-transform-x, 0), var(--radix-popper-transform-y, 0), 0) !important;
-    min-width: var(--radix-popper-anchor-width, auto) !important;
-    max-height: var(--radix-popper-available-height, auto) !important;
-    max-width: var(--radix-popper-available-width, auto) !important;
-    z-index: 9999 !important;
+  /* Remove global fix for dropdown positioning - we want them to be in the normal flow */
+  
+  /* Add proper fixed portal positioning */
+  :root {
+    --portal-z-index: 50;
+  }
+
+  /* Ensure all dropdowns render in a portal layer without affecting document flow */
+  [data-radix-portal] {
+    pointer-events: none;
+  }
+
+  [data-radix-portal] > * {
+    pointer-events: auto;
   }
 }
