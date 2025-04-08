@@ -215,10 +215,13 @@
   /* Global fix for all dropdown positioning to prevent layout shifts */
   [data-radix-popper-content-wrapper] {
     position: fixed !important;
-    transform: none !important;
-    top: var(--radix-popper-anchor-top, 0) !important;
+    top: var(--radix-popper-anchor-top, 0) !important; 
     left: var(--radix-popper-anchor-left, 0) !important;
     width: var(--radix-popper-anchor-width, auto) !important;
+    transform: translate3d(var(--radix-popper-transform-x, 0), var(--radix-popper-transform-y, 0), 0) !important;
+    min-width: var(--radix-popper-anchor-width, auto) !important;
+    max-height: var(--radix-popper-available-height, auto) !important;
+    max-width: var(--radix-popper-available-width, auto) !important;
     z-index: 9999 !important;
   }
 }
