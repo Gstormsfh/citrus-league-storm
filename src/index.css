@@ -121,10 +121,15 @@
   *:focus-visible {
     @apply outline-none ring-2 ring-primary/70;
   }
+  
+  /* Ensure radix portals properly render above content without breaking layout */
+  [data-radix-popper-content-wrapper] {
+    @apply z-[60] !important;
+  }
 }
 
 @layer components {
-  /* Fixed width navigation buttons to prevent shifting */
+  /* Premium navigation buttons with animated underline */
   .nav-button {
     @apply relative inline-flex items-center justify-center box-border font-medium text-foreground transition-colors hover:text-primary;
     width: auto;
@@ -133,20 +138,24 @@
   }
   
   .nav-button::after {
-    @apply content-[''] absolute -bottom-1 left-1/2 -translate-x-1/2 w-0 h-0.5 bg-primary transition-all duration-300;
+    @apply content-[''] absolute -bottom-1 left-0 w-0 h-0.5 bg-primary transition-all duration-300 opacity-0;
   }
   
   .nav-button:hover::after {
-    @apply w-1/2;
+    @apply w-full opacity-100;
   }
   
-  /* Dropdown styling */
+  .nav-button.active::after {
+    @apply w-full opacity-100;
+  }
+  
+  /* Premium dropdown styling with glass morphism */
   .dropdown-menu {
-    @apply absolute top-full left-0 mt-1 w-56 rounded-md bg-background/95 backdrop-blur-sm shadow-lg border border-border overflow-hidden z-50;
+    @apply absolute top-full left-0 mt-1 w-56 rounded-xl bg-background/95 backdrop-blur-lg shadow-lg border border-border/40 overflow-hidden z-[60];
   }
   
   .dropdown-item {
-    @apply block w-full text-left px-4 py-2 hover:bg-accent/20 transition-colors;
+    @apply block w-full text-left px-4 py-2.5 hover:bg-accent/20 transition-colors rounded-lg my-0.5;
   }
   
   /* Fixed width selects to prevent shifting */
@@ -154,7 +163,7 @@
     @apply w-[160px] !important;
   }
   
-  /* Vibrant button styles */
+  /* Premium button styles */
   .btn-citrus {
     @apply px-6 py-3 font-medium rounded-full bg-primary text-white hover:bg-primary/90 transition-colors shadow-md hover:shadow-lg;
   }
@@ -175,14 +184,21 @@
     @apply px-6 py-3 font-medium rounded-full bg-[hsl(var(--vibrant-peach))] text-white hover:bg-[hsl(var(--vibrant-peach))]/90 transition-colors shadow-md hover:shadow-lg;
   }
   
+  /* Premium card styles */
   .card-citrus {
-    @apply bg-white rounded-xl p-6 shadow-md hover:shadow-lg transition-shadow;
+    @apply bg-white rounded-xl p-6 shadow-md hover:shadow-lg transition-shadow border border-border/10;
   }
   
+  .card-premium {
+    @apply bg-white/70 backdrop-blur-md rounded-xl p-6 shadow-lg hover:shadow-xl transition-all duration-300 border border-white/20;
+  }
+  
+  /* Premium section padding */
   .section-padding {
     @apply py-20 px-6 md:px-12 lg:px-24;
   }
   
+  /* Element animations */
   .animated-element {
     @apply opacity-0;
   }
@@ -191,6 +207,7 @@
     @apply animate-fade-in;
   }
   
+  /* Premium gradients */
   .citrus-gradient {
     @apply bg-gradient-to-br from-[hsl(var(--vibrant-green))] to-[hsl(var(--vibrant-yellow))];
   }
@@ -199,7 +216,7 @@
     @apply bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent;
   }
   
-  /* Vibrant gradients */
+  /* Premium vibrant gradients */
   .vibrant-gradient-1 {
     @apply bg-gradient-to-r from-[hsl(var(--vibrant-green))] to-[hsl(var(--vibrant-yellow))];
   }
@@ -212,19 +229,46 @@
     @apply bg-gradient-to-r from-[hsl(var(--vibrant-orange))] to-[hsl(var(--vibrant-yellow))];
   }
 
-  /* Remove global fix for dropdown positioning - we want them to be in the normal flow */
+  /* Premium UI glass effect */
+  .glass-panel {
+    @apply bg-white/30 backdrop-blur-md border border-white/20 shadow-lg;
+  }
   
-  /* Add proper fixed portal positioning */
-  :root {
-    --portal-z-index: 50;
+  .dark .glass-panel {
+    @apply bg-black/30 backdrop-blur-md border border-white/10 shadow-lg;
   }
+  
+  /* Premium tab styles */
+  .premium-tabs {
+    @apply p-1 rounded-lg bg-muted/30;
+  }
+  
+  .premium-tab {
+    @apply px-4 py-2 rounded-md font-medium text-sm transition-all duration-200;
+  }
+  
+  .premium-tab.active {
+    @apply bg-background text-foreground shadow-sm;
+  }
+}
 
-  /* Ensure all dropdowns render in a portal layer without affecting document flow */
-  [data-radix-portal] {
-    pointer-events: none;
-  }
+/* Fix positioning for Radix UI dropdown components */
+[data-radix-portal] {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+}
 
-  [data-radix-portal] > * {
-    pointer-events: auto;
-  }
+[data-radix-portal] > * {
+  pointer-events: auto;
+}
+
+/* Ensure dropdowns and popovers stay in viewport and don't shift layout */
+:root {
+  --portal-z-index: 60;
 }
