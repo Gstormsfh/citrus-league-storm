@@ -67,7 +67,7 @@ const NavigationMenuContent = React.forwardRef<
   React.ElementRef<typeof NavigationMenuPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof NavigationMenuPrimitive.Content>
 >(({ className, ...props }, ref) => (
-  <NavigationMenuPrimitive.Portal>
+  <div className="absolute left-0 top-0 w-full">
     <NavigationMenuPrimitive.Content
       ref={ref}
       className={cn(
@@ -76,7 +76,7 @@ const NavigationMenuContent = React.forwardRef<
       )}
       {...props}
     />
-  </NavigationMenuPrimitive.Portal>
+  </div>
 ))
 NavigationMenuContent.displayName = NavigationMenuPrimitive.Content.displayName
 

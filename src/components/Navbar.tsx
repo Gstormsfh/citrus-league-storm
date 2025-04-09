@@ -328,11 +328,11 @@ const Navbar = () => {
       )}
 
       {/* This sets a css variable that we can use to properly position the mobile menu */}
-      <style jsx global>{`
-        :root {
+      <style>
+        {`:root {
           --header-height: ${isScrolled ? '73px' : '89px'};
-        }
-      `}</style>
+        }`}
+      </style>
     </header>
   );
 };
