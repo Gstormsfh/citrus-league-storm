@@ -66,20 +66,20 @@ const Navbar = () => {
             <NavigationMenu>
               <NavigationMenuList>
                 <NavigationMenuItem>
-                  <NavigationMenuTrigger className="bg-transparent text-sm font-medium hover:bg-accent/20 hover:text-primary focus:bg-accent/20 h-9">My Team</NavigationMenuTrigger>
+                  <NavigationMenuTrigger className="bg-gradient-to-br from-primary/20 to-secondary/20 border border-primary/20 text-sm font-semibold hover:shadow-md hover:from-primary/30 hover:to-secondary/30 transition-all h-10">My Team</NavigationMenuTrigger>
                   <NavigationMenuContent>
-                    <div className="w-[400px] p-3 grid gap-2 grid-cols-2">
-                      <Link to="/roster" onClick={closeMobileMenu} className="flex h-full w-full select-none flex-col justify-end rounded-lg bg-gradient-to-b from-muted/30 to-muted/50 p-4 no-underline outline-none focus:shadow-md hover:shadow-md transition-shadow">
+                    <div className="w-[360px] p-3 grid gap-2 grid-cols-2">
+                      <Link to="/roster" onClick={closeMobileMenu} className="flex h-full w-full select-none flex-col justify-end rounded-lg bg-gradient-to-b from-primary/10 to-primary/20 p-4 no-underline outline-none focus:shadow-md hover:shadow-md hover:scale-[1.02] transition-all duration-200">
                         <div className="mb-1 mt-2 text-base font-medium">Roster</div>
                         <p className="text-xs leading-tight text-muted-foreground">Manage your team's lineup</p>
                         <ChevronRight className="h-3 w-3 mt-2 text-primary" />
                       </Link>
-                      <Link to="/gm-office" onClick={closeMobileMenu} className="flex h-full w-full select-none flex-col justify-end rounded-lg bg-gradient-to-b from-muted/30 to-muted/50 p-4 no-underline outline-none focus:shadow-md hover:shadow-md transition-shadow">
+                      <Link to="/gm-office" onClick={closeMobileMenu} className="flex h-full w-full select-none flex-col justify-end rounded-lg bg-gradient-to-b from-secondary/10 to-secondary/20 p-4 no-underline outline-none focus:shadow-md hover:shadow-md hover:scale-[1.02] transition-all duration-200">
                         <div className="mb-1 mt-2 text-base font-medium">GM's Office</div>
                         <p className="text-xs leading-tight text-muted-foreground">Team operations center</p>
                         <ChevronRight className="h-3 w-3 mt-2 text-primary" />
                       </Link>
-                      <Link to="/team-settings" onClick={closeMobileMenu} className="flex h-full w-full select-none flex-col justify-end rounded-lg bg-gradient-to-b from-muted/30 to-muted/50 p-4 no-underline outline-none focus:shadow-md hover:shadow-md transition-shadow">
+                      <Link to="/team-settings" onClick={closeMobileMenu} className="flex h-full w-full select-none flex-col justify-end rounded-lg bg-gradient-to-b from-accent/10 to-accent/20 p-4 no-underline outline-none focus:shadow-md hover:shadow-md hover:scale-[1.02] transition-all duration-200">
                         <div className="mb-1 mt-2 text-base font-medium">Team Settings</div>
                         <p className="text-xs leading-tight text-muted-foreground">Customize your team</p>
                         <ChevronRight className="h-3 w-3 mt-2 text-primary" />
@@ -89,20 +89,20 @@ const Navbar = () => {
                 </NavigationMenuItem>
                 
                 <NavigationMenuItem>
-                  <NavigationMenuTrigger className="bg-transparent text-sm font-medium hover:bg-accent/20 hover:text-primary focus:bg-accent/20 h-9">League</NavigationMenuTrigger>
+                  <NavigationMenuTrigger className="bg-gradient-to-br from-secondary/20 to-accent/20 border border-secondary/20 text-sm font-semibold hover:shadow-md hover:from-secondary/30 hover:to-accent/30 transition-all h-10">League</NavigationMenuTrigger>
                   <NavigationMenuContent>
-                    <div className="w-[400px] p-3 grid gap-2 grid-cols-2">
-                      <Link to="/matchup" onClick={closeMobileMenu} className="flex h-full w-full select-none flex-col justify-end rounded-lg bg-gradient-to-b from-muted/30 to-muted/50 p-4 no-underline outline-none focus:shadow-md hover:shadow-md transition-shadow">
+                    <div className="w-[360px] p-3 grid gap-2 grid-cols-2">
+                      <Link to="/matchup" onClick={closeMobileMenu} className="flex h-full w-full select-none flex-col justify-end rounded-lg bg-gradient-to-b from-primary/10 to-primary/20 p-4 no-underline outline-none focus:shadow-md hover:shadow-md hover:scale-[1.02] transition-all duration-200">
                         <div className="mb-1 mt-2 text-base font-medium">Matchup</div>
                         <p className="text-xs leading-tight text-muted-foreground">Current matchups</p>
                         <ChevronRight className="h-3 w-3 mt-2 text-primary" />
                       </Link>
-                      <Link to="/standings" onClick={closeMobileMenu} className="flex h-full w-full select-none flex-col justify-end rounded-lg bg-gradient-to-b from-muted/30 to-muted/50 p-4 no-underline outline-none focus:shadow-md hover:shadow-md transition-shadow">
+                      <Link to="/standings" onClick={closeMobileMenu} className="flex h-full w-full select-none flex-col justify-end rounded-lg bg-gradient-to-b from-secondary/10 to-secondary/20 p-4 no-underline outline-none focus:shadow-md hover:shadow-md hover:scale-[1.02] transition-all duration-200">
                         <div className="mb-1 mt-2 text-base font-medium">Standings</div>
                         <p className="text-xs leading-tight text-muted-foreground">League rankings</p>
                         <ChevronRight className="h-3 w-3 mt-2 text-primary" />
                       </Link>
-                      <Link to="/free-agents" onClick={closeMobileMenu} className="flex h-full w-full select-none flex-col justify-end rounded-lg bg-gradient-to-b from-muted/30 to-muted/50 p-4 no-underline outline-none focus:shadow-md hover:shadow-md transition-shadow">
+                      <Link to="/free-agents" onClick={closeMobileMenu} className="flex h-full w-full select-none flex-col justify-end rounded-lg bg-gradient-to-b from-accent/10 to-accent/20 p-4 no-underline outline-none focus:shadow-md hover:shadow-md hover:scale-[1.02] transition-all duration-200">
                         <div className="mb-1 mt-2 text-base font-medium">Free Agents</div>
                         <p className="text-xs leading-tight text-muted-foreground">Available players</p>
                         <ChevronRight className="h-3 w-3 mt-2 text-primary" />
@@ -112,20 +112,20 @@ const Navbar = () => {
                 </NavigationMenuItem>
                 
                 <NavigationMenuItem>
-                  <NavigationMenuTrigger className="bg-transparent text-sm font-medium hover:bg-accent/20 hover:text-primary focus:bg-accent/20 h-9">Resources</NavigationMenuTrigger>
+                  <NavigationMenuTrigger className="bg-gradient-to-br from-accent/20 to-primary/20 border border-accent/20 text-sm font-semibold hover:shadow-md hover:from-accent/30 hover:to-primary/30 transition-all h-10">Resources</NavigationMenuTrigger>
                   <NavigationMenuContent>
-                    <div className="w-[400px] p-3 grid gap-2 grid-cols-2">
-                      <Link to="/blog" onClick={closeMobileMenu} className="flex h-full w-full select-none flex-col justify-end rounded-lg bg-gradient-to-b from-muted/30 to-muted/50 p-4 no-underline outline-none focus:shadow-md hover:shadow-md transition-shadow">
+                    <div className="w-[360px] p-3 grid gap-2 grid-cols-2">
+                      <Link to="/blog" onClick={closeMobileMenu} className="flex h-full w-full select-none flex-col justify-end rounded-lg bg-gradient-to-b from-primary/10 to-primary/20 p-4 no-underline outline-none focus:shadow-md hover:shadow-md hover:scale-[1.02] transition-all duration-200">
                         <div className="mb-1 mt-2 text-base font-medium">Blog</div>
                         <p className="text-xs leading-tight text-muted-foreground">Fantasy sports insights</p>
                         <ChevronRight className="h-3 w-3 mt-2 text-primary" />
                       </Link>
-                      <Link to="/podcasts" onClick={closeMobileMenu} className="flex h-full w-full select-none flex-col justify-end rounded-lg bg-gradient-to-b from-muted/30 to-muted/50 p-4 no-underline outline-none focus:shadow-md hover:shadow-md transition-shadow">
+                      <Link to="/podcasts" onClick={closeMobileMenu} className="flex h-full w-full select-none flex-col justify-end rounded-lg bg-gradient-to-b from-secondary/10 to-secondary/20 p-4 no-underline outline-none focus:shadow-md hover:shadow-md hover:scale-[1.02] transition-all duration-200">
                         <div className="mb-1 mt-2 text-base font-medium">Podcasts</div>
                         <p className="text-xs leading-tight text-muted-foreground">Expert analysis</p>
                         <ChevronRight className="h-3 w-3 mt-2 text-primary" />
                       </Link>
-                      <Link to="/guides" onClick={closeMobileMenu} className="flex h-full w-full select-none flex-col justify-end rounded-lg bg-gradient-to-b from-muted/30 to-muted/50 p-4 no-underline outline-none focus:shadow-md hover:shadow-md transition-shadow">
+                      <Link to="/guides" onClick={closeMobileMenu} className="flex h-full w-full select-none flex-col justify-end rounded-lg bg-gradient-to-b from-accent/10 to-accent/20 p-4 no-underline outline-none focus:shadow-md hover:shadow-md hover:scale-[1.02] transition-all duration-200">
                         <div className="mb-1 mt-2 text-base font-medium">Strategy Guides</div>
                         <p className="text-xs leading-tight text-muted-foreground">Winning tactics</p>
                         <ChevronRight className="h-3 w-3 mt-2 text-primary" />
@@ -137,7 +137,7 @@ const Navbar = () => {
                 <NavigationMenuItem>
                   <NavigationMenuLink asChild>
                     <Link to="/contact" className={cn(
-                      "inline-flex items-center justify-center rounded-md h-9 px-3 py-1.5 text-sm font-medium bg-transparent hover:bg-accent/20 hover:text-primary transition-colors focus:bg-accent/20"
+                      "inline-flex items-center justify-center rounded-md h-10 px-4 py-1.5 text-sm font-semibold bg-gradient-to-r from-primary to-secondary text-white shadow-sm hover:shadow-md hover:opacity-90 transition-all"
                     )}>
                       Contact
                     </Link>
@@ -151,7 +151,7 @@ const Navbar = () => {
           <div className="hidden lg:flex items-center space-x-2">
             <Popover>
               <PopoverTrigger asChild>
-                <Button variant="ghost" size="icon" className="text-foreground hover:text-primary h-9 w-9 rounded-full">
+                <Button variant="ghost" size="icon" className="text-foreground hover:text-primary hover:bg-primary/10 h-9 w-9 rounded-full">
                   <Search className="h-4 w-4" />
                 </Button>
               </PopoverTrigger>
@@ -174,7 +174,7 @@ const Navbar = () => {
             
             <Popover>
               <PopoverTrigger asChild>
-                <Button variant="ghost" size="icon" className="text-foreground hover:text-primary relative h-9 w-9 rounded-full">
+                <Button variant="ghost" size="icon" className="text-foreground hover:text-primary hover:bg-primary/10 relative h-9 w-9 rounded-full">
                   <Bell className="h-4 w-4" />
                   <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[9px] text-white">2</span>
                 </Button>
@@ -215,7 +215,7 @@ const Navbar = () => {
             
             <Popover>
               <PopoverTrigger asChild>
-                <Button variant="outline" className="rounded-full border-primary/20 flex gap-2 pl-2 pr-3 h-9">
+                <Button variant="outline" className="bg-gradient-to-r from-primary/10 to-secondary/10 rounded-full border-primary/20 flex gap-2 pl-2 pr-3 h-9 hover:shadow-sm">
                   <div className="h-5 w-5 rounded-full bg-primary flex items-center justify-center text-white text-xs font-medium">J</div>
                   <span className="text-xs font-medium">John</span>
                 </Button>
@@ -299,9 +299,9 @@ const Navbar = () => {
                   </Link>
                 </MobileNavSection>
                 
-                <Link to="/contact" className="flex items-center justify-between p-2.5 rounded-lg hover:bg-accent/20" onClick={closeMobileMenu}>
+                <Link to="/contact" className="bg-gradient-to-r from-primary to-secondary text-white flex items-center justify-between p-2.5 rounded-lg" onClick={closeMobileMenu}>
                   <span className="text-sm font-medium">Contact</span>
-                  <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+                  <ChevronRight className="h-3.5 w-3.5 text-white/70" />
                 </Link>
               </nav>
             </div>
@@ -323,7 +323,6 @@ const Navbar = () => {
         </div>
       )}
 
-      {/* This sets a css variable that we can use to properly position the mobile menu */}
       <style>
         {`:root {
           --header-height: ${isScrolled ? '73px' : '89px'};
