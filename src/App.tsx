@@ -16,6 +16,7 @@ import Matchup from "./pages/Matchup";
 import FreeAgents from "./pages/FreeAgents";
 import GMOffice from "./pages/GMOffice";
 import TeamSettings from "./pages/TeamSettings";
+import News from "./pages/News";
 import "./App.css";
 
 // Configure with a higher stale time to prevent unnecessary refetches
@@ -45,6 +46,7 @@ const App = () => (
           <Route path="/free-agents" element={<FreeAgents />} />
           <Route path="/gm-office" element={<GMOffice />} />
           <Route path="/team-settings" element={<TeamSettings />} />
+          <Route path="/news" element={<News />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
