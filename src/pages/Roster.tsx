@@ -5,15 +5,26 @@ import Footer from '../components/Footer';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
+import { StarIcon, Star } from 'lucide-react';
 
-// Mock player data
+// Enhanced player data with starter status and more details
 const players = [
   {
     id: 1,
     name: 'James Wilson',
     position: 'QB',
     number: 12,
+    starter: true,
     stats: { passing: 3240, touchdowns: 28, interceptions: 7 },
+    team: 'Arizona Cardinals',
+    college: 'Ohio State',
+    height: '6\'2"',
+    weight: '220 lbs',
+    age: 27,
+    experience: '5 years',
     image: 'https://images.unsplash.com/photo-1566577739112-5180d4bf9390?q=80&w=200&auto=format&fit=crop'
   },
   {
@@ -21,7 +32,14 @@ const players = [
     name: 'Marcus Johnson',
     position: 'RB',
     number: 23,
+    starter: true,
     stats: { rushing: 1120, touchdowns: 9, fumbles: 2 },
+    team: 'Los Angeles Rams',
+    college: 'Alabama',
+    height: '5\'11"',
+    weight: '215 lbs',
+    age: 25,
+    experience: '3 years',
     image: 'https://images.unsplash.com/photo-1580064003896-8eba6fc5435f?q=80&w=200&auto=format&fit=crop'
   },
   {
@@ -29,7 +47,14 @@ const players = [
     name: 'Tyler Martinez',
     position: 'WR',
     number: 84,
+    starter: true,
     stats: { receiving: 1050, touchdowns: 11, receptions: 87 },
+    team: 'San Francisco 49ers',
+    college: 'Michigan',
+    height: '6\'1"',
+    weight: '198 lbs',
+    age: 26,
+    experience: '4 years',
     image: 'https://images.unsplash.com/photo-1574883052806-413e0927a4d7?q=80&w=200&auto=format&fit=crop'
   },
   {
@@ -37,7 +62,14 @@ const players = [
     name: 'Darius Smith',
     position: 'TE',
     number: 87,
+    starter: true,
     stats: { receiving: 780, touchdowns: 6, receptions: 62 },
+    team: 'Seattle Seahawks',
+    college: 'Notre Dame',
+    height: '6\'5"',
+    weight: '250 lbs',
+    age: 28,
+    experience: '5 years',
     image: 'https://images.unsplash.com/photo-1627037558426-c2d07beda3af?q=80&w=200&auto=format&fit=crop'
   },
   {
@@ -45,7 +77,14 @@ const players = [
     name: 'Jordan Williams',
     position: 'LB',
     number: 55,
+    starter: true,
     stats: { tackles: 112, sacks: 7, interceptions: 1 },
+    team: 'Philadelphia Eagles',
+    college: 'Penn State',
+    height: '6\'3"',
+    weight: '245 lbs',
+    age: 27,
+    experience: '4 years',
     image: 'https://images.unsplash.com/photo-1580652870699-ae85c08a1ace?q=80&w=200&auto=format&fit=crop'
   },
   {
@@ -53,13 +92,67 @@ const players = [
     name: 'Michael Taylor',
     position: 'CB',
     number: 27,
+    starter: true,
     stats: { tackles: 64, interceptions: 4, passDefended: 12 },
+    team: 'New England Patriots',
+    college: 'LSU',
+    height: '6\'0"',
+    weight: '195 lbs',
+    age: 24,
+    experience: '2 years',
     image: 'https://images.unsplash.com/photo-1527861518817-93eef51df1c6?q=80&w=200&auto=format&fit=crop'
+  },
+  {
+    id: 7,
+    name: 'David Roberts',
+    position: 'QB',
+    number: 11,
+    starter: false,
+    stats: { passing: 875, touchdowns: 5, interceptions: 3 },
+    team: 'Arizona Cardinals',
+    college: 'Clemson',
+    height: '6\'3"',
+    weight: '225 lbs',
+    age: 24,
+    experience: '2 years',
+    image: 'https://images.unsplash.com/photo-1565035010268-a3816f98589a?q=80&w=200&auto=format&fit=crop'
+  },
+  {
+    id: 8,
+    name: 'Chris Nelson',
+    position: 'RB',
+    number: 28,
+    starter: false,
+    stats: { rushing: 450, touchdowns: 3, fumbles: 1 },
+    team: 'Los Angeles Rams',
+    college: 'Auburn',
+    height: '5\'10"',
+    weight: '205 lbs',
+    age: 23,
+    experience: '1 year',
+    image: 'https://images.unsplash.com/photo-1562088287-bde35a1ea917?q=80&w=200&auto=format&fit=crop'
+  },
+  {
+    id: 9,
+    name: 'Kevin Jones',
+    position: 'WR',
+    number: 18,
+    starter: false,
+    stats: { receiving: 425, touchdowns: 3, receptions: 32 },
+    team: 'San Francisco 49ers',
+    college: 'Florida State',
+    height: '6\'0"',
+    weight: '192 lbs',
+    age: 25,
+    experience: '2 years',
+    image: 'https://images.unsplash.com/photo-1566492031773-4f4e44671857?q=80&w=200&auto=format&fit=crop'
   },
 ];
 
 const Roster = () => {
-  // Animation observer setup
+  const [selectedPlayer, setSelectedPlayer] = useState<typeof players[0] | null>(null);
+  const [isPlayerDialogOpen, setIsPlayerDialogOpen] = useState(false);
+
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
@@ -80,6 +173,15 @@ const Roster = () => {
     };
   }, []);
 
+  const handlePlayerClick = (player: typeof players[0]) => {
+    setSelectedPlayer(player);
+    setIsPlayerDialogOpen(true);
+  };
+
+  // Filter starters and bench players
+  const starters = players.filter(player => player.starter);
+  const benchPlayers = players.filter(player => !player.starter);
+
   return (
     <div className="min-h-screen">
       <Navbar />
@@ -98,32 +200,105 @@ const Roster = () => {
             </TabsList>
             
             <TabsContent value="offense" className="space-y-8">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {players.filter(p => ['QB', 'RB', 'WR', 'TE'].includes(p.position)).map((player, index) => (
-                  <Card key={player.id} className="overflow-hidden hover:shadow-lg transition-shadow animated-element" style={{animationDelay: `${index * 100}ms`}}>
-                    <div className="flex">
-                      <div className="w-1/3">
-                        <img src={player.image} alt={player.name} className="h-full w-full object-cover" />
-                      </div>
-                      <div className="w-2/3 p-4">
-                        <div className="flex justify-between items-start">
-                          <h3 className="font-bold text-lg">{player.name}</h3>
-                          <div className="bg-primary/10 text-primary font-bold px-2 py-0.5 rounded-full">{player.position}</div>
-                        </div>
-                        <div className="mt-2 text-3xl font-bold text-accent">#{player.number}</div>
-                        <div className="mt-4 text-sm text-muted-foreground">
-                          {Object.entries(player.stats).map(([key, value], i) => (
-                            <div key={i} className="flex justify-between">
-                              <span className="capitalize">{key}:</span>
-                              <span className="font-medium">{value}</span>
+              <div className="rounded-lg border shadow-sm">
+                <div className="p-4 bg-muted/30">
+                  <h2 className="text-xl font-bold flex items-center gap-2">
+                    <Star className="h-5 w-5 text-amber-500 fill-amber-500" />
+                    Starters
+                  </h2>
+                </div>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-12">No.</TableHead>
+                      <TableHead>Player</TableHead>
+                      <TableHead>Position</TableHead>
+                      <TableHead>Key Stat</TableHead>
+                      <TableHead className="text-right">Action</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {starters.filter(p => ['QB', 'RB', 'WR', 'TE'].includes(p.position)).map((player) => (
+                      <TableRow key={player.id} className="animated-element hover:bg-muted/50 cursor-pointer" onClick={() => handlePlayerClick(player)}>
+                        <TableCell className="font-medium">{player.number}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            <div className="h-10 w-10 rounded-full overflow-hidden">
+                              <img src={player.image} alt={player.name} className="h-full w-full object-cover" />
                             </div>
-                          ))}
-                        </div>
-                        <Button variant="ghost" size="sm" className="mt-4 w-full bg-muted/50 hover:bg-muted">View Details</Button>
-                      </div>
-                    </div>
-                  </Card>
-                ))}
+                            <span className="font-medium">{player.name}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="font-semibold bg-primary/10 text-primary">
+                            {player.position}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {player.position === 'QB' && `${player.stats.passing} yds, ${player.stats.touchdowns} TD`}
+                          {player.position === 'RB' && `${player.stats.rushing} yds, ${player.stats.touchdowns} TD`}
+                          {player.position === 'WR' && `${player.stats.receiving} yds, ${player.stats.receptions} rec`}
+                          {player.position === 'TE' && `${player.stats.receiving} yds, ${player.stats.receptions} rec`}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button size="sm" variant="ghost" onClick={(e) => {
+                            e.stopPropagation();
+                            handlePlayerClick(player);
+                          }}>View</Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+
+              <div className="rounded-lg border shadow-sm">
+                <div className="p-4 bg-muted/30">
+                  <h2 className="text-xl font-bold">Bench</h2>
+                </div>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-12">No.</TableHead>
+                      <TableHead>Player</TableHead>
+                      <TableHead>Position</TableHead>
+                      <TableHead>Key Stat</TableHead>
+                      <TableHead className="text-right">Action</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {benchPlayers.filter(p => ['QB', 'RB', 'WR', 'TE'].includes(p.position)).map((player) => (
+                      <TableRow key={player.id} className="animated-element hover:bg-muted/50 cursor-pointer" onClick={() => handlePlayerClick(player)}>
+                        <TableCell className="font-medium">{player.number}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            <div className="h-10 w-10 rounded-full overflow-hidden">
+                              <img src={player.image} alt={player.name} className="h-full w-full object-cover" />
+                            </div>
+                            <span className="font-medium">{player.name}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="font-semibold bg-muted/50">
+                            {player.position}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {player.position === 'QB' && `${player.stats.passing} yds, ${player.stats.touchdowns} TD`}
+                          {player.position === 'RB' && `${player.stats.rushing} yds, ${player.stats.touchdowns} TD`}
+                          {player.position === 'WR' && `${player.stats.receiving} yds, ${player.stats.receptions} rec`}
+                          {player.position === 'TE' && `${player.stats.receiving} yds, ${player.stats.receptions} rec`}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button size="sm" variant="ghost" onClick={(e) => {
+                            e.stopPropagation();
+                            handlePlayerClick(player);
+                          }}>View</Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               </div>
               
               <div className="text-center animated-element">
@@ -132,32 +307,54 @@ const Roster = () => {
             </TabsContent>
             
             <TabsContent value="defense" className="space-y-8">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {players.filter(p => ['LB', 'CB'].includes(p.position)).map((player, index) => (
-                  <Card key={player.id} className="overflow-hidden hover:shadow-lg transition-shadow animated-element" style={{animationDelay: `${index * 100}ms`}}>
-                    <div className="flex">
-                      <div className="w-1/3">
-                        <img src={player.image} alt={player.name} className="h-full w-full object-cover" />
-                      </div>
-                      <div className="w-2/3 p-4">
-                        <div className="flex justify-between items-start">
-                          <h3 className="font-bold text-lg">{player.name}</h3>
-                          <div className="bg-[hsl(var(--vibrant-blue))]/10 text-[hsl(var(--vibrant-blue))] font-bold px-2 py-0.5 rounded-full">{player.position}</div>
-                        </div>
-                        <div className="mt-2 text-3xl font-bold text-accent">#{player.number}</div>
-                        <div className="mt-4 text-sm text-muted-foreground">
-                          {Object.entries(player.stats).map(([key, value], i) => (
-                            <div key={i} className="flex justify-between">
-                              <span className="capitalize">{key}:</span>
-                              <span className="font-medium">{value}</span>
+              <div className="rounded-lg border shadow-sm">
+                <div className="p-4 bg-muted/30">
+                  <h2 className="text-xl font-bold flex items-center gap-2">
+                    <Star className="h-5 w-5 text-amber-500 fill-amber-500" />
+                    Starters
+                  </h2>
+                </div>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-12">No.</TableHead>
+                      <TableHead>Player</TableHead>
+                      <TableHead>Position</TableHead>
+                      <TableHead>Key Stat</TableHead>
+                      <TableHead className="text-right">Action</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {starters.filter(p => ['LB', 'CB'].includes(p.position)).map((player) => (
+                      <TableRow key={player.id} className="animated-element hover:bg-muted/50 cursor-pointer" onClick={() => handlePlayerClick(player)}>
+                        <TableCell className="font-medium">{player.number}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            <div className="h-10 w-10 rounded-full overflow-hidden">
+                              <img src={player.image} alt={player.name} className="h-full w-full object-cover" />
                             </div>
-                          ))}
-                        </div>
-                        <Button variant="ghost" size="sm" className="mt-4 w-full bg-muted/50 hover:bg-muted">View Details</Button>
-                      </div>
-                    </div>
-                  </Card>
-                ))}
+                            <span className="font-medium">{player.name}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="font-semibold bg-[hsl(var(--vibrant-blue))]/10 text-[hsl(var(--vibrant-blue))]">
+                            {player.position}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {player.position === 'LB' && `${player.stats.tackles} tackles, ${player.stats.sacks} sacks`}
+                          {player.position === 'CB' && `${player.stats.tackles} tackles, ${player.stats.interceptions} INT`}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button size="sm" variant="ghost" onClick={(e) => {
+                            e.stopPropagation();
+                            handlePlayerClick(player);
+                          }}>View</Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               </div>
               
               <div className="text-center animated-element">
@@ -202,6 +399,104 @@ const Roster = () => {
         </div>
       </main>
       <Footer />
+
+      {/* Player Detail Dialog */}
+      <Dialog open={isPlayerDialogOpen} onOpenChange={setIsPlayerDialogOpen}>
+        <DialogContent className="sm:max-w-[600px] p-0 overflow-hidden">
+          {selectedPlayer && (
+            <div>
+              <div className="relative h-40 bg-gradient-to-r from-primary/80 to-accent/80 flex items-end">
+                <div className="absolute top-4 right-4">
+                  <Badge 
+                    variant="outline" 
+                    className={`font-bold px-3 py-1 ${selectedPlayer.starter ? 
+                      'bg-amber-100 text-amber-800 border-amber-300' : 
+                      'bg-blue-100 text-blue-800 border-blue-300'}`}
+                  >
+                    {selectedPlayer.starter ? 'Starter' : 'Bench'}
+                  </Badge>
+                </div>
+                <div className="p-6 pb-0 flex items-end gap-4">
+                  <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-white shadow-lg translate-y-8">
+                    <img 
+                      src={selectedPlayer.image} 
+                      alt={selectedPlayer.name} 
+                      className="h-full w-full object-cover" 
+                    />
+                  </div>
+                  <div className="text-white mb-4">
+                    <h2 className="text-2xl font-bold">{selectedPlayer.name}</h2>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="bg-white/20 border-white/30 text-white">
+                        {selectedPlayer.position}
+                      </Badge>
+                      <span className="text-white/90">#{selectedPlayer.number}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-6 pt-12">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <h3 className="text-lg font-medium mb-3">Player Details</h3>
+                    <div className="space-y-2">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Team:</span>
+                        <span className="font-medium">{selectedPlayer.team}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">College:</span>
+                        <span className="font-medium">{selectedPlayer.college}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Height:</span>
+                        <span className="font-medium">{selectedPlayer.height}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Weight:</span>
+                        <span className="font-medium">{selectedPlayer.weight}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Age:</span>
+                        <span className="font-medium">{selectedPlayer.age}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Experience:</span>
+                        <span className="font-medium">{selectedPlayer.experience}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <h3 className="text-lg font-medium mb-3">Season Stats</h3>
+                    <div className="space-y-2">
+                      {Object.entries(selectedPlayer.stats).map(([key, value]) => (
+                        <div key={key} className="flex justify-between">
+                          <span className="text-muted-foreground capitalize">{key}:</span>
+                          <span className="font-medium">{value}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="border-t border-border mt-6 pt-6 flex justify-between">
+                  <Button variant="outline" size="sm" onClick={() => setIsPlayerDialogOpen(false)}>Close</Button>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" className="text-red-500 hover:text-red-600 hover:bg-red-50">Trade</Button>
+                    {!selectedPlayer.starter ? (
+                      <Button size="sm" className="bg-amber-500 hover:bg-amber-600">Make Starter</Button>
+                    ) : (
+                      <Button size="sm" className="bg-blue-500 hover:bg-blue-600">Move to Bench</Button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
