@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
@@ -406,163 +407,175 @@ const Roster = () => {
             <Button className="bg-[#33C3F0] hover:bg-[#33C3F0]/80 text-white">Add Player</Button>
             <Button variant="outline" className="border-[#33C3F0]/30 text-[#33C3F0] hover:bg-[#33C3F0]/10">Export Roster</Button>
           </div>
-          
-          <Dialog open={isPlayerDialogOpen} onOpenChange={setIsPlayerDialogOpen}>
-            <DialogContent className="sm:max-w-[600px] p-0 overflow-hidden bg-[#1A1F2C]/95 backdrop-blur-md border-[#33C3F0]/20 text-white animate-fade-in">
-              {selectedPlayer && (
-                <div>
-                  <div className="relative h-40 bg-gradient-to-r from-[#33C3F0]/80 to-[#9b87f5]/80 flex items-end overflow-hidden">
-                    <div className="absolute inset-0" style={{backgroundImage: "url('data:image/svg+xml,%3Csvg width=\"60\" height=\"60\" viewBox=\"0 0 60 60\" xmlns=\"http://www.w3.org/2000/svg\"%3E%3Cg fill=\"none\" fill-rule=\"evenodd\"%3E%3Cg fill=\"%23FFFFFF\" fill-opacity=\"0.1\"%3E%3Cpath d=\"M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z\"%2F%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fsvg%3E')", opacity: "0.5"}}></div>
-                    <div className="absolute top-4 right-4 animate-fade-in">
-                      <Badge 
-                        variant="outline" 
-                        className={`font-bold px-3 py-1 ${selectedPlayer.starter ? 
-                          'bg-amber-900/50 text-amber-200 border-amber-700/50' : 
-                          'bg-[#1A1F2C]/50 text-[#8E9196] border-[#8E9196]/30'}`}
-                      >
-                        {selectedPlayer.starter ? 'Starter' : 'Bench'}
+        </div>
+      </main>
+      <Footer />
+
+      <Dialog open={isPlayerDialogOpen} onOpenChange={setIsPlayerDialogOpen}>
+        <DialogContent className="sm:max-w-[600px] p-0 overflow-hidden bg-[#1A1F2C]/95 backdrop-blur-md border-[#33C3F0]/20 text-white animate-fade-in">
+          {selectedPlayer && (
+            <div>
+              <div className="relative h-40 bg-gradient-to-r from-[#33C3F0]/80 to-[#9b87f5]/80 flex items-end overflow-hidden">
+                <div className="absolute inset-0" style={{backgroundImage: "url('data:image/svg+xml,%3Csvg width=\"60\" height=\"60\" viewBox=\"0 0 60 60\" xmlns=\"http://www.w3.org/2000/svg\"%3E%3Cg fill=\"none\" fill-rule=\"evenodd\"%3E%3Cg fill=\"%23FFFFFF\" fill-opacity=\"0.1\"%3E%3Cpath d=\"M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z\"%2F%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fsvg%3E')", opacity: "0.5"}}></div>
+                <div className="absolute top-4 right-4 animate-fade-in">
+                  <Badge 
+                    variant="outline" 
+                    className={`font-bold px-3 py-1 ${selectedPlayer.starter ? 
+                      'bg-amber-900/50 text-amber-200 border-amber-700/50' : 
+                      'bg-[#1A1F2C]/50 text-[#8E9196] border-[#8E9196]/30'}`}
+                  >
+                    {selectedPlayer.starter ? 'Starter' : 'Bench'}
+                  </Badge>
+                </div>
+                <div className="p-6 pb-0 flex items-end gap-4 relative z-10">
+                  <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-white shadow-lg translate-y-8 animate-fade-in transition-transform duration-300 hover:scale-105">
+                    <img 
+                      src={selectedPlayer.image} 
+                      alt={selectedPlayer.name} 
+                      className="h-full w-full object-cover" 
+                    />
+                  </div>
+                  <div className="text-white mb-4 animate-fade-in">
+                    <h2 className="text-2xl font-bold">{selectedPlayer.name}</h2>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="bg-white/20 border-white/30 text-white">
+                        {selectedPlayer.position}
                       </Badge>
-                    </div>
-                    <div className="p-6 pb-0 flex items-end gap-4 relative z-10">
-                      <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-white shadow-lg translate-y-8 animate-fade-in transition-transform duration-300 hover:scale-105">
-                        <img 
-                          src={selectedPlayer.image} 
-                          alt={selectedPlayer.name} 
-                          className="h-full w-full object-cover" 
-                        />
-                      </div>
-                      <div className="text-white mb-4 animate-fade-in">
-                        <h2 className="text-2xl font-bold">{selectedPlayer.name}</h2>
-                        <div className="flex items-center gap-2">
-                          <Badge variant="outline" className="bg-white/20 border-white/30 text-white">
-                            {selectedPlayer.position}
-                          </Badge>
-                          <span className="text-white/90">#{selectedPlayer.number}</span>
-                        </div>
-                      </div>
+                      <span className="text-white/90">#{selectedPlayer.number}</span>
                     </div>
                   </div>
+                </div>
+              </div>
 
-                  <div className="p-6 pt-12">
-                    <Tabs defaultValue="details" className="w-full">
-                      <TabsList className="bg-[#221F26] w-full mb-6">
-                        <TabsTrigger value="details" className="data-[state=active]:bg-[#33C3F0]/20 data-[state=active]:text-[#33C3F0]">Player Details</TabsTrigger>
-                        <TabsTrigger value="stats" className="data-[state=active]:bg-[#33C3F0]/20 data-[state=active]:text-[#33C3F0]">Season Stats</TabsTrigger>
-                        <TabsTrigger value="history" className="data-[state=active]:bg-[#33C3F0]/20 data-[state=active]:text-[#33C3F0]">History</TabsTrigger>
-                      </TabsList>
-                      
-                      <TabsContent value="details">
-                        <div className="grid grid-cols-2 gap-6">
-                          <div className="space-y-3">
-                            <div className="flex justify-between">
-                              <span className="text-[#8E9196]">Team:</span>
-                              <span className="font-medium text-white">{selectedPlayer.team}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-[#8E9196]">Position:</span>
-                              <span className="font-medium text-white">{selectedPlayer.position}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-[#8E9196]">Number:</span>
-                              <span className="font-medium text-white">#{selectedPlayer.number}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-[#8E9196]">Status:</span>
-                              <span className="font-medium text-white">{selectedPlayer.starter ? 'Starter' : 'Bench'}</span>
-                            </div>
-                          </div>
+              <div className="p-6 pt-12">
+                <Tabs defaultValue="details" className="w-full">
+                  <TabsList className="bg-[#221F26] w-full mb-6">
+                    <TabsTrigger value="details" className="data-[state=active]:bg-[#33C3F0]/20 data-[state=active]:text-[#33C3F0]">Player Details</TabsTrigger>
+                    <TabsTrigger value="stats" className="data-[state=active]:bg-[#33C3F0]/20 data-[state=active]:text-[#33C3F0]">Season Stats</TabsTrigger>
+                    <TabsTrigger value="history" className="data-[state=active]:bg-[#33C3F0]/20 data-[state=active]:text-[#33C3F0]">History</TabsTrigger>
+                  </TabsList>
+                  
+                  <TabsContent value="details">
+                    <div className="grid grid-cols-2 gap-6">
+                      <div className="space-y-3">
+                        <div className="flex justify-between">
+                          <span className="text-[#8E9196]">Team:</span>
+                          <span className="font-medium text-white">{selectedPlayer.team}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-[#8E9196]">Position:</span>
+                          <span className="font-medium text-white">{selectedPlayer.position}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-[#8E9196]">Number:</span>
+                          <span className="font-medium text-white">#{selectedPlayer.number}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-[#8E9196]">Status:</span>
+                          <span className="font-medium text-white">{selectedPlayer.starter ? 'Starter' : 'Bench'}</span>
+                        </div>
+                      </div>
 
-                          <div className="space-y-3">
-                            <div className="flex justify-between">
-                              <span className="text-[#8E9196]">Height:</span>
-                              <span className="font-medium text-white">{selectedPlayer.height}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-[#8E9196]">Weight:</span>
-                              <span className="font-medium text-white">{selectedPlayer.weight}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-[#8E9196]">Age:</span>
-                              <span className="font-medium text-white">{selectedPlayer.age}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-[#8E9196]">Experience:</span>
-                              <span className="font-medium text-white">{selectedPlayer.experience}</span>
-                            </div>
-                          </div>
+                      <div className="space-y-3">
+                        <div className="flex justify-between">
+                          <span className="text-[#8E9196]">Height:</span>
+                          <span className="font-medium text-white">{selectedPlayer.height}</span>
                         </div>
-                      </TabsContent>
-                      
-                      <TabsContent value="stats">
-                        <div className="space-y-4">
-                          <div className="grid grid-cols-3 gap-4">
-                            {selectedPlayer.position === 'Goalie' ? (
-                              <>
-                                <Card className="bg-[#221F26] border-[#33C3F0]/20 p-4">
-                                  <h4 className="text-sm text-[#8E9196]">Wins</h4>
-                                  <p className="text-2xl font-bold text-white">{selectedPlayer.stats.wins}</p>
-                                </Card>
-                                <Card className="bg-[#221F26] border-[#33C3F0]/20 p-4">
-                                  <h4 className="text-sm text-[#8E9196]">GAA</h4>
-                                  <p className="text-2xl font-bold text-white">{selectedPlayer.stats.gaa}</p>
-                                </Card>
-                                <Card className="bg-[#221F26] border-[#33C3F0]/20 p-4">
-                                  <h4 className="text-sm text-[#8E9196]">Save %</h4>
-                                  <p className="text-2xl font-bold text-white">{selectedPlayer.stats.savePct}</p>
-                                </Card>
-                              </>
-                            ) : (
-                              <>
-                                <Card className="bg-[#221F26] border-[#33C3F0]/20 p-4">
-                                  <h4 className="text-sm text-[#8E9196]">Goals</h4>
-                                  <p className="text-2xl font-bold text-white">{selectedPlayer.stats.goals}</p>
-                                </Card>
-                                <Card className="bg-[#221F26] border-[#33C3F0]/20 p-4">
-                                  <h4 className="text-sm text-[#8E9196]">Assists</h4>
-                                  <p className="text-2xl font-bold text-white">{selectedPlayer.stats.assists}</p>
-                                </Card>
-                                <Card className="bg-[#221F26] border-[#33C3F0]/20 p-4">
-                                  <h4 className="text-sm text-[#8E9196]">Points</h4>
-                                  <p className="text-2xl font-bold text-white">{selectedPlayer.stats.points}</p>
-                                </Card>
-                              </>
-                            )}
-                          </div>
-                          
-                          <div className="mt-4 bg-[#221F26] p-4 rounded-md border border-[#33C3F0]/10">
-                            <h4 className="text-sm text-[#8E9196] mb-2">Performance Trend</h4>
-                            <div className="h-12 flex items-end gap-1">
-                              {Array.from({length: 10}).map((_, i) => (
-                                <div 
-                                  key={i} 
-                                  className="bg-gradient-to-t from-[#33C3F0] to-[#9b87f5] rounded-sm"
-                                  style={{
-                                    height: `${Math.max(15, Math.random() * 100)}%`,
-                                    width: '8%'
-                                  }}
-                                />
-                              ))}
-                            </div>
-                          </div>
+                        <div className="flex justify-between">
+                          <span className="text-[#8E9196]">Weight:</span>
+                          <span className="font-medium text-white">{selectedPlayer.weight}</span>
                         </div>
-                      </TabsContent>
-                      
-                      <TabsContent value="history">
-                        <div className="text-center py-4">
-                          <p className="text-[#8E9196]">Player history data will be available after the season starts</p>
+                        <div className="flex justify-between">
+                          <span className="text-[#8E9196]">Age:</span>
+                          <span className="font-medium text-white">{selectedPlayer.age}</span>
                         </div>
-                      </TabsContent>
-                    </Tabs>
-
-                    <div className="border-t border-[#33C3F0]/20 mt-6 pt-6 flex justify-between">
-                      <Button variant="outline" size="sm" className="border-[#8E9196]/30 text-[#8E9196] hover:bg-[#221F26]" onClick={() => setIsPlayerDialogOpen(false)}>Close</Button>
-                      <div className="flex gap-2">
-                        <Button variant="outline" size="sm" className="text-red-400 border-red-500/30 hover:bg-red-500/10">Trade</Button>
-                        {!selectedPlayer.starter ? (
-                          <Button size="sm" className="bg-amber-600 hover:bg-amber-700">Make Starter</Button>
+                        <div className="flex justify-between">
+                          <span className="text-[#8E9196]">Experience:</span>
+                          <span className="font-medium text-white">{selectedPlayer.experience}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </TabsContent>
+                  
+                  <TabsContent value="stats">
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-3 gap-4">
+                        {selectedPlayer.position === 'Goalie' ? (
+                          <>
+                            <Card className="bg-[#221F26] border-[#33C3F0]/20 p-4">
+                              <h4 className="text-sm text-[#8E9196]">Wins</h4>
+                              <p className="text-2xl font-bold text-white">{selectedPlayer.stats.wins}</p>
+                            </Card>
+                            <Card className="bg-[#221F26] border-[#33C3F0]/20 p-4">
+                              <h4 className="text-sm text-[#8E9196]">GAA</h4>
+                              <p className="text-2xl font-bold text-white">{selectedPlayer.stats.gaa}</p>
+                            </Card>
+                            <Card className="bg-[#221F26] border-[#33C3F0]/20 p-4">
+                              <h4 className="text-sm text-[#8E9196]">Save %</h4>
+                              <p className="text-2xl font-bold text-white">{selectedPlayer.stats.savePct}</p>
+                            </Card>
+                          </>
                         ) : (
-                          <Button size="sm" className="bg-[#33C3F0] hover:bg-[#33C3F0]/80">Move to Bench</Button>
+                          <>
+                            <Card className="bg-[#221F26] border-[#33C3F0]/20 p-4">
+                              <h4 className="text-sm text-[#8E9196]">Goals</h4>
+                              <p className="text-2xl font-bold text-white">{selectedPlayer.stats.goals}</p>
+                            </Card>
+                            <Card className="bg-[#221F26] border-[#33C3F0]/20 p-4">
+                              <h4 className="text-sm text-[#8E9196]">Assists</h4>
+                              <p className="text-2xl font-bold text-white">{selectedPlayer.stats.assists}</p>
+                            </Card>
+                            <Card className="bg-[#221F26] border-[#33C3F0]/20 p-4">
+                              <h4 className="text-sm text-[#8E9196]">Points</h4>
+                              <p className="text-2xl font-bold text-white">{selectedPlayer.stats.points}</p>
+                            </Card>
+                          </>
                         )}
                       </div>
+                      
+                      <div className="mt-4 bg-[#221F26] p-4 rounded-md border border-[#33C3F0]/10">
+                        <h4 className="text-sm text-[#8E9196] mb-2">Performance Trend</h4>
+                        <div className="h-12 flex items-end gap-1">
+                          {Array.from({length: 10}).map((_, i) => (
+                            <div 
+                              key={i} 
+                              className="bg-gradient-to-t from-[#33C3F0] to-[#9b87f5] rounded-sm"
+                              style={{
+                                height: `${Math.max(15, Math.random() * 100)}%`,
+                                width: '8%'
+                              }}
+                            />
+                          ))}
+                        </div>
+                      </div>
                     </div>
+                  </TabsContent>
+                  
+                  <TabsContent value="history">
+                    <div className="text-center py-4">
+                      <p className="text-[#8E9196]">Player history data will be available after the season starts</p>
+                    </div>
+                  </TabsContent>
+                </Tabs>
+
+                <div className="border-t border-[#33C3F0]/20 mt-6 pt-6 flex justify-between">
+                  <Button variant="outline" size="sm" className="border-[#8E9196]/30 text-[#8E9196] hover:bg-[#221F26]" onClick={() => setIsPlayerDialogOpen(false)}>Close</Button>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" className="text-red-400 border-red-500/30 hover:bg-red-500/10">Trade</Button>
+                    {!selectedPlayer.starter ? (
+                      <Button size="sm" className="bg-amber-600 hover:bg-amber-700">Make Starter</Button>
+                    ) : (
+                      <Button size="sm" className="bg-[#33C3F0] hover:bg-[#33C3F0]/80">Move to Bench</Button>
+                    )}
                   </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+};
+
+export default Roster;
