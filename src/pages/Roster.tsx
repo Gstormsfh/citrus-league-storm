@@ -1,16 +1,17 @@
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Star, ChevronDown, ChevronRight } from 'lucide-react';
+import { ChevronDown, ChevronRight, Star, TrendingUp, TrendingDown, BarChart } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
+// Sample player data - hockey themed
 const players = [
   {
     id: 1,
@@ -18,7 +19,7 @@ const players = [
     position: 'Centre',
     number: 97,
     starter: true,
-    stats: { goals: 44, assists: 89, points: 133 },
+    stats: { goals: 44, assists: 89, points: 133, plusMinus: 28, pim: 36, shots: 352 },
     team: 'Edmonton Oilers',
     height: '6\'1"',
     weight: '193 lbs',
@@ -32,7 +33,7 @@ const players = [
     position: 'Centre',
     number: 29,
     starter: true,
-    stats: { goals: 41, assists: 64, points: 105 },
+    stats: { goals: 41, assists: 64, points: 105, plusMinus: 7, pim: 42, shots: 245 },
     team: 'Edmonton Oilers',
     height: '6\'2"',
     weight: '208 lbs',
@@ -46,7 +47,7 @@ const players = [
     position: 'Centre',
     number: 29,
     starter: false,
-    stats: { goals: 51, assists: 89, points: 140 },
+    stats: { goals: 51, assists: 89, points: 140, plusMinus: 32, pim: 28, shots: 370 },
     team: 'Colorado Avalanche',
     height: '6\'0"',
     weight: '200 lbs',
@@ -60,7 +61,7 @@ const players = [
     position: 'Right Wing',
     number: 88,
     starter: true,
-    stats: { goals: 47, assists: 63, points: 110 },
+    stats: { goals: 47, assists: 63, points: 110, plusMinus: 26, pim: 34, shots: 312 },
     team: 'Boston Bruins',
     height: '6\'0"',
     weight: '195 lbs',
@@ -74,7 +75,7 @@ const players = [
     position: 'Right Wing',
     number: 96,
     starter: true,
-    stats: { goals: 40, assists: 64, points: 104 },
+    stats: { goals: 40, assists: 64, points: 104, plusMinus: 24, pim: 48, shots: 265 },
     team: 'Colorado Avalanche',
     height: '6\'4"',
     weight: '215 lbs',
@@ -88,7 +89,7 @@ const players = [
     position: 'Right Wing',
     number: 16,
     starter: false,
-    stats: { goals: 26, assists: 59, points: 85 },
+    stats: { goals: 26, assists: 59, points: 85, plusMinus: 16, pim: 22, shots: 198 },
     team: 'Toronto Maple Leafs',
     height: '6\'0"',
     weight: '175 lbs',
@@ -102,7 +103,7 @@ const players = [
     position: 'Left Wing',
     number: 97,
     starter: true,
-    stats: { goals: 39, assists: 57, points: 96 },
+    stats: { goals: 39, assists: 57, points: 96, plusMinus: 22, pim: 30, shots: 243 },
     team: 'Minnesota Wild',
     height: '5\'10"',
     weight: '201 lbs',
@@ -116,7 +117,7 @@ const players = [
     position: 'Left Wing',
     number: 19,
     starter: true,
-    stats: { goals: 26, assists: 61, points: 87 },
+    stats: { goals: 26, assists: 61, points: 87, plusMinus: -2, pim: 110, shots: 234 },
     team: 'Florida Panthers',
     height: '6\'2"',
     weight: '202 lbs',
@@ -130,7 +131,7 @@ const players = [
     position: 'Left Wing',
     number: 21,
     starter: false,
-    stats: { goals: 29, assists: 50, points: 79 },
+    stats: { goals: 29, assists: 50, points: 79, plusMinus: 15, pim: 24, shots: 214 },
     team: 'Dallas Stars',
     height: '6\'3"',
     weight: '200 lbs',
@@ -144,7 +145,7 @@ const players = [
     position: 'Defence',
     number: 8,
     starter: true,
-    stats: { goals: 21, assists: 62, points: 83 },
+    stats: { goals: 21, assists: 62, points: 83, plusMinus: 29, pim: 26, shots: 246 },
     team: 'Colorado Avalanche',
     height: '5\'11"',
     weight: '187 lbs',
@@ -158,7 +159,7 @@ const players = [
     position: 'Defence',
     number: 59,
     starter: true,
-    stats: { goals: 18, assists: 67, points: 85 },
+    stats: { goals: 18, assists: 67, points: 85, plusMinus: -5, pim: 38, shots: 270 },
     team: 'Nashville Predators',
     height: '6\'1"',
     weight: '201 lbs',
@@ -172,7 +173,7 @@ const players = [
     position: 'Defence',
     number: 77,
     starter: false,
-    stats: { goals: 13, assists: 62, points: 75 },
+    stats: { goals: 13, assists: 62, points: 75, plusMinus: 14, pim: 52, shots: 195 },
     team: 'Tampa Bay Lightning',
     height: '6\'6"',
     weight: '241 lbs',
@@ -186,7 +187,7 @@ const players = [
     position: 'Goalie',
     number: 88,
     starter: true,
-    stats: { wins: 30, gaa: 2.50, savePct: 0.915 },
+    stats: { wins: 30, losses: 15, otl: 5, gaa: 2.50, savePct: 0.915, shutouts: 4 },
     team: 'Tampa Bay Lightning',
     height: '6\'3"',
     weight: '225 lbs',
@@ -200,7 +201,7 @@ const players = [
     position: 'Goalie',
     number: 31,
     starter: false,
-    stats: { wins: 36, gaa: 2.58, savePct: 0.913 },
+    stats: { wins: 36, losses: 17, otl: 2, gaa: 2.58, savePct: 0.913, shutouts: 3 },
     team: 'New York Rangers',
     height: '6\'2"',
     weight: '182 lbs',
@@ -210,51 +211,39 @@ const players = [
   },
 ];
 
+// Sample team stats for analytics section
+const teamStats = {
+  record: "42-22-8",
+  points: 92,
+  goalsFor: 247,
+  goalsAgainst: 198,
+  powerPlayPct: 23.5,
+  penaltyKillPct: 82.4,
+  lastTenGames: "7-2-1",
+  streak: "W3",
+  homeRecord: "22-10-4",
+  awayRecord: "20-12-4",
+  trends: [
+    { stat: "Goals", direction: "up", value: "+2.4%" },
+    { stat: "Save %", direction: "up", value: "+1.8%" },
+    { stat: "PP%", direction: "down", value: "-3.2%" },
+    { stat: "Shots", direction: "up", value: "+4.1%" },
+    { stat: "PK%", direction: "up", value: "+0.7%" }
+  ]
+};
+
 const Roster = () => {
   const [selectedPlayer, setSelectedPlayer] = useState<typeof players[0] | null>(null);
   const [isPlayerDialogOpen, setIsPlayerDialogOpen] = useState(false);
-  const [expandedPositions, setExpandedPositions] = useState<Record<string, boolean>>({
-    'Centre': true,
-    'Right Wing': true,
-    'Left Wing': true,
-    'Defence': true,
-    'Goalie': true
-  });
-
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry, index) => {
-          if (entry.isIntersecting) {
-            setTimeout(() => {
-              entry.target.classList.add('animate');
-            }, index * 100);
-          }
-        });
-      },
-      { threshold: 0.1 }
-    );
-
-    const animatedElements = document.querySelectorAll('.animated-element');
-    animatedElements.forEach(el => observer.observe(el));
-
-    return () => {
-      animatedElements.forEach(el => observer.unobserve(el));
-    };
-  }, []);
+  const [activeTab, setActiveTab] = useState("roster");
+  const [activeStat, setActiveStat] = useState("standard");
 
   const handlePlayerClick = (player: typeof players[0]) => {
     setSelectedPlayer(player);
     setIsPlayerDialogOpen(true);
   };
 
-  const togglePositionExpand = (position: string) => {
-    setExpandedPositions(prev => ({
-      ...prev,
-      [position]: !prev[position]
-    }));
-  };
-
+  // Group players by position
   const positionGroups = players.reduce((groups: Record<string, typeof players>, player) => {
     if (!groups[player.position]) {
       groups[player.position] = [];
@@ -263,6 +252,7 @@ const Roster = () => {
     return groups;
   }, {});
 
+  // Sort players by starter status
   Object.keys(positionGroups).forEach(position => {
     positionGroups[position].sort((a, b) => {
       if (a.starter && !b.starter) return -1;
@@ -273,201 +263,518 @@ const Roster = () => {
 
   const positionOrder = ['Centre', 'Right Wing', 'Left Wing', 'Defence', 'Goalie'];
 
-  const getPositionCoordinates = (position: string) => {
-    switch (position) {
-      case 'Left Wing':
-        return 'left-[15%] top-[40%]';
-      case 'Centre':
-        return 'left-[50%] top-[40%] -translate-x-1/2';
-      case 'Right Wing':
-        return 'right-[15%] top-[40%]';
-      case 'Defence':
-        return 'translate-x-1/2'; // Will be used with additional classes
-      case 'Goalie':
-        return 'left-1/2 top-[85%] -translate-x-1/2';
-      default:
-        return '';
-    }
-  };
-
   return (
-    <div className="min-h-screen bg-[#121820] text-white" style={{backgroundImage: "url('data:image/svg+xml,%3Csvg width=\"60\" height=\"60\" viewBox=\"0 0 60 60\" xmlns=\"http://www.w3.org/2000/svg\"%3E%3Cg fill=\"none\" fill-rule=\"evenodd\"%3E%3Cg fill=\"%239C92AC\" fill-opacity=\"0.04\"%3E%3Cpath d=\"M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z\"%2F%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fsvg%3E')"}}>
+    <div className="min-h-screen bg-fantasy-background text-fantasy-dark">
       <Navbar />
+      
       <main className="pt-24 pb-16">
-        <div className="container mx-auto px-4">
-          <div className="max-w-3xl mx-auto text-center mb-10 animated-element">
-            <h1 className="text-5xl md:text-6xl font-bold mb-4 bg-gradient-to-r from-[#33C3F0] via-[#9b87f5] to-[#7E69AB] inline-block text-transparent bg-clip-text animate-fade-in">Team Roster</h1>
-            <p className="text-xl text-[#8E9196] animate-fade-in delay-100">Premium hockey team management with real-time player stats and lineup optimization.</p>
+        <div className="container max-w-7xl mx-auto px-4">
+          {/* Fantasy Team Header - similar to the example image */}
+          <div className="bg-white rounded-lg shadow-md border border-fantasy-border p-4 mb-6">
+            <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-full bg-fantasy-primary flex items-center justify-center text-white text-2xl font-bold">
+                  HC
+                </div>
+                <div>
+                  <h1 className="text-2xl font-bold text-fantasy-dark">Hockey Champions</h1>
+                  <div className="text-fantasy-muted text-sm">Manager: John Smith</div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <div className="text-center px-4 py-2">
+                  <div className="text-sm text-fantasy-muted">Record</div>
+                  <div className="font-bold">{teamStats.record}</div>
+                </div>
+                <div className="text-center px-4 py-2">
+                  <div className="text-sm text-fantasy-muted">Points</div>
+                  <div className="font-bold">{teamStats.points}</div>
+                </div>
+                <div className="text-center px-4 py-2">
+                  <div className="text-sm text-fantasy-muted">Standing</div>
+                  <div className="font-bold">#3</div>
+                </div>
+              </div>
+
+              <div>
+                <Button className="bg-fantasy-primary hover:bg-fantasy-primary/90 text-white">
+                  Edit Lineup
+                </Button>
+              </div>
+            </div>
           </div>
 
-          {/* Hockey Rink Layout */}
-          <div className="relative w-full max-w-5xl mx-auto h-[600px] mb-8 rounded-[200px] bg-gradient-to-b from-[#1A1F2C]/95 to-[#1A1F2C]/70 border border-[#33C3F0]/20 backdrop-blur-sm overflow-hidden">
-            {/* Rink Markings */}
-            <div className="absolute inset-0">
-              {/* Center Ice Line */}
-              <div className="absolute left-1/2 top-0 bottom-0 w-0.5 bg-[#33C3F0]/20"></div>
-              {/* Center Circle */}
-              <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 rounded-full border-2 border-[#33C3F0]/20"></div>
-              {/* Blue Lines */}
-              <div className="absolute left-[25%] top-0 bottom-0 w-0.5 bg-[#33C3F0]/20"></div>
-              <div className="absolute right-[25%] top-0 bottom-0 w-0.5 bg-[#33C3F0]/20"></div>
-            </div>
-
-            {/* Starters on Ice */}
-            {positionOrder.map(position => {
-              const startersInPosition = players.filter(p => p.position === position && p.starter);
-              return startersInPosition.map((player, index) => (
-                <div
-                  key={player.id}
-                  className={`absolute ${getPositionCoordinates(position)} ${
-                    position === 'Defence' ? 
-                    index === 0 ? 'left-[30%] top-[65%]' : 'right-[30%] top-[65%]' : 
-                    ''
-                  } transform cursor-pointer group animate-fade-in`}
-                  onClick={() => handlePlayerClick(player)}
+          {/* Main Tabs */}
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+            <div className="bg-white rounded-lg shadow-md border border-fantasy-border">
+              <TabsList className="w-full p-0 bg-transparent border-b border-fantasy-border rounded-none gap-0">
+                <TabsTrigger 
+                  value="roster" 
+                  className="flex-1 py-4 rounded-none data-[state=active]:bg-white data-[state=active]:border-b-2 data-[state=active]:border-fantasy-primary data-[state=active]:text-fantasy-primary"
                 >
-                  <div className="relative w-16 h-16">
-                    <div className="absolute inset-0 bg-gradient-to-r from-[#33C3F0] to-[#9b87f5] rounded-full opacity-20 group-hover:opacity-30 transition-opacity"></div>
-                    <img
-                      src={player.image}
-                      alt={player.name}
-                      className="w-16 h-16 rounded-full border-2 border-[#33C3F0]/40 hover:border-[#33C3F0] transition-all duration-200 group-hover:scale-110"
-                    />
-                    <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 text-center min-w-max">
-                      <div className="text-sm font-medium text-white group-hover:text-[#33C3F0] transition-colors">
-                        {player.name}
+                  Roster
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="stats" 
+                  className="flex-1 py-4 rounded-none data-[state=active]:bg-white data-[state=active]:border-b-2 data-[state=active]:border-fantasy-primary data-[state=active]:text-fantasy-primary"
+                >
+                  Team Stats
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="trends" 
+                  className="flex-1 py-4 rounded-none data-[state=active]:bg-white data-[state=active]:border-b-2 data-[state=active]:border-fantasy-primary data-[state=active]:text-fantasy-primary"
+                >
+                  Trends &amp; Analytics
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="ai-gm" 
+                  className="flex-1 py-4 rounded-none data-[state=active]:bg-white data-[state=active]:border-b-2 data-[state=active]:border-fantasy-primary data-[state=active]:text-fantasy-primary"
+                >
+                  AI GM Tool
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="roster" className="m-0 p-6">
+                {/* Secondary tabs for roster view */}
+                <Tabs value={activeStat} onValueChange={setActiveStat} className="mb-4">
+                  <TabsList className="bg-fantasy-background/80 p-1">
+                    <TabsTrigger value="standard" className="data-[state=active]:bg-white data-[state=active]:text-fantasy-primary">
+                      Standard
+                    </TabsTrigger>
+                    <TabsTrigger value="advanced" className="data-[state=active]:bg-white data-[state=active]:text-fantasy-primary">
+                      Advanced
+                    </TabsTrigger>
+                  </TabsList>
+                </Tabs>
+                
+                {/* Roster table similar to example */}
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-fantasy-light hover:bg-fantasy-light">
+                      <TableHead className="w-[40px]">POS</TableHead>
+                      <TableHead>Player</TableHead>
+                      <TableHead className="text-right"># / Team</TableHead>
+                      <TableHead className="text-right">G</TableHead>
+                      <TableHead className="text-right">A</TableHead>
+                      <TableHead className="text-right">PTS</TableHead>
+                      <TableHead className="text-right">+/-</TableHead>
+                      <TableHead className="text-right">PIM</TableHead>
+                      <TableHead className="text-right">SOG</TableHead>
+                      {activeStat === "advanced" && (
+                        <>
+                          <TableHead className="text-right">PP PTS</TableHead>
+                          <TableHead className="text-right">SH PTS</TableHead>
+                          <TableHead className="text-right">GWG</TableHead>
+                          <TableHead className="text-right">FO%</TableHead>
+                        </>
+                      )}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {positionOrder.map(position => (
+                      positionGroups[position]?.map((player) => (
+                        <TableRow 
+                          key={player.id} 
+                          className="cursor-pointer hover:bg-fantasy-light"
+                          onClick={() => handlePlayerClick(player)}
+                        >
+                          <TableCell className="font-medium">
+                            <Badge className={`${player.starter ? 'bg-fantasy-primary' : 'bg-fantasy-muted'} text-white`}>
+                              {position === 'Centre' ? 'C' : 
+                               position === 'Right Wing' ? 'RW' : 
+                               position === 'Left Wing' ? 'LW' : 
+                               position === 'Defence' ? 'D' : 'G'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 rounded-full overflow-hidden">
+                                <img 
+                                  src={player.image} 
+                                  alt={player.name} 
+                                  className="object-cover w-full h-full"
+                                />
+                              </div>
+                              <div>
+                                <div className="font-medium">{player.name}</div>
+                                <div className="text-xs text-fantasy-muted">{player.position}</div>
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="font-medium">#{player.number}</div>
+                            <div className="text-xs text-fantasy-muted">{player.team}</div>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {position === 'Goalie' ? player.stats.wins : player.stats.goals}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {position === 'Goalie' ? player.stats.losses : player.stats.assists}
+                          </TableCell>
+                          <TableCell className="text-right font-medium">
+                            {position === 'Goalie' ? player.stats.otl : player.stats.points}
+                          </TableCell>
+                          <TableCell className={`text-right ${
+                            position !== 'Goalie' && player.stats.plusMinus > 0 
+                              ? 'text-fantasy-positive' 
+                              : position !== 'Goalie' && player.stats.plusMinus < 0 
+                                ? 'text-fantasy-danger' 
+                                : ''
+                          }`}>
+                            {position === 'Goalie' ? player.stats.gaa : player.stats.plusMinus > 0 ? `+${player.stats.plusMinus}` : player.stats.plusMinus}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {position === 'Goalie' ? player.stats.savePct : player.stats.pim}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {position === 'Goalie' ? player.stats.shutouts : player.stats.shots}
+                          </TableCell>
+                          {activeStat === "advanced" && (
+                            <>
+                              <TableCell className="text-right">{position !== 'Goalie' ? Math.floor(Math.random() * 30) : '-'}</TableCell>
+                              <TableCell className="text-right">{position !== 'Goalie' ? Math.floor(Math.random() * 10) : '-'}</TableCell>
+                              <TableCell className="text-right">{position !== 'Goalie' ? Math.floor(Math.random() * 10) : '-'}</TableCell>
+                              <TableCell className="text-right">{position === 'Centre' ? `${Math.floor(45 + Math.random() * 15)}%` : '-'}</TableCell>
+                            </>
+                          )}
+                        </TableRow>
+                      ))
+                    ))}
+                  </TableBody>
+                </Table>
+              </TabsContent>
+
+              <TabsContent value="stats" className="m-0 p-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <Card className="bg-gradient-to-br from-white to-fantasy-light border-fantasy-border">
+                    <CardContent className="pt-6">
+                      <h3 className="text-lg font-semibold text-fantasy-dark mb-4">Team Performance</h3>
+                      <div className="space-y-3">
+                        <div className="flex justify-between items-center">
+                          <span className="text-fantasy-muted">Record</span>
+                          <span className="font-medium">{teamStats.record}</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-fantasy-muted">Points</span>
+                          <span className="font-medium">{teamStats.points}</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-fantasy-muted">Last 10 Games</span>
+                          <span className="font-medium">{teamStats.lastTenGames}</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-fantasy-muted">Current Streak</span>
+                          <span className="font-medium">{teamStats.streak}</span>
+                        </div>
                       </div>
-                      <div className="text-xs text-[#8E9196]">#{player.number}</div>
-                    </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="bg-gradient-to-br from-white to-fantasy-light border-fantasy-border">
+                    <CardContent className="pt-6">
+                      <h3 className="text-lg font-semibold text-fantasy-dark mb-4">Offense</h3>
+                      <div className="space-y-3">
+                        <div className="flex justify-between items-center">
+                          <span className="text-fantasy-muted">Goals For</span>
+                          <span className="font-medium">{teamStats.goalsFor}</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-fantasy-muted">Avg. Goals/Game</span>
+                          <span className="font-medium">{(teamStats.goalsFor / 72).toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-fantasy-muted">Power Play %</span>
+                          <span className="font-medium">{teamStats.powerPlayPct}%</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-fantasy-muted">Shots/Game</span>
+                          <span className="font-medium">32.4</span>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="bg-gradient-to-br from-white to-fantasy-light border-fantasy-border">
+                    <CardContent className="pt-6">
+                      <h3 className="text-lg font-semibold text-fantasy-dark mb-4">Defense</h3>
+                      <div className="space-y-3">
+                        <div className="flex justify-between items-center">
+                          <span className="text-fantasy-muted">Goals Against</span>
+                          <span className="font-medium">{teamStats.goalsAgainst}</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-fantasy-muted">Avg. GA/Game</span>
+                          <span className="font-medium">{(teamStats.goalsAgainst / 72).toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-fantasy-muted">Penalty Kill %</span>
+                          <span className="font-medium">{teamStats.penaltyKillPct}%</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-fantasy-muted">Shots Against/Game</span>
+                          <span className="font-medium">29.7</span>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="md:col-span-2 lg:col-span-3 bg-gradient-to-br from-white to-fantasy-light border-fantasy-border">
+                    <CardContent className="pt-6">
+                      <h3 className="text-lg font-semibold text-fantasy-dark mb-4">Scoring by Period</h3>
+                      <div className="h-24 flex items-end space-x-1">
+                        {Array.from({ length: 3 }).map((_, i) => (
+                          <div key={i} className="flex-1 flex flex-col items-center">
+                            <div 
+                              className="w-full bg-fantasy-primary rounded-t"
+                              style={{ height: `${Math.max(30, Math.random() * 100)}px` }}
+                            />
+                            <div className="mt-2 text-sm font-medium">
+                              {i === 0 ? '1st' : i === 1 ? '2nd' : '3rd'}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="trends" className="m-0 p-6">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <Card className="bg-gradient-to-br from-white to-fantasy-light border-fantasy-border">
+                    <CardContent className="pt-6">
+                      <div className="flex justify-between items-center mb-4">
+                        <h3 className="text-lg font-semibold text-fantasy-dark">Recent Trends</h3>
+                        <Badge className="bg-fantasy-secondary text-white">Last 30 days</Badge>
+                      </div>
+                      <div className="space-y-4">
+                        {teamStats.trends.map((trend, i) => (
+                          <div key={i} className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              {trend.direction === "up" ? (
+                                <TrendingUp className="text-fantasy-positive h-5 w-5" />
+                              ) : (
+                                <TrendingDown className="text-fantasy-danger h-5 w-5" />
+                              )}
+                              <span className="font-medium">{trend.stat}</span>
+                            </div>
+                            <span className={trend.direction === "up" ? "text-fantasy-positive font-medium" : "text-fantasy-danger font-medium"}>
+                              {trend.value}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="bg-gradient-to-br from-white to-fantasy-light border-fantasy-border">
+                    <CardContent className="pt-6">
+                      <div className="flex justify-between items-center mb-4">
+                        <h3 className="text-lg font-semibold text-fantasy-dark">Scoring Analysis</h3>
+                        <Badge className="bg-fantasy-tertiary text-white">Full Season</Badge>
+                      </div>
+                      <div className="space-y-4">
+                        <div className="space-y-1">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-fantasy-muted">Even Strength</span>
+                            <span className="font-medium">68%</span>
+                          </div>
+                          <div className="w-full bg-fantasy-border rounded-full h-2">
+                            <div className="bg-fantasy-primary rounded-full h-2" style={{ width: "68%" }}></div>
+                          </div>
+                        </div>
+                        
+                        <div className="space-y-1">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-fantasy-muted">Power Play</span>
+                            <span className="font-medium">24%</span>
+                          </div>
+                          <div className="w-full bg-fantasy-border rounded-full h-2">
+                            <div className="bg-fantasy-secondary rounded-full h-2" style={{ width: "24%" }}></div>
+                          </div>
+                        </div>
+                        
+                        <div className="space-y-1">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-fantasy-muted">Short-handed</span>
+                            <span className="font-medium">5%</span>
+                          </div>
+                          <div className="w-full bg-fantasy-border rounded-full h-2">
+                            <div className="bg-fantasy-tertiary rounded-full h-2" style={{ width: "5%" }}></div>
+                          </div>
+                        </div>
+                        
+                        <div className="space-y-1">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-fantasy-muted">Empty Net</span>
+                            <span className="font-medium">3%</span>
+                          </div>
+                          <div className="w-full bg-fantasy-border rounded-full h-2">
+                            <div className="bg-fantasy-muted rounded-full h-2" style={{ width: "3%" }}></div>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="lg:col-span-2 bg-gradient-to-br from-white to-fantasy-light border-fantasy-border">
+                    <CardContent className="pt-6">
+                      <h3 className="text-lg font-semibold text-fantasy-dark mb-4">Top Performers (Last 10 Games)</h3>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                        {players.filter((p, i) => i < 3).map((player) => (
+                          <div key={player.id} className="flex items-center gap-3 p-2 rounded-lg border border-fantasy-border bg-white hover:shadow-md transition-shadow">
+                            <div className="w-12 h-12 rounded-full overflow-hidden">
+                              <img 
+                                src={player.image} 
+                                alt={player.name} 
+                                className="object-cover w-full h-full"
+                              />
+                            </div>
+                            <div>
+                              <div className="font-medium">{player.name}</div>
+                              <div className="text-xs text-fantasy-muted">{player.position}</div>
+                              <div className="text-sm font-medium text-fantasy-primary">
+                                {player.position === 'Goalie' 
+                                  ? `${player.stats.wins} W, ${player.stats.savePct} SV%` 
+                                  : `${player.stats.goals} G, ${player.stats.assists} A, ${player.stats.points} P`
+                                }
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="ai-gm" className="m-0 p-6">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  <div className="lg:col-span-2">
+                    <Card className="border-fantasy-border bg-white">
+                      <CardContent className="pt-6">
+                        <div className="flex items-center gap-3 mb-6">
+                          <div className="w-10 h-10 rounded-full bg-fantasy-primary/20 flex items-center justify-center">
+                            <BarChart className="h-5 w-5 text-fantasy-primary" />
+                          </div>
+                          <h3 className="text-xl font-semibold text-fantasy-dark">AI GM Analysis</h3>
+                        </div>
+                        
+                        <div className="space-y-4">
+                          <div className="p-4 rounded-lg border border-fantasy-border bg-fantasy-light">
+                            <h4 className="font-medium mb-2 text-fantasy-dark">Team Assessment</h4>
+                            <p className="text-sm text-fantasy-muted">
+                              Your team is well-balanced but could use more depth at the wing positions. 
+                              Consider acquiring a top-tier winger to complement McDavid and Draisaitl.
+                            </p>
+                          </div>
+                          
+                          <div className="p-4 rounded-lg border border-fantasy-border bg-fantasy-light">
+                            <h4 className="font-medium mb-2 text-fantasy-dark">Recommended Actions</h4>
+                            <ul className="text-sm text-fantasy-muted space-y-2">
+                              <li className="flex items-start gap-2">
+                                <span className="text-fantasy-primary">•</span>
+                                <span>Trade for a scoring winger using your excess defensive depth</span>
+                              </li>
+                              <li className="flex items-start gap-2">
+                                <span className="text-fantasy-primary">•</span>
+                                <span>Consider starting Shesterkin against upcoming opponent Toronto (favorable matchup)</span>
+                              </li>
+                              <li className="flex items-start gap-2">
+                                <span className="text-fantasy-primary">•</span>
+                                <span>Monitor Tkachuk's PIM count - may impact your team's performance negatively</span>
+                              </li>
+                            </ul>
+                          </div>
+
+                          <div className="p-4 rounded-lg border border-fantasy-border bg-fantasy-light">
+                            <h4 className="font-medium mb-2 text-fantasy-dark">Power Play Optimization</h4>
+                            <p className="text-sm text-fantasy-muted">
+                              Suggested PP1 unit: McDavid, Draisaitl, Pastrnak, Makar, and Kaprizov.
+                              This combination maximizes one-timer opportunities from the left side.
+                            </p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  <div className="space-y-6">
+                    <Card className="border-fantasy-border bg-white">
+                      <CardContent className="pt-6">
+                        <h3 className="text-lg font-semibold text-fantasy-dark mb-4">Trade Finder</h3>
+                        <div className="space-y-3">
+                          <div className="flex justify-between items-center">
+                            <span>Target Position</span>
+                            <Badge className="bg-fantasy-secondary">RW</Badge>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span>Available Assets</span>
+                            <span className="font-medium">3</span>
+                          </div>
+                          <Button className="w-full bg-fantasy-primary hover:bg-fantasy-primary/90 text-white mt-2">
+                            Find Trade Options
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="border-fantasy-border bg-white">
+                      <CardContent className="pt-6">
+                        <h3 className="text-lg font-semibold text-fantasy-dark mb-4">Upcoming Schedule</h3>
+                        <div className="space-y-3">
+                          {Array.from({ length: 3 }).map((_, i) => (
+                            <div key={i} className="flex items-center gap-3 p-2 rounded-lg border border-fantasy-border hover:bg-fantasy-light transition-colors">
+                              <div className="w-10 h-10 flex items-center justify-center bg-fantasy-primary/10 rounded-full">
+                                <div className="text-xs font-medium">
+                                  {i === 0 ? 'TUE' : i === 1 ? 'THU' : 'SAT'}
+                                </div>
+                              </div>
+                              <div>
+                                <div className="text-sm font-medium">vs {i === 0 ? 'TOR' : i === 1 ? 'MTL' : 'BOS'}</div>
+                                <div className="text-xs text-fantasy-muted">{i === 0 ? 'Home' : i === 1 ? 'Away' : 'Home'}</div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
                   </div>
                 </div>
-              ));
-            })}
-          </div>
-
-          {/* Bench Players */}
-          <div className="max-w-7xl mx-auto">
-            <div className="bg-[#1A1F2C]/70 rounded-lg border border-[#33C3F0]/20 backdrop-blur-sm shadow-lg p-4">
-              <h3 className="text-xl font-semibold text-white mb-4 px-2">Bench Players</h3>
-              <ScrollArea className="h-[600px]">
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 p-2">
-                  {players.filter(p => !p.starter).map(player => (
-                    <Card
-                      key={player.id}
-                      className="bg-[#221F26]/90 border-[#33C3F0]/10 hover:bg-[#221F26] transition-all duration-200 cursor-pointer aspect-square"
-                      onClick={() => handlePlayerClick(player)}
-                    >
-                      <div className="p-4 h-full flex flex-col">
-                        <div className="relative w-full pb-[100%] mb-4">
-                          <img
-                            src={player.image}
-                            alt={player.name}
-                            className="absolute inset-0 w-full h-full object-cover rounded-lg border-2 border-[#33C3F0]/20"
-                          />
-                          <div className="absolute top-2 right-2">
-                            <Badge variant="outline" className="bg-[#1A1F2C]/50 text-[#33C3F0] border-[#33C3F0]/30">
-                              {player.position}
-                            </Badge>
-                          </div>
-                        </div>
-                        <div className="flex-1 flex flex-col justify-between">
-                          <div>
-                            <h4 className="font-medium text-white text-lg mb-1">{player.name}</h4>
-                            <p className="text-sm text-[#8E9196]">#{player.number} · {player.team}</p>
-                          </div>
-                          <div className="mt-3 grid grid-cols-3 gap-2 text-center">
-                            {player.position === 'Goalie' ? (
-                              <>
-                                <div className="bg-[#1A1F2C]/30 rounded p-1">
-                                  <div className="text-[#33C3F0] text-sm">{player.stats.wins}</div>
-                                  <div className="text-[#8E9196] text-xs">Wins</div>
-                                </div>
-                                <div className="bg-[#1A1F2C]/30 rounded p-1">
-                                  <div className="text-[#33C3F0] text-sm">{player.stats.gaa}</div>
-                                  <div className="text-[#8E9196] text-xs">GAA</div>
-                                </div>
-                                <div className="bg-[#1A1F2C]/30 rounded p-1">
-                                  <div className="text-[#33C3F0] text-sm">{player.stats.savePct}</div>
-                                  <div className="text-[#8E9196] text-xs">SV%</div>
-                                </div>
-                              </>
-                            ) : (
-                              <>
-                                <div className="bg-[#1A1F2C]/30 rounded p-1">
-                                  <div className="text-[#33C3F0] text-sm">{player.stats.goals}</div>
-                                  <div className="text-[#8E9196] text-xs">Goals</div>
-                                </div>
-                                <div className="bg-[#1A1F2C]/30 rounded p-1">
-                                  <div className="text-[#33C3F0] text-sm">{player.stats.assists}</div>
-                                  <div className="text-[#8E9196] text-xs">Assists</div>
-                                </div>
-                                <div className="bg-[#1A1F2C]/30 rounded p-1">
-                                  <div className="text-[#33C3F0] text-sm">{player.stats.points}</div>
-                                  <div className="text-[#8E9196] text-xs">Points</div>
-                                </div>
-                              </>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </Card>
-                  ))}
-                </div>
-              </ScrollArea>
+              </TabsContent>
             </div>
-          </div>
-
-          <div className="max-w-5xl mx-auto mt-10 grid grid-cols-1 md:grid-cols-3 gap-6">
-            <Card className="p-4 bg-gradient-to-br from-[#1A1F2C] to-[#221F26] border-[#33C3F0]/20">
-              <h3 className="text-lg font-medium text-[#33C3F0] mb-2">Team Ranking</h3>
-              <p className="text-3xl font-bold text-white">#3</p>
-              <p className="text-sm text-[#8E9196] mt-1">Up from #5 last week</p>
-            </Card>
-            <Card className="p-4 bg-gradient-to-br from-[#1A1F2C] to-[#221F26] border-[#33C3F0]/20">
-              <h3 className="text-lg font-medium text-[#9b87f5] mb-2">Goals Scored</h3>
-              <p className="text-3xl font-bold text-white">247</p>
-              <p className="text-sm text-[#8E9196] mt-1">Avg 3.1 per game</p>
-            </Card>
-            <Card className="p-4 bg-gradient-to-br from-[#1A1F2C] to-[#221F26] border-[#33C3F0]/20">
-              <h3 className="text-lg font-medium text-[#7E69AB] mb-2">Record</h3>
-              <p className="text-3xl font-bold text-white">42-22-8</p>
-              <p className="text-sm text-[#8E9196] mt-1">92 points</p>
-            </Card>
-          </div>
-
-          <div className="max-w-5xl mx-auto mt-10 flex justify-center gap-4">
-            <Button className="bg-[#33C3F0] hover:bg-[#33C3F0]/80 text-white">Add Player</Button>
-            <Button variant="outline" className="border-[#33C3F0]/30 text-[#33C3F0] hover:bg-[#33C3F0]/10">Export Roster</Button>
-          </div>
+          </Tabs>
         </div>
       </main>
+
       <Footer />
 
+      {/* Player Details Dialog */}
       <Dialog open={isPlayerDialogOpen} onOpenChange={setIsPlayerDialogOpen}>
-        <DialogContent className="sm:max-w-[600px] p-0 overflow-hidden bg-[#1A1F2C]/95 backdrop-blur-md border-[#33C3F0]/20 text-white animate-fade-in">
+        <DialogContent className="sm:max-w-[600px] p-0 overflow-hidden bg-white">
           {selectedPlayer && (
             <div>
-              <div className="relative h-40 bg-gradient-to-r from-[#33C3F0]/80 to-[#9b87f5]/80 flex items-end overflow-hidden">
-                <div className="absolute inset-0" style={{backgroundImage: "url('data:image/svg+xml,%3Csvg width=\"60\" height=\"60\" viewBox=\"0 0 60 60\" xmlns=\"http://www.w3.org/2000/svg\"%3E%3Cg fill=\"none\" fill-rule=\"evenodd\"%3E%3Cg fill=\"%23FFFFFF\" fill-opacity=\"0.1\"%3E%3Cpath d=\"M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z\"%2F%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fsvg%3E')", opacity: "0.5"}}></div>
-                <div className="absolute top-4 right-4 animate-fade-in">
+              <div className="relative h-40 bg-gradient-to-r from-fantasy-primary to-fantasy-tertiary flex items-end overflow-hidden">
+                <div className="absolute top-4 right-4">
                   <Badge 
                     variant="outline" 
                     className={`font-bold px-3 py-1 ${selectedPlayer.starter ? 
-                      'bg-amber-900/50 text-amber-200 border-amber-700/50' : 
-                      'bg-[#1A1F2C]/50 text-[#8E9196] border-[#8E9196]/30'}`}
+                      'bg-fantasy-tertiary/90 text-white border-white/30' : 
+                      'bg-fantasy-muted/50 text-white border-white/30'}`}
                   >
                     {selectedPlayer.starter ? 'Starter' : 'Bench'}
                   </Badge>
                 </div>
                 <div className="p-6 pb-0 flex items-end gap-4 relative z-10">
-                  <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-white shadow-lg translate-y-8 animate-fade-in transition-transform duration-300 hover:scale-105">
+                  <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-white shadow-lg translate-y-8 transition-transform duration-300 hover:scale-105">
                     <img 
                       src={selectedPlayer.image} 
                       alt={selectedPlayer.name} 
                       className="h-full w-full object-cover" 
                     />
                   </div>
-                  <div className="text-white mb-4 animate-fade-in">
+                  <div className="text-white mb-4">
                     <h2 className="text-2xl font-bold">{selectedPlayer.name}</h2>
                     <div className="flex items-center gap-2">
                       <Badge variant="outline" className="bg-white/20 border-white/30 text-white">
@@ -481,49 +788,55 @@ const Roster = () => {
 
               <div className="p-6 pt-12">
                 <Tabs defaultValue="details" className="w-full">
-                  <TabsList className="bg-[#221F26] w-full mb-6">
-                    <TabsTrigger value="details" className="data-[state=active]:bg-[#33C3F0]/20 data-[state=active]:text-[#33C3F0]">Player Details</TabsTrigger>
-                    <TabsTrigger value="stats" className="data-[state=active]:bg-[#33C3F0]/20 data-[state=active]:text-[#33C3F0]">Season Stats</TabsTrigger>
-                    <TabsTrigger value="history" className="data-[state=active]:bg-[#33C3F0]/20 data-[state=active]:text-[#33C3F0]">History</TabsTrigger>
+                  <TabsList className="bg-fantasy-background w-full mb-6">
+                    <TabsTrigger value="details" className="data-[state=active]:bg-fantasy-primary/20 data-[state=active]:text-fantasy-primary">
+                      Player Details
+                    </TabsTrigger>
+                    <TabsTrigger value="stats" className="data-[state=active]:bg-fantasy-primary/20 data-[state=active]:text-fantasy-primary">
+                      Season Stats
+                    </TabsTrigger>
+                    <TabsTrigger value="history" className="data-[state=active]:bg-fantasy-primary/20 data-[state=active]:text-fantasy-primary">
+                      History
+                    </TabsTrigger>
                   </TabsList>
                   
                   <TabsContent value="details">
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-3">
                         <div className="flex justify-between">
-                          <span className="text-[#8E9196]">Team:</span>
-                          <span className="font-medium text-white">{selectedPlayer.team}</span>
+                          <span className="text-fantasy-muted">Team:</span>
+                          <span className="font-medium">{selectedPlayer.team}</span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-[#8E9196]">Position:</span>
-                          <span className="font-medium text-white">{selectedPlayer.position}</span>
+                          <span className="text-fantasy-muted">Position:</span>
+                          <span className="font-medium">{selectedPlayer.position}</span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-[#8E9196]">Number:</span>
-                          <span className="font-medium text-white">#{selectedPlayer.number}</span>
+                          <span className="text-fantasy-muted">Number:</span>
+                          <span className="font-medium">#{selectedPlayer.number}</span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-[#8E9196]">Status:</span>
-                          <span className="font-medium text-white">{selectedPlayer.starter ? 'Starter' : 'Bench'}</span>
+                          <span className="text-fantasy-muted">Status:</span>
+                          <span className="font-medium">{selectedPlayer.starter ? 'Starter' : 'Bench'}</span>
                         </div>
                       </div>
 
                       <div className="space-y-3">
                         <div className="flex justify-between">
-                          <span className="text-[#8E9196]">Height:</span>
-                          <span className="font-medium text-white">{selectedPlayer.height}</span>
+                          <span className="text-fantasy-muted">Height:</span>
+                          <span className="font-medium">{selectedPlayer.height}</span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-[#8E9196]">Weight:</span>
-                          <span className="font-medium text-white">{selectedPlayer.weight}</span>
+                          <span className="text-fantasy-muted">Weight:</span>
+                          <span className="font-medium">{selectedPlayer.weight}</span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-[#8E9196]">Age:</span>
-                          <span className="font-medium text-white">{selectedPlayer.age}</span>
+                          <span className="text-fantasy-muted">Age:</span>
+                          <span className="font-medium">{selectedPlayer.age}</span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-[#8E9196]">Experience:</span>
-                          <span className="font-medium text-white">{selectedPlayer.experience}</span>
+                          <span className="text-fantasy-muted">Experience:</span>
+                          <span className="font-medium">{selectedPlayer.experience}</span>
                         </div>
                       </div>
                     </div>
@@ -534,44 +847,44 @@ const Roster = () => {
                       <div className="grid grid-cols-3 gap-4">
                         {selectedPlayer.position === 'Goalie' ? (
                           <>
-                            <Card className="bg-[#221F26] border-[#33C3F0]/20 p-4">
-                              <h4 className="text-sm text-[#8E9196]">Wins</h4>
-                              <p className="text-2xl font-bold text-white">{selectedPlayer.stats.wins}</p>
+                            <Card className="bg-fantasy-light border-fantasy-border p-4">
+                              <h4 className="text-sm text-fantasy-muted">Wins</h4>
+                              <p className="text-2xl font-bold">{selectedPlayer.stats.wins}</p>
                             </Card>
-                            <Card className="bg-[#221F26] border-[#33C3F0]/20 p-4">
-                              <h4 className="text-sm text-[#8E9196]">GAA</h4>
-                              <p className="text-2xl font-bold text-white">{selectedPlayer.stats.gaa}</p>
+                            <Card className="bg-fantasy-light border-fantasy-border p-4">
+                              <h4 className="text-sm text-fantasy-muted">GAA</h4>
+                              <p className="text-2xl font-bold">{selectedPlayer.stats.gaa}</p>
                             </Card>
-                            <Card className="bg-[#221F26] border-[#33C3F0]/20 p-4">
-                              <h4 className="text-sm text-[#8E9196]">Save %</h4>
-                              <p className="text-2xl font-bold text-white">{selectedPlayer.stats.savePct}</p>
+                            <Card className="bg-fantasy-light border-fantasy-border p-4">
+                              <h4 className="text-sm text-fantasy-muted">Save %</h4>
+                              <p className="text-2xl font-bold">{selectedPlayer.stats.savePct}</p>
                             </Card>
                           </>
                         ) : (
                           <>
-                            <Card className="bg-[#221F26] border-[#33C3F0]/20 p-4">
-                              <h4 className="text-sm text-[#8E9196]">Goals</h4>
-                              <p className="text-2xl font-bold text-white">{selectedPlayer.stats.goals}</p>
+                            <Card className="bg-fantasy-light border-fantasy-border p-4">
+                              <h4 className="text-sm text-fantasy-muted">Goals</h4>
+                              <p className="text-2xl font-bold">{selectedPlayer.stats.goals}</p>
                             </Card>
-                            <Card className="bg-[#221F26] border-[#33C3F0]/20 p-4">
-                              <h4 className="text-sm text-[#8E9196]">Assists</h4>
-                              <p className="text-2xl font-bold text-white">{selectedPlayer.stats.assists}</p>
+                            <Card className="bg-fantasy-light border-fantasy-border p-4">
+                              <h4 className="text-sm text-fantasy-muted">Assists</h4>
+                              <p className="text-2xl font-bold">{selectedPlayer.stats.assists}</p>
                             </Card>
-                            <Card className="bg-[#221F26] border-[#33C3F0]/20 p-4">
-                              <h4 className="text-sm text-[#8E9196]">Points</h4>
-                              <p className="text-2xl font-bold text-white">{selectedPlayer.stats.points}</p>
+                            <Card className="bg-fantasy-light border-fantasy-border p-4">
+                              <h4 className="text-sm text-fantasy-muted">Points</h4>
+                              <p className="text-2xl font-bold">{selectedPlayer.stats.points}</p>
                             </Card>
                           </>
                         )}
                       </div>
                       
-                      <div className="mt-4 bg-[#221F26] p-4 rounded-md border border-[#33C3F0]/10">
-                        <h4 className="text-sm text-[#8E9196] mb-2">Performance Trend</h4>
+                      <div className="mt-4 bg-fantasy-light p-4 rounded-md border border-fantasy-border">
+                        <h4 className="text-sm text-fantasy-muted mb-2">Performance Trend</h4>
                         <div className="h-12 flex items-end gap-1">
                           {Array.from({length: 10}).map((_, i) => (
                             <div 
                               key={i} 
-                              className="bg-gradient-to-t from-[#33C3F0] to-[#9b87f5] rounded-sm"
+                              className="bg-gradient-to-t from-fantasy-primary to-fantasy-secondary rounded-sm"
                               style={{
                                 height: `${Math.max(15, Math.random() * 100)}%`,
                                 width: '8%'
@@ -585,19 +898,27 @@ const Roster = () => {
                   
                   <TabsContent value="history">
                     <div className="text-center py-4">
-                      <p className="text-[#8E9196]">Player history data will be available after the season starts</p>
+                      <p className="text-fantasy-muted">Player history data will be available after the season starts</p>
                     </div>
                   </TabsContent>
                 </Tabs>
 
-                <div className="border-t border-[#33C3F0]/20 mt-6 pt-6 flex justify-between">
-                  <Button variant="outline" size="sm" className="border-[#8E9196]/30 text-[#8E9196] hover:bg-[#221F26]" onClick={() => setIsPlayerDialogOpen(false)}>Close</Button>
+                <div className="border-t border-fantasy-border mt-6 pt-6 flex justify-between">
+                  <Button variant="outline" size="sm" className="border-fantasy-muted text-fantasy-muted hover:bg-fantasy-light" onClick={() => setIsPlayerDialogOpen(false)}>
+                    Close
+                  </Button>
                   <div className="flex gap-2">
-                    <Button variant="outline" size="sm" className="text-red-400 border-red-500/30 hover:bg-red-500/10">Trade</Button>
+                    <Button variant="outline" size="sm" className="text-fantasy-danger border-fantasy-danger/30 hover:bg-fantasy-danger/10">
+                      Trade
+                    </Button>
                     {!selectedPlayer.starter ? (
-                      <Button size="sm" className="bg-amber-600 hover:bg-amber-700">Make Starter</Button>
+                      <Button size="sm" className="bg-fantasy-primary hover:bg-fantasy-primary/90 text-white">
+                        Make Starter
+                      </Button>
                     ) : (
-                      <Button size="sm" className="bg-[#33C3F0] hover:bg-[#33C3F0]/80">Move to Bench</Button>
+                      <Button size="sm" className="bg-fantasy-tertiary hover:bg-fantasy-tertiary/90 text-white">
+                        Move to Bench
+                      </Button>
                     )}
                   </div>
                 </div>

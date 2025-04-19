@@ -63,24 +63,20 @@ export default {
 					border: 'hsl(var(--sidebar-border))',
 					ring: 'hsl(var(--sidebar-ring))'
 				},
-				// Citrus theme custom colors
-				citrus: {
-					green: {
-						light: '#F2FCE2',
-						DEFAULT: '#C1E5AC',
-						dark: '#8BB27D'
-					},
-					yellow: {
-						light: '#FEF7CD',
-						DEFAULT: '#FFEAA7',
-						dark: '#F6D365'
-					},
-					peach: {
-						light: '#FDE1D3',
-						DEFAULT: '#FFBE9D',
-						dark: '#FF9A76'
-					},
-					cream: '#FEF9EF'
+				// Citrus fantasy sports theme colors
+				fantasy: {
+					primary: '#FF7A00',     // Bright orange
+					secondary: '#7CB518',   // Lime green
+					tertiary: '#FFB700',    // Golden yellow
+					light: '#FFF1DB',      // Light cream
+					dark: '#1E293B',       // Slate dark
+					muted: '#94A3B8',      // Slate gray
+					border: '#E2E8F0',     // Light border
+					danger: '#ef4444',     // Red for negative
+					positive: '#22c55e',   // Green for positive
+					neutral: '#f59e0b',    // Amber for neutral
+					surface: '#FFFFFF',    // White surface
+					background: '#F8FAFC'  // Light background
 				}
 			},
 			borderRadius: {
