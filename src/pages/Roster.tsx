@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
@@ -291,7 +290,7 @@ const Roster = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#121820] text-white" style={{backgroundImage: "url('data:image/svg+xml,%3Csvg width=\"60\" height=\"60\" viewBox=\"0 0 60 60\" xmlns=\"http://www.w3.org/2000/svg\"%3E%3Cg fill=\"none\" fill-rule=\"evenodd\"%3E%3Cg fill=\"%239C92AC\" fill-opacity=\"0.04\"%3E%3Cpath d=\"M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z\"%2F%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fsvg%3E')"}}>
+    <div className="min-h-screen bg-[#121820] text-white" style={{backgroundImage: "url('data:image/svg+xml,%3Csvg width=\"60\" height=\"60\" viewBox=\"0 0 60 60\" xmlns=\"http://www.w3.org/2000/svg\"%3E%3Cg fill=\"none\" fill-rule=\"evenodd\"%3E%3Cg fill=\"%239C92AC\" fill-opacity=\"0.04\"%3E%3Cpath d=\"M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z\"%2F%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fsvg%3E')}}>
       <Navbar />
       <main className="pt-24 pb-16">
         <div className="container mx-auto px-4">
@@ -346,36 +345,68 @@ const Roster = () => {
           </div>
 
           {/* Bench Players */}
-          <div className="max-w-5xl mx-auto">
+          <div className="max-w-7xl mx-auto">
             <div className="bg-[#1A1F2C]/70 rounded-lg border border-[#33C3F0]/20 backdrop-blur-sm shadow-lg p-4">
               <h3 className="text-xl font-semibold text-white mb-4 px-2">Bench Players</h3>
-              <ScrollArea className="h-[300px]">
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 p-2">
+              <ScrollArea className="h-[600px]">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 p-2">
                   {players.filter(p => !p.starter).map(player => (
                     <Card
                       key={player.id}
-                      className="bg-[#221F26]/90 border-[#33C3F0]/10 hover:bg-[#221F26] transition-all duration-200 cursor-pointer"
+                      className="bg-[#221F26]/90 border-[#33C3F0]/10 hover:bg-[#221F26] transition-all duration-200 cursor-pointer aspect-square"
                       onClick={() => handlePlayerClick(player)}
                     >
-                      <div className="p-4">
-                        <div className="flex items-center gap-3 mb-3">
-                          <div className="relative h-12 w-12 rounded-full bg-gradient-to-r from-[#33C3F0]/30 to-[#9b87f5]/30 p-0.5">
-                            <img
-                              src={player.image}
-                              alt={player.name}
-                              className="h-full w-full object-cover rounded-full"
-                            />
-                          </div>
-                          <div>
-                            <div className="font-medium text-white">{player.name}</div>
-                            <div className="text-xs text-[#8E9196]">#{player.number}</div>
+                      <div className="p-4 h-full flex flex-col">
+                        <div className="relative w-full pb-[100%] mb-4">
+                          <img
+                            src={player.image}
+                            alt={player.name}
+                            className="absolute inset-0 w-full h-full object-cover rounded-lg border-2 border-[#33C3F0]/20"
+                          />
+                          <div className="absolute top-2 right-2">
+                            <Badge variant="outline" className="bg-[#1A1F2C]/50 text-[#33C3F0] border-[#33C3F0]/30">
+                              {player.position}
+                            </Badge>
                           </div>
                         </div>
-                        <div className="flex items-center justify-between text-sm">
-                          <Badge variant="outline" className="bg-[#1A1F2C]/50 text-[#33C3F0] border-[#33C3F0]/30">
-                            {player.position}
-                          </Badge>
-                          <span className="text-[#8E9196]">{player.experience}</span>
+                        <div className="flex-1 flex flex-col justify-between">
+                          <div>
+                            <h4 className="font-medium text-white text-lg mb-1">{player.name}</h4>
+                            <p className="text-sm text-[#8E9196]">#{player.number} · {player.team}</p>
+                          </div>
+                          <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+                            {player.position === 'Goalie' ? (
+                              <>
+                                <div className="bg-[#1A1F2C]/30 rounded p-1">
+                                  <div className="text-[#33C3F0] text-sm">{player.stats.wins}</div>
+                                  <div className="text-[#8E9196] text-xs">Wins</div>
+                                </div>
+                                <div className="bg-[#1A1F2C]/30 rounded p-1">
+                                  <div className="text-[#33C3F0] text-sm">{player.stats.gaa}</div>
+                                  <div className="text-[#8E9196] text-xs">GAA</div>
+                                </div>
+                                <div className="bg-[#1A1F2C]/30 rounded p-1">
+                                  <div className="text-[#33C3F0] text-sm">{player.stats.savePct}</div>
+                                  <div className="text-[#8E9196] text-xs">SV%</div>
+                                </div>
+                              </>
+                            ) : (
+                              <>
+                                <div className="bg-[#1A1F2C]/30 rounded p-1">
+                                  <div className="text-[#33C3F0] text-sm">{player.stats.goals}</div>
+                                  <div className="text-[#8E9196] text-xs">Goals</div>
+                                </div>
+                                <div className="bg-[#1A1F2C]/30 rounded p-1">
+                                  <div className="text-[#33C3F0] text-sm">{player.stats.assists}</div>
+                                  <div className="text-[#8E9196] text-xs">Assists</div>
+                                </div>
+                                <div className="bg-[#1A1F2C]/30 rounded p-1">
+                                  <div className="text-[#33C3F0] text-sm">{player.stats.points}</div>
+                                  <div className="text-[#8E9196] text-xs">Points</div>
+                                </div>
+                              </>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </Card>
@@ -456,7 +487,7 @@ const Roster = () => {
                   </TabsList>
                   
                   <TabsContent value="details">
-                    <div className="grid grid-cols-2 gap-6">
+                    <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-3">
                         <div className="flex justify-between">
                           <span className="text-[#8E9196]">Team:</span>
