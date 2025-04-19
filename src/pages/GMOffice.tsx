@@ -1,150 +1,35 @@
-
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
-import { Button } from '@/components/ui/button';
+import { StatsOverviewCards } from '@/components/gm-office/StatsOverviewCards';
+import { ActionsSidebar } from '@/components/gm-office/ActionsSidebar';
+import { ActivityFeed } from '@/components/gm-office/ActivityFeed';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const GMOffice = () => {
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-gradient-to-br from-background to-background/95">
       <Navbar />
       <main className="pt-24 pb-16">
         <div className="container mx-auto px-4">
           <div className="max-w-3xl mx-auto text-center mb-10 animated-element">
-            <h1 className="text-4xl md:text-5xl font-bold mb-4 vibrant-gradient-1 bg-clip-text text-transparent">
+            <h1 className="text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-[hsl(var(--vibrant-orange))] via-primary to-[hsl(var(--vibrant-purple))] inline-block text-transparent bg-clip-text">
               GM's Office
             </h1>
             <p className="text-lg text-muted-foreground">
-              Manage your team and make strategic decisions
+              Your command center for team management and strategy
             </p>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-10">
-            <Card className="md:col-span-2 animated-element">
-              <CardHeader>
-                <CardTitle>Team Overview</CardTitle>
-                <CardDescription>Citrus Crushers | Current Record: 7-3</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-                  <div className="bg-muted/30 rounded-lg p-4 text-center">
-                    <div className="text-sm text-muted-foreground mb-1">League Rank</div>
-                    <div className="text-3xl font-bold">3rd</div>
-                    <div className="text-sm text-[hsl(var(--vibrant-orange))]">Top 33%</div>
-                  </div>
-                  <div className="bg-muted/30 rounded-lg p-4 text-center">
-                    <div className="text-sm text-muted-foreground mb-1">Points For</div>
-                    <div className="text-3xl font-bold">1,247</div>
-                    <div className="text-sm text-primary">124.7 avg/week</div>
-                  </div>
-                  <div className="bg-muted/30 rounded-lg p-4 text-center">
-                    <div className="text-sm text-muted-foreground mb-1">Points Against</div>
-                    <div className="text-3xl font-bold">1,118</div>
-                    <div className="text-sm text-[hsl(var(--vibrant-purple))]">111.8 avg/week</div>
-                  </div>
-                </div>
-                
-                <h3 className="text-lg font-medium mb-3">Recent Activity</h3>
-                <div className="space-y-3 mb-6">
-                  <ActivityItem 
-                    date="Apr 5, 2025"
-                    type="add"
-                    description="Added WR Noah Brown (WAS) to team"
-                  />
-                  <ActivityItem 
-                    date="Apr 3, 2025"
-                    type="drop"
-                    description="Dropped TE Cole Kmet (CHI) from team"
-                  />
-                  <ActivityItem 
-                    date="Apr 2, 2025"
-                    type="trade"
-                    description="Traded RB Derrick Henry for WR CeeDee Lamb"
-                  />
-                </div>
-                
-                <h3 className="text-lg font-medium mb-3">Upcoming Schedule</h3>
-                <div className="space-y-3">
-                  <ScheduleItem 
-                    week="Week 11"
-                    opponent="Touchdown Titans"
-                    record="9-1"
-                    projection="Projected: 82-87"
-                  />
-                  <ScheduleItem 
-                    week="Week 12"
-                    opponent="Scoring Sharks"
-                    record="8-2"
-                    projection="Projected: 88-91"
-                  />
-                  <ScheduleItem 
-                    week="Week 13"
-                    opponent="Hustle Heroes"
-                    record="2-8"
-                    projection="Projected: 128-102"
-                  />
-                </div>
-              </CardContent>
-            </Card>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-10">
+            <div className="lg:col-span-2 space-y-8">
+              <StatsOverviewCards />
+              <ActivityFeed />
+            </div>
             
-            <Card className="animated-element">
-              <CardHeader>
-                <CardTitle>Team Actions</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <Button className="w-full btn-vibrant-orange">
-                  View Team Roster
-                </Button>
-                <Button className="w-full btn-vibrant-purple">
-                  Propose Trade
-                </Button>
-                <Button variant="outline" className="w-full">
-                  Add/Drop Players
-                </Button>
-                <Button variant="outline" className="w-full">
-                  Manage Lineup
-                </Button>
-                
-                <div className="border-t border-border pt-4 mt-4">
-                  <h3 className="text-lg font-medium mb-3">Quick Links</h3>
-                  <ul className="space-y-3">
-                    <li>
-                      <a href="#" className="text-[hsl(var(--vibrant-orange))] hover:underline flex items-center">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4 mr-2">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
-                        </svg>
-                        League Standings
-                      </a>
-                    </li>
-                    <li>
-                      <a href="#" className="text-[hsl(var(--vibrant-orange))] hover:underline flex items-center">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4 mr-2">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 14.25v2.25m3-4.5v4.5m3-6.75v6.75m3-9v9M6 20.25h12A2.25 2.25 0 0020.25 18V6A2.25 2.25 0 0018 3.75H6A2.25 2.25 0 003.75 6v12A2.25 2.25 0 006 20.25z" />
-                        </svg>
-                        Player Stats
-                      </a>
-                    </li>
-                    <li>
-                      <a href="#" className="text-[hsl(var(--vibrant-orange))] hover:underline flex items-center">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4 mr-2">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        League Settings
-                      </a>
-                    </li>
-                    <li>
-                      <a href="#" className="text-[hsl(var(--vibrant-orange))] hover:underline flex items-center">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4 mr-2">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M8.625 9.75a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375m-13.5 3.01c0 1.6 1.123 2.994 2.707 3.227 1.087.16 2.185.283 3.293.369V21l4.184-4.183a1.14 1.14 0 01.778-.332 48.294 48.294 0 005.83-.498c1.585-.233 2.708-1.626 2.708-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z" />
-                        </svg>
-                        Message Board
-                      </a>
-                    </li>
-                  </ul>
-                </div>
-              </CardContent>
-            </Card>
+            <div className="space-y-8">
+              <ActionsSidebar />
+            </div>
           </div>
           
           <Tabs defaultValue="news" className="animated-element">
@@ -153,6 +38,7 @@ const GMOffice = () => {
               <TabsTrigger value="analysis">Analysis</TabsTrigger>
               <TabsTrigger value="transactions">Transactions</TabsTrigger>
             </TabsList>
+            
             <TabsContent value="news" className="mt-6">
               <Card>
                 <CardHeader>
