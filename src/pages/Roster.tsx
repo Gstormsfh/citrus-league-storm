@@ -1,15 +1,23 @@
-
 import { useState } from 'react';
+import {
+  DndContext,
+  DragEndEvent,
+  closestCenter,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  rectSortingStrategy,
+} from '@dnd-kit/sortable';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
+import { PlayerCard } from '@/components/gm-office/PlayerCard';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { ChevronDown, ChevronRight, Star, TrendingUp, TrendingDown, BarChart } from 'lucide-react';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Card, CardContent } from '@/components/ui/card';
+import { BarChart, Star, TrendingUp, TrendingDown } from 'lucide-react';
 
 // Sample player data - hockey themed
 const players = [
@@ -236,32 +244,39 @@ const Roster = () => {
   const [selectedPlayer, setSelectedPlayer] = useState<typeof players[0] | null>(null);
   const [isPlayerDialogOpen, setIsPlayerDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("roster");
-  const [activeStat, setActiveStat] = useState("standard");
+  const [rosterPlayers, setRosterPlayers] = useState(players);
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    
+    if (active.id !== over?.id) {
+      setRosterPlayers((items) => {
+        const oldIndex = items.findIndex((item) => item.id === active.id);
+        const newIndex = items.findIndex((item) => item.id === over?.id);
+        
+        const newItems = arrayMove(items, oldIndex, newIndex);
+        
+        // Toggle starter status when dragging between sections
+        const activePlayer = items[oldIndex];
+        const overPlayer = items[newIndex];
+        
+        if (activePlayer.starter !== overPlayer.starter) {
+          newItems[newIndex] = { ...newItems[newIndex], starter: !newItems[newIndex].starter };
+          newItems[oldIndex] = { ...newItems[oldIndex], starter: !newItems[oldIndex].starter };
+        }
+        
+        return newItems;
+      });
+    }
+  };
 
   const handlePlayerClick = (player: typeof players[0]) => {
     setSelectedPlayer(player);
     setIsPlayerDialogOpen(true);
   };
 
-  // Group players by position
-  const positionGroups = players.reduce((groups: Record<string, typeof players>, player) => {
-    if (!groups[player.position]) {
-      groups[player.position] = [];
-    }
-    groups[player.position].push(player);
-    return groups;
-  }, {});
-
-  // Sort players by starter status
-  Object.keys(positionGroups).forEach(position => {
-    positionGroups[position].sort((a, b) => {
-      if (a.starter && !b.starter) return -1;
-      if (!a.starter && b.starter) return 1;
-      return 0;
-    });
-  });
-
-  const positionOrder = ['Centre', 'Right Wing', 'Left Wing', 'Defence', 'Goalie'];
+  const starters = rosterPlayers.filter(player => player.starter);
+  const bench = rosterPlayers.filter(player => !player.starter);
 
   return (
     <div className="min-h-screen bg-fantasy-background text-fantasy-dark">
@@ -337,7 +352,7 @@ const Roster = () => {
 
               <TabsContent value="roster" className="m-0 p-6">
                 {/* Secondary tabs for roster view */}
-                <Tabs value={activeStat} onValueChange={setActiveStat} className="mb-4">
+                <Tabs value="standard" onValueChange={() => {}} className="mb-4">
                   <TabsList className="bg-fantasy-background/80 p-1">
                     <TabsTrigger value="standard" className="data-[state=active]:bg-white data-[state=active]:text-fantasy-primary">
                       Standard
@@ -349,100 +364,62 @@ const Roster = () => {
                 </Tabs>
                 
                 {/* Roster table similar to example */}
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-fantasy-light hover:bg-fantasy-light">
-                      <TableHead className="w-[40px]">POS</TableHead>
-                      <TableHead>Player</TableHead>
-                      <TableHead className="text-right"># / Team</TableHead>
-                      <TableHead className="text-right">G</TableHead>
-                      <TableHead className="text-right">A</TableHead>
-                      <TableHead className="text-right">PTS</TableHead>
-                      <TableHead className="text-right">+/-</TableHead>
-                      <TableHead className="text-right">PIM</TableHead>
-                      <TableHead className="text-right">SOG</TableHead>
-                      {activeStat === "advanced" && (
-                        <>
-                          <TableHead className="text-right">PP PTS</TableHead>
-                          <TableHead className="text-right">SH PTS</TableHead>
-                          <TableHead className="text-right">GWG</TableHead>
-                          <TableHead className="text-right">FO%</TableHead>
-                        </>
-                      )}
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {positionOrder.map(position => (
-                      positionGroups[position]?.map((player) => (
-                        <TableRow 
-                          key={player.id} 
-                          className="cursor-pointer hover:bg-fantasy-light"
-                          onClick={() => handlePlayerClick(player)}
-                        >
-                          <TableCell className="font-medium">
-                            <Badge className={`${player.starter ? 'bg-fantasy-primary' : 'bg-fantasy-muted'} text-white`}>
-                              {position === 'Centre' ? 'C' : 
-                               position === 'Right Wing' ? 'RW' : 
-                               position === 'Left Wing' ? 'LW' : 
-                               position === 'Defence' ? 'D' : 'G'}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 rounded-full overflow-hidden">
-                                <img 
-                                  src={player.image} 
-                                  alt={player.name} 
-                                  className="object-cover w-full h-full"
-                                />
-                              </div>
-                              <div>
-                                <div className="font-medium">{player.name}</div>
-                                <div className="text-xs text-fantasy-muted">{player.position}</div>
-                              </div>
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="font-medium">#{player.number}</div>
-                            <div className="text-xs text-fantasy-muted">{player.team}</div>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            {position === 'Goalie' ? player.stats.wins : player.stats.goals}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            {position === 'Goalie' ? player.stats.losses : player.stats.assists}
-                          </TableCell>
-                          <TableCell className="text-right font-medium">
-                            {position === 'Goalie' ? player.stats.otl : player.stats.points}
-                          </TableCell>
-                          <TableCell className={`text-right ${
-                            position !== 'Goalie' && player.stats.plusMinus > 0 
-                              ? 'text-fantasy-positive' 
-                              : position !== 'Goalie' && player.stats.plusMinus < 0 
-                                ? 'text-fantasy-danger' 
-                                : ''
-                          }`}>
-                            {position === 'Goalie' ? player.stats.gaa : player.stats.plusMinus > 0 ? `+${player.stats.plusMinus}` : player.stats.plusMinus}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            {position === 'Goalie' ? player.stats.savePct : player.stats.pim}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            {position === 'Goalie' ? player.stats.shutouts : player.stats.shots}
-                          </TableCell>
-                          {activeStat === "advanced" && (
-                            <>
-                              <TableCell className="text-right">{position !== 'Goalie' ? Math.floor(Math.random() * 30) : '-'}</TableCell>
-                              <TableCell className="text-right">{position !== 'Goalie' ? Math.floor(Math.random() * 10) : '-'}</TableCell>
-                              <TableCell className="text-right">{position !== 'Goalie' ? Math.floor(Math.random() * 10) : '-'}</TableCell>
-                              <TableCell className="text-right">{position === 'Centre' ? `${Math.floor(45 + Math.random() * 15)}%` : '-'}</TableCell>
-                            </>
-                          )}
-                        </TableRow>
-                      ))
-                    ))}
-                  </TableBody>
-                </Table>
+                <DndContext
+                  collisionDetection={closestCenter}
+                  onDragEnd={handleDragEnd}
+                >
+                  <div className="space-y-8">
+                    {/* Starters Section */}
+                    <div>
+                      <div className="flex items-center gap-2 mb-4">
+                        <Star className="w-5 h-5 text-fantasy-primary" />
+                        <h2 className="text-xl font-semibold">Starters</h2>
+                        <Badge variant="outline" className="ml-2">
+                          {starters.length} Players
+                        </Badge>
+                      </div>
+                      
+                      <div className="relative">
+                        <SortableContext items={starters.map(p => p.id)} strategy={rectSortingStrategy}>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                            {starters.map((player) => (
+                              <PlayerCard
+                                key={player.id}
+                                player={player}
+                                onPlayerClick={handlePlayerClick}
+                              />
+                            ))}
+                          </div>
+                        </SortableContext>
+                      </div>
+                    </div>
+
+                    {/* Bench Section */}
+                    <div>
+                      <div className="flex items-center gap-2 mb-4">
+                        <BarChart className="w-5 h-5 text-fantasy-muted" />
+                        <h2 className="text-xl font-semibold">Bench</h2>
+                        <Badge variant="outline" className="ml-2">
+                          {bench.length} Players
+                        </Badge>
+                      </div>
+                      
+                      <div className="relative">
+                        <SortableContext items={bench.map(p => p.id)} strategy={rectSortingStrategy}>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                            {bench.map((player) => (
+                              <PlayerCard
+                                key={player.id}
+                                player={player}
+                                onPlayerClick={handlePlayerClick}
+                              />
+                            ))}
+                          </div>
+                        </SortableContext>
+                      </div>
+                    </div>
+                  </div>
+                </DndContext>
               </TabsContent>
 
               <TabsContent value="stats" className="m-0 p-6">
