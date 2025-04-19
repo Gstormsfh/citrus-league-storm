@@ -1,7 +1,7 @@
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { users, briefcase, settings } from 'lucide-react';
+import { Users, Briefcase, Settings } from 'lucide-react';
 
 export const ActionsSidebar = () => {
   return (
@@ -11,15 +11,15 @@ export const ActionsSidebar = () => {
       </CardHeader>
       <CardContent className="space-y-4">
         <Button className="w-full bg-[hsl(var(--vibrant-orange))] hover:bg-[hsl(var(--vibrant-orange))]/90 text-white group transition-all">
-          <users className="w-4 h-4 mr-2 transition-transform group-hover:scale-110" />
+          <Users className="w-4 h-4 mr-2 transition-transform group-hover:scale-110" />
           Manage Team
         </Button>
         <Button className="w-full bg-gradient-to-r from-primary/90 to-primary hover:from-primary hover:to-primary/90 text-white group transition-all">
-          <briefcase className="w-4 h-4 mr-2 transition-transform group-hover:scale-110" />
+          <Briefcase className="w-4 h-4 mr-2 transition-transform group-hover:scale-110" />
           Trade Center
         </Button>
         <Button variant="outline" className="w-full group">
-          <settings className="w-4 h-4 mr-2 transition-transform group-hover:scale-110" />
+          <Settings className="w-4 h-4 mr-2 transition-transform group-hover:scale-110" />
           Team Settings
         </Button>
         
