@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
@@ -273,6 +272,23 @@ const Roster = () => {
 
   const positionOrder = ['Centre', 'Right Wing', 'Left Wing', 'Defence', 'Goalie'];
 
+  const getPositionCoordinates = (position: string) => {
+    switch (position) {
+      case 'Left Wing':
+        return 'left-[15%] top-[40%]';
+      case 'Centre':
+        return 'left-[50%] top-[40%] -translate-x-1/2';
+      case 'Right Wing':
+        return 'right-[15%] top-[40%]';
+      case 'Defence':
+        return 'translate-x-1/2'; // Will be used with additional classes
+      case 'Goalie':
+        return 'left-1/2 top-[85%] -translate-x-1/2';
+      default:
+        return '';
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#121820] text-white" style={{backgroundImage: "url('data:image/svg+xml,%3Csvg width=\"60\" height=\"60\" viewBox=\"0 0 60 60\" xmlns=\"http://www.w3.org/2000/svg\"%3E%3Cg fill=\"none\" fill-rule=\"evenodd\"%3E%3Cg fill=\"%239C92AC\" fill-opacity=\"0.04\"%3E%3Cpath d=\"M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z\"%2F%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fsvg%3E')"}}>
       <Navbar />
@@ -283,132 +299,89 @@ const Roster = () => {
             <p className="text-xl text-[#8E9196] animate-fade-in delay-100">Premium hockey team management with real-time player stats and lineup optimization.</p>
           </div>
 
-          <div className="bg-[#1A1F2C]/70 rounded-lg border border-[#33C3F0]/20 backdrop-blur-sm shadow-lg max-w-5xl mx-auto mb-8 animate-fade-in delay-200">
-            <div className="p-6 border-b border-[#33C3F0]/20">
-              <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-semibold text-white animate-fade-in delay-300">2024-2025 Season Roster</h2>
-                <div className="flex items-center gap-3">
-                  <Badge className="bg-[#33C3F0] text-white animate-fade-in delay-400">
-                    {players.filter(p => p.starter).length} Starters
-                  </Badge>
-                  <Badge className="bg-[#1A1F2C] text-[#8E9196] border border-[#8E9196]/30 animate-fade-in delay-500">
-                    {players.filter(p => !p.starter).length} Bench
-                  </Badge>
-                </div>
-              </div>
+          {/* Hockey Rink Layout */}
+          <div className="relative w-full max-w-5xl mx-auto h-[600px] mb-8 rounded-[200px] bg-gradient-to-b from-[#1A1F2C]/95 to-[#1A1F2C]/70 border border-[#33C3F0]/20 backdrop-blur-sm overflow-hidden">
+            {/* Rink Markings */}
+            <div className="absolute inset-0">
+              {/* Center Ice Line */}
+              <div className="absolute left-1/2 top-0 bottom-0 w-0.5 bg-[#33C3F0]/20"></div>
+              {/* Center Circle */}
+              <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 rounded-full border-2 border-[#33C3F0]/20"></div>
+              {/* Blue Lines */}
+              <div className="absolute left-[25%] top-0 bottom-0 w-0.5 bg-[#33C3F0]/20"></div>
+              <div className="absolute right-[25%] top-0 bottom-0 w-0.5 bg-[#33C3F0]/20"></div>
             </div>
-            
-            <ScrollArea className="h-[calc(100vh-350px)] p-4">
-              <div className="space-y-6 p-2">
-                {positionOrder.map((position, positionIndex) => (
-                  <Card 
-                    key={position} 
-                    className="bg-[#221F26]/90 border-[#33C3F0]/10 transition-all duration-300 hover:bg-[#221F26] animated-element"
-                    style={{
-                      animationDelay: `${positionIndex * 100}ms`
-                    }}
-                  >
-                    <div 
-                      className="p-4 flex items-center justify-between cursor-pointer transition-colors duration-200 hover:bg-[#1A1F2C]/30"
-                      onClick={() => togglePositionExpand(position)}
-                    >
-                      <div className="flex items-center gap-3">
-                        {expandedPositions[position] ? 
-                          <ChevronDown className="h-5 w-5 text-[#33C3F0] transition-transform duration-200" /> : 
-                          <ChevronRight className="h-5 w-5 text-[#33C3F0] transition-transform duration-200" />}
-                        <h3 className="text-xl font-semibold text-white">{position}</h3>
-                        <Badge variant="outline" className="ml-2 bg-[#1A1F2C] border-[#33C3F0]/30 text-[#33C3F0]">
-                          {positionGroups[position]?.length || 0}
-                        </Badge>
+
+            {/* Starters on Ice */}
+            {positionOrder.map(position => {
+              const startersInPosition = players.filter(p => p.position === position && p.starter);
+              return startersInPosition.map((player, index) => (
+                <div
+                  key={player.id}
+                  className={`absolute ${getPositionCoordinates(position)} ${
+                    position === 'Defence' ? 
+                    index === 0 ? 'left-[30%] top-[65%]' : 'right-[30%] top-[65%]' : 
+                    ''
+                  } transform cursor-pointer group animate-fade-in`}
+                  onClick={() => handlePlayerClick(player)}
+                >
+                  <div className="relative w-16 h-16">
+                    <div className="absolute inset-0 bg-gradient-to-r from-[#33C3F0] to-[#9b87f5] rounded-full opacity-20 group-hover:opacity-30 transition-opacity"></div>
+                    <img
+                      src={player.image}
+                      alt={player.name}
+                      className="w-16 h-16 rounded-full border-2 border-[#33C3F0]/40 hover:border-[#33C3F0] transition-all duration-200 group-hover:scale-110"
+                    />
+                    <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 text-center min-w-max">
+                      <div className="text-sm font-medium text-white group-hover:text-[#33C3F0] transition-colors">
+                        {player.name}
                       </div>
-                      <div>
-                        <Badge variant="outline" className="bg-[#1A1F2C]/50 border-[#8E9196]/20 text-[#8E9196]">
-                          {positionGroups[position]?.filter(p => p.starter).length || 0} Active
-                        </Badge>
-                      </div>
+                      <div className="text-xs text-[#8E9196]">#{player.number}</div>
                     </div>
-                    
-                    {expandedPositions[position] && positionGroups[position] && (
-                      <div className="px-4 pb-4 animate-accordion-down">
-                        <Table>
-                          <TableHeader>
-                            <TableRow className="border-[#33C3F0]/10 hover:bg-[#1A1F2C]/30">
-                              <TableHead className="w-12 text-[#8E9196]">No.</TableHead>
-                              <TableHead className="text-[#8E9196]">Player</TableHead>
-                              <TableHead className="text-[#8E9196]">Status</TableHead>
-                              <TableHead className="text-[#8E9196]">Key Stats</TableHead>
-                              <TableHead className="text-right text-[#8E9196]"></TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {positionGroups[position].map((player, playerIndex) => (
-                              <TableRow 
-                                key={player.id} 
-                                className={`animated-element border-[#33C3F0]/10 hover:bg-[#1A1F2C] cursor-pointer transition-all duration-300 ${player.starter ? 'bg-[#1A1F2C]/30' : ''}`}
-                                onClick={() => handlePlayerClick(player)}
-                                style={{
-                                  animationDelay: `${playerIndex * 50}ms`
-                                }}
-                              >
-                                <TableCell className="font-medium text-white">{player.number}</TableCell>
-                                <TableCell>
-                                  <div className="flex items-center gap-3">
-                                    <div className="relative h-10 w-10 rounded-full bg-gradient-to-r from-[#33C3F0]/30 to-[#9b87f5]/30 p-0.5 overflow-hidden group-hover:scale-110 transition-transform duration-200">
-                                      <img 
-                                        src={player.image} 
-                                        alt={player.name} 
-                                        className="h-full w-full object-cover rounded-full transition-transform duration-200 hover:scale-110" 
-                                      />
-                                    </div>
-                                    <div>
-                                      <span className="font-medium text-white group-hover:text-[#33C3F0] transition-colors duration-200">{player.name}</span>
-                                      <div className="text-xs text-[#8E9196]">{player.team}</div>
-                                    </div>
-                                  </div>
-                                </TableCell>
-                                <TableCell>
-                                  {player.starter ? (
-                                    <div className="flex items-center">
-                                      <Star className="h-4 w-4 text-amber-500 fill-amber-500 mr-1.5 animate-pulse" />
-                                      <span className="text-amber-400">Starter</span>
-                                    </div>
-                                  ) : (
-                                    <span className="text-[#8E9196] text-sm">Bench</span>
-                                  )}
-                                </TableCell>
-                                <TableCell>
-                                  {position === 'Goalie' ? (
-                                    <span className="text-[#aaadb0]">
-                                      {player.stats.wins}W, {player.stats.gaa} GAA, {player.stats.savePct} SV%
-                                    </span>
-                                  ) : (
-                                    <span className="text-[#aaadb0]">
-                                      {player.stats.goals}G, {player.stats.assists}A, {player.stats.points}P
-                                    </span>
-                                  )}
-                                </TableCell>
-                                <TableCell className="text-right">
-                                  <Button 
-                                    size="sm" 
-                                    className="bg-[#1A1F2C] hover:bg-[#33C3F0]/20 text-[#33C3F0] border border-[#33C3F0]/30 transition-all duration-200 hover:scale-105"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handlePlayerClick(player);
-                                    }}
-                                  >
-                                    View
-                                  </Button>
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
+                  </div>
+                </div>
+              ));
+            })}
+          </div>
+
+          {/* Bench Players */}
+          <div className="max-w-5xl mx-auto">
+            <div className="bg-[#1A1F2C]/70 rounded-lg border border-[#33C3F0]/20 backdrop-blur-sm shadow-lg p-4">
+              <h3 className="text-xl font-semibold text-white mb-4 px-2">Bench Players</h3>
+              <ScrollArea className="h-[300px]">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 p-2">
+                  {players.filter(p => !p.starter).map(player => (
+                    <Card
+                      key={player.id}
+                      className="bg-[#221F26]/90 border-[#33C3F0]/10 hover:bg-[#221F26] transition-all duration-200 cursor-pointer"
+                      onClick={() => handlePlayerClick(player)}
+                    >
+                      <div className="p-4">
+                        <div className="flex items-center gap-3 mb-3">
+                          <div className="relative h-12 w-12 rounded-full bg-gradient-to-r from-[#33C3F0]/30 to-[#9b87f5]/30 p-0.5">
+                            <img
+                              src={player.image}
+                              alt={player.name}
+                              className="h-full w-full object-cover rounded-full"
+                            />
+                          </div>
+                          <div>
+                            <div className="font-medium text-white">{player.name}</div>
+                            <div className="text-xs text-[#8E9196]">#{player.number}</div>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between text-sm">
+                          <Badge variant="outline" className="bg-[#1A1F2C]/50 text-[#33C3F0] border-[#33C3F0]/30">
+                            {player.position}
+                          </Badge>
+                          <span className="text-[#8E9196]">{player.experience}</span>
+                        </div>
                       </div>
-                    )}
-                  </Card>
-                ))}
-              </div>
-            </ScrollArea>
+                    </Card>
+                  ))}
+                </div>
+              </ScrollArea>
+            </div>
           </div>
 
           <div className="max-w-5xl mx-auto mt-10 grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -433,175 +406,163 @@ const Roster = () => {
             <Button className="bg-[#33C3F0] hover:bg-[#33C3F0]/80 text-white">Add Player</Button>
             <Button variant="outline" className="border-[#33C3F0]/30 text-[#33C3F0] hover:bg-[#33C3F0]/10">Export Roster</Button>
           </div>
-        </div>
-      </main>
-      <Footer />
-
-      <Dialog open={isPlayerDialogOpen} onOpenChange={setIsPlayerDialogOpen}>
-        <DialogContent className="sm:max-w-[600px] p-0 overflow-hidden bg-[#1A1F2C]/95 backdrop-blur-md border-[#33C3F0]/20 text-white animate-fade-in">
-          {selectedPlayer && (
-            <div>
-              <div className="relative h-40 bg-gradient-to-r from-[#33C3F0]/80 to-[#9b87f5]/80 flex items-end overflow-hidden">
-                <div className="absolute inset-0" style={{backgroundImage: "url('data:image/svg+xml,%3Csvg width=\"60\" height=\"60\" viewBox=\"0 0 60 60\" xmlns=\"http://www.w3.org/2000/svg\"%3E%3Cg fill=\"none\" fill-rule=\"evenodd\"%3E%3Cg fill=\"%23FFFFFF\" fill-opacity=\"0.1\"%3E%3Cpath d=\"M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z\"%2F%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fsvg%3E')", opacity: "0.5"}}></div>
-                <div className="absolute top-4 right-4 animate-fade-in">
-                  <Badge 
-                    variant="outline" 
-                    className={`font-bold px-3 py-1 ${selectedPlayer.starter ? 
-                      'bg-amber-900/50 text-amber-200 border-amber-700/50' : 
-                      'bg-[#1A1F2C]/50 text-[#8E9196] border-[#8E9196]/30'}`}
-                  >
-                    {selectedPlayer.starter ? 'Starter' : 'Bench'}
-                  </Badge>
-                </div>
-                <div className="p-6 pb-0 flex items-end gap-4 relative z-10">
-                  <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-white shadow-lg translate-y-8 animate-fade-in transition-transform duration-300 hover:scale-105">
-                    <img 
-                      src={selectedPlayer.image} 
-                      alt={selectedPlayer.name} 
-                      className="h-full w-full object-cover" 
-                    />
-                  </div>
-                  <div className="text-white mb-4 animate-fade-in">
-                    <h2 className="text-2xl font-bold">{selectedPlayer.name}</h2>
-                    <div className="flex items-center gap-2">
-                      <Badge variant="outline" className="bg-white/20 border-white/30 text-white">
-                        {selectedPlayer.position}
+          
+          <Dialog open={isPlayerDialogOpen} onOpenChange={setIsPlayerDialogOpen}>
+            <DialogContent className="sm:max-w-[600px] p-0 overflow-hidden bg-[#1A1F2C]/95 backdrop-blur-md border-[#33C3F0]/20 text-white animate-fade-in">
+              {selectedPlayer && (
+                <div>
+                  <div className="relative h-40 bg-gradient-to-r from-[#33C3F0]/80 to-[#9b87f5]/80 flex items-end overflow-hidden">
+                    <div className="absolute inset-0" style={{backgroundImage: "url('data:image/svg+xml,%3Csvg width=\"60\" height=\"60\" viewBox=\"0 0 60 60\" xmlns=\"http://www.w3.org/2000/svg\"%3E%3Cg fill=\"none\" fill-rule=\"evenodd\"%3E%3Cg fill=\"%23FFFFFF\" fill-opacity=\"0.1\"%3E%3Cpath d=\"M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z\"%2F%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fsvg%3E')", opacity: "0.5"}}></div>
+                    <div className="absolute top-4 right-4 animate-fade-in">
+                      <Badge 
+                        variant="outline" 
+                        className={`font-bold px-3 py-1 ${selectedPlayer.starter ? 
+                          'bg-amber-900/50 text-amber-200 border-amber-700/50' : 
+                          'bg-[#1A1F2C]/50 text-[#8E9196] border-[#8E9196]/30'}`}
+                      >
+                        {selectedPlayer.starter ? 'Starter' : 'Bench'}
                       </Badge>
-                      <span className="text-white/90">#{selectedPlayer.number}</span>
+                    </div>
+                    <div className="p-6 pb-0 flex items-end gap-4 relative z-10">
+                      <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-white shadow-lg translate-y-8 animate-fade-in transition-transform duration-300 hover:scale-105">
+                        <img 
+                          src={selectedPlayer.image} 
+                          alt={selectedPlayer.name} 
+                          className="h-full w-full object-cover" 
+                        />
+                      </div>
+                      <div className="text-white mb-4 animate-fade-in">
+                        <h2 className="text-2xl font-bold">{selectedPlayer.name}</h2>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className="bg-white/20 border-white/30 text-white">
+                            {selectedPlayer.position}
+                          </Badge>
+                          <span className="text-white/90">#{selectedPlayer.number}</span>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                </div>
-              </div>
 
-              <div className="p-6 pt-12">
-                <Tabs defaultValue="details" className="w-full">
-                  <TabsList className="bg-[#221F26] w-full mb-6">
-                    <TabsTrigger value="details" className="data-[state=active]:bg-[#33C3F0]/20 data-[state=active]:text-[#33C3F0]">Player Details</TabsTrigger>
-                    <TabsTrigger value="stats" className="data-[state=active]:bg-[#33C3F0]/20 data-[state=active]:text-[#33C3F0]">Season Stats</TabsTrigger>
-                    <TabsTrigger value="history" className="data-[state=active]:bg-[#33C3F0]/20 data-[state=active]:text-[#33C3F0]">History</TabsTrigger>
-                  </TabsList>
-                  
-                  <TabsContent value="details">
-                    <div className="grid grid-cols-2 gap-6">
-                      <div className="space-y-3">
-                        <div className="flex justify-between">
-                          <span className="text-[#8E9196]">Team:</span>
-                          <span className="font-medium text-white">{selectedPlayer.team}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-[#8E9196]">Position:</span>
-                          <span className="font-medium text-white">{selectedPlayer.position}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-[#8E9196]">Number:</span>
-                          <span className="font-medium text-white">#{selectedPlayer.number}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-[#8E9196]">Status:</span>
-                          <span className="font-medium text-white">{selectedPlayer.starter ? 'Starter' : 'Bench'}</span>
-                        </div>
-                      </div>
+                  <div className="p-6 pt-12">
+                    <Tabs defaultValue="details" className="w-full">
+                      <TabsList className="bg-[#221F26] w-full mb-6">
+                        <TabsTrigger value="details" className="data-[state=active]:bg-[#33C3F0]/20 data-[state=active]:text-[#33C3F0]">Player Details</TabsTrigger>
+                        <TabsTrigger value="stats" className="data-[state=active]:bg-[#33C3F0]/20 data-[state=active]:text-[#33C3F0]">Season Stats</TabsTrigger>
+                        <TabsTrigger value="history" className="data-[state=active]:bg-[#33C3F0]/20 data-[state=active]:text-[#33C3F0]">History</TabsTrigger>
+                      </TabsList>
+                      
+                      <TabsContent value="details">
+                        <div className="grid grid-cols-2 gap-6">
+                          <div className="space-y-3">
+                            <div className="flex justify-between">
+                              <span className="text-[#8E9196]">Team:</span>
+                              <span className="font-medium text-white">{selectedPlayer.team}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-[#8E9196]">Position:</span>
+                              <span className="font-medium text-white">{selectedPlayer.position}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-[#8E9196]">Number:</span>
+                              <span className="font-medium text-white">#{selectedPlayer.number}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-[#8E9196]">Status:</span>
+                              <span className="font-medium text-white">{selectedPlayer.starter ? 'Starter' : 'Bench'}</span>
+                            </div>
+                          </div>
 
-                      <div className="space-y-3">
-                        <div className="flex justify-between">
-                          <span className="text-[#8E9196]">Height:</span>
-                          <span className="font-medium text-white">{selectedPlayer.height}</span>
+                          <div className="space-y-3">
+                            <div className="flex justify-between">
+                              <span className="text-[#8E9196]">Height:</span>
+                              <span className="font-medium text-white">{selectedPlayer.height}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-[#8E9196]">Weight:</span>
+                              <span className="font-medium text-white">{selectedPlayer.weight}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-[#8E9196]">Age:</span>
+                              <span className="font-medium text-white">{selectedPlayer.age}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-[#8E9196]">Experience:</span>
+                              <span className="font-medium text-white">{selectedPlayer.experience}</span>
+                            </div>
+                          </div>
                         </div>
-                        <div className="flex justify-between">
-                          <span className="text-[#8E9196]">Weight:</span>
-                          <span className="font-medium text-white">{selectedPlayer.weight}</span>
+                      </TabsContent>
+                      
+                      <TabsContent value="stats">
+                        <div className="space-y-4">
+                          <div className="grid grid-cols-3 gap-4">
+                            {selectedPlayer.position === 'Goalie' ? (
+                              <>
+                                <Card className="bg-[#221F26] border-[#33C3F0]/20 p-4">
+                                  <h4 className="text-sm text-[#8E9196]">Wins</h4>
+                                  <p className="text-2xl font-bold text-white">{selectedPlayer.stats.wins}</p>
+                                </Card>
+                                <Card className="bg-[#221F26] border-[#33C3F0]/20 p-4">
+                                  <h4 className="text-sm text-[#8E9196]">GAA</h4>
+                                  <p className="text-2xl font-bold text-white">{selectedPlayer.stats.gaa}</p>
+                                </Card>
+                                <Card className="bg-[#221F26] border-[#33C3F0]/20 p-4">
+                                  <h4 className="text-sm text-[#8E9196]">Save %</h4>
+                                  <p className="text-2xl font-bold text-white">{selectedPlayer.stats.savePct}</p>
+                                </Card>
+                              </>
+                            ) : (
+                              <>
+                                <Card className="bg-[#221F26] border-[#33C3F0]/20 p-4">
+                                  <h4 className="text-sm text-[#8E9196]">Goals</h4>
+                                  <p className="text-2xl font-bold text-white">{selectedPlayer.stats.goals}</p>
+                                </Card>
+                                <Card className="bg-[#221F26] border-[#33C3F0]/20 p-4">
+                                  <h4 className="text-sm text-[#8E9196]">Assists</h4>
+                                  <p className="text-2xl font-bold text-white">{selectedPlayer.stats.assists}</p>
+                                </Card>
+                                <Card className="bg-[#221F26] border-[#33C3F0]/20 p-4">
+                                  <h4 className="text-sm text-[#8E9196]">Points</h4>
+                                  <p className="text-2xl font-bold text-white">{selectedPlayer.stats.points}</p>
+                                </Card>
+                              </>
+                            )}
+                          </div>
+                          
+                          <div className="mt-4 bg-[#221F26] p-4 rounded-md border border-[#33C3F0]/10">
+                            <h4 className="text-sm text-[#8E9196] mb-2">Performance Trend</h4>
+                            <div className="h-12 flex items-end gap-1">
+                              {Array.from({length: 10}).map((_, i) => (
+                                <div 
+                                  key={i} 
+                                  className="bg-gradient-to-t from-[#33C3F0] to-[#9b87f5] rounded-sm"
+                                  style={{
+                                    height: `${Math.max(15, Math.random() * 100)}%`,
+                                    width: '8%'
+                                  }}
+                                />
+                              ))}
+                            </div>
+                          </div>
                         </div>
-                        <div className="flex justify-between">
-                          <span className="text-[#8E9196]">Age:</span>
-                          <span className="font-medium text-white">{selectedPlayer.age}</span>
+                      </TabsContent>
+                      
+                      <TabsContent value="history">
+                        <div className="text-center py-4">
+                          <p className="text-[#8E9196]">Player history data will be available after the season starts</p>
                         </div>
-                        <div className="flex justify-between">
-                          <span className="text-[#8E9196]">Experience:</span>
-                          <span className="font-medium text-white">{selectedPlayer.experience}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </TabsContent>
-                  
-                  <TabsContent value="stats">
-                    <div className="space-y-4">
-                      <div className="grid grid-cols-3 gap-4">
-                        {selectedPlayer.position === 'Goalie' ? (
-                          <>
-                            <Card className="bg-[#221F26] border-[#33C3F0]/20 p-4">
-                              <h4 className="text-sm text-[#8E9196]">Wins</h4>
-                              <p className="text-2xl font-bold text-white">{selectedPlayer.stats.wins}</p>
-                            </Card>
-                            <Card className="bg-[#221F26] border-[#33C3F0]/20 p-4">
-                              <h4 className="text-sm text-[#8E9196]">GAA</h4>
-                              <p className="text-2xl font-bold text-white">{selectedPlayer.stats.gaa}</p>
-                            </Card>
-                            <Card className="bg-[#221F26] border-[#33C3F0]/20 p-4">
-                              <h4 className="text-sm text-[#8E9196]">Save %</h4>
-                              <p className="text-2xl font-bold text-white">{selectedPlayer.stats.savePct}</p>
-                            </Card>
-                          </>
+                      </TabsContent>
+                    </Tabs>
+
+                    <div className="border-t border-[#33C3F0]/20 mt-6 pt-6 flex justify-between">
+                      <Button variant="outline" size="sm" className="border-[#8E9196]/30 text-[#8E9196] hover:bg-[#221F26]" onClick={() => setIsPlayerDialogOpen(false)}>Close</Button>
+                      <div className="flex gap-2">
+                        <Button variant="outline" size="sm" className="text-red-400 border-red-500/30 hover:bg-red-500/10">Trade</Button>
+                        {!selectedPlayer.starter ? (
+                          <Button size="sm" className="bg-amber-600 hover:bg-amber-700">Make Starter</Button>
                         ) : (
-                          <>
-                            <Card className="bg-[#221F26] border-[#33C3F0]/20 p-4">
-                              <h4 className="text-sm text-[#8E9196]">Goals</h4>
-                              <p className="text-2xl font-bold text-white">{selectedPlayer.stats.goals}</p>
-                            </Card>
-                            <Card className="bg-[#221F26] border-[#33C3F0]/20 p-4">
-                              <h4 className="text-sm text-[#8E9196]">Assists</h4>
-                              <p className="text-2xl font-bold text-white">{selectedPlayer.stats.assists}</p>
-                            </Card>
-                            <Card className="bg-[#221F26] border-[#33C3F0]/20 p-4">
-                              <h4 className="text-sm text-[#8E9196]">Points</h4>
-                              <p className="text-2xl font-bold text-white">{selectedPlayer.stats.points}</p>
-                            </Card>
-                          </>
+                          <Button size="sm" className="bg-[#33C3F0] hover:bg-[#33C3F0]/80">Move to Bench</Button>
                         )}
                       </div>
-                      
-                      <div className="mt-4 bg-[#221F26] p-4 rounded-md border border-[#33C3F0]/10">
-                        <h4 className="text-sm text-[#8E9196] mb-2">Performance Trend</h4>
-                        <div className="h-12 flex items-end gap-1">
-                          {Array.from({length: 10}).map((_, i) => (
-                            <div 
-                              key={i} 
-                              className="bg-gradient-to-t from-[#33C3F0] to-[#9b87f5] rounded-sm"
-                              style={{
-                                height: `${Math.max(15, Math.random() * 100)}%`,
-                                width: '8%'
-                              }}
-                            />
-                          ))}
-                        </div>
-                      </div>
                     </div>
-                  </TabsContent>
-                  
-                  <TabsContent value="history">
-                    <div className="text-center py-4">
-                      <p className="text-[#8E9196]">Player history data will be available after the season starts</p>
-                    </div>
-                  </TabsContent>
-                </Tabs>
-
-                <div className="border-t border-[#33C3F0]/20 mt-6 pt-6 flex justify-between">
-                  <Button variant="outline" size="sm" className="border-[#8E9196]/30 text-[#8E9196] hover:bg-[#221F26]" onClick={() => setIsPlayerDialogOpen(false)}>Close</Button>
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="sm" className="text-red-400 border-red-500/30 hover:bg-red-500/10">Trade</Button>
-                    {!selectedPlayer.starter ? (
-                      <Button size="sm" className="bg-amber-600 hover:bg-amber-700">Make Starter</Button>
-                    ) : (
-                      <Button size="sm" className="bg-[#33C3F0] hover:bg-[#33C3F0]/80">Move to Bench</Button>
-                    )}
                   </div>
-                </div>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-    </div>
-  );
-};
-
-export default Roster;
