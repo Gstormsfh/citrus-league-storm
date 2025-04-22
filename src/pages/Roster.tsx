@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
@@ -10,6 +9,22 @@ import { Badge } from '@/components/ui/badge';
 import { ChevronDown, ChevronRight, Star, TrendingUp, TrendingDown, BarChart } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { 
+  DndContext, 
+  closestCenter, 
+  KeyboardSensor, 
+  PointerSensor, 
+  useSensor, 
+  useSensors,
+  DragEndEvent
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { PlayerCard } from '@/components/gm-office/PlayerCard';
 
 // Sample player data - hockey themed
 const players = [
@@ -237,6 +252,35 @@ const Roster = () => {
   const [isPlayerDialogOpen, setIsPlayerDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("roster");
   const [activeStat, setActiveStat] = useState("standard");
+  const [rosterPlayers, setRosterPlayers] = useState(players);
+  
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    
+    if (active.id !== over?.id) {
+      setRosterPlayers((items) => {
+        const oldIndex = items.findIndex((item) => item.id === active.id);
+        const newIndex = items.findIndex((item) => item.id === over?.id);
+        
+        const newItems = arrayMove(items, oldIndex, newIndex);
+        
+        // Toggle starter status if dragging between sections
+        if ((items[oldIndex].starter && !items[newIndex].starter) || 
+            (!items[oldIndex].starter && items[newIndex].starter)) {
+          newItems[oldIndex] = { ...newItems[oldIndex], starter: !newItems[oldIndex].starter };
+        }
+        
+        return newItems;
+      });
+    }
+  };
 
   const handlePlayerClick = (player: typeof players[0]) => {
     setSelectedPlayer(player);
@@ -244,7 +288,7 @@ const Roster = () => {
   };
 
   // Group players by position
-  const positionGroups = players.reduce((groups: Record<string, typeof players>, player) => {
+  const positionGroups = rosterPlayers.reduce((groups: Record<string, typeof players>, player) => {
     if (!groups[player.position]) {
       groups[player.position] = [];
     }
@@ -348,103 +392,153 @@ const Roster = () => {
                   </TabsList>
                 </Tabs>
                 
-                {/* Roster table similar to example */}
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-fantasy-light hover:bg-fantasy-light">
-                      <TableHead className="w-[40px]">POS</TableHead>
-                      <TableHead>Player</TableHead>
-                      <TableHead className="text-right"># / Team</TableHead>
-                      <TableHead className="text-right">G</TableHead>
-                      <TableHead className="text-right">A</TableHead>
-                      <TableHead className="text-right">PTS</TableHead>
-                      <TableHead className="text-right">+/-</TableHead>
-                      <TableHead className="text-right">PIM</TableHead>
-                      <TableHead className="text-right">SOG</TableHead>
-                      {activeStat === "advanced" && (
-                        <>
-                          <TableHead className="text-right">PP PTS</TableHead>
-                          <TableHead className="text-right">SH PTS</TableHead>
-                          <TableHead className="text-right">GWG</TableHead>
-                          <TableHead className="text-right">FO%</TableHead>
-                        </>
-                      )}
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {positionOrder.map(position => (
-                      positionGroups[position]?.map((player) => (
-                        <TableRow 
-                          key={player.id} 
-                          className="cursor-pointer hover:bg-fantasy-light"
-                          onClick={() => handlePlayerClick(player)}
-                        >
-                          <TableCell className="font-medium">
-                            <Badge className={`${player.starter ? 'bg-fantasy-primary' : 'bg-fantasy-muted'} text-white`}>
-                              {position === 'Centre' ? 'C' : 
-                               position === 'Right Wing' ? 'RW' : 
-                               position === 'Left Wing' ? 'LW' : 
-                               position === 'Defence' ? 'D' : 'G'}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 rounded-full overflow-hidden">
-                                <img 
-                                  src={player.image} 
-                                  alt={player.name} 
-                                  className="object-cover w-full h-full"
-                                />
+                {/* Drag and drop roster sections */}
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  onDragEnd={handleDragEnd}
+                >
+                  <div className="mb-8">
+                    <h2 className="text-lg font-bold mb-3 text-fantasy-primary flex items-center">
+                      <Star className="h-5 w-5 mr-2" /> Starters
+                    </h2>
+                    <SortableContext items={rosterPlayers.filter(p => p.starter).map(p => p.id)} strategy={verticalListSortingStrategy}>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+                        {rosterPlayers
+                          .filter(player => player.starter)
+                          .map(player => (
+                            <PlayerCard 
+                              key={player.id} 
+                              player={player}
+                              onClick={() => handlePlayerClick(player)}
+                            />
+                          ))
+                        }
+                      </div>
+                    </SortableContext>
+                  </div>
+                  
+                  <div>
+                    <h2 className="text-lg font-bold mb-3 text-fantasy-muted flex items-center">
+                      <ChevronRight className="h-5 w-5 mr-2" /> Bench
+                    </h2>
+                    <SortableContext items={rosterPlayers.filter(p => !p.starter).map(p => p.id)} strategy={verticalListSortingStrategy}>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+                        {rosterPlayers
+                          .filter(player => !player.starter)
+                          .map(player => (
+                            <PlayerCard 
+                              key={player.id} 
+                              player={player}
+                              onClick={() => handlePlayerClick(player)}
+                            />
+                          ))
+                        }
+                      </div>
+                    </SortableContext>
+                  </div>
+                </DndContext>
+                
+                <div className="mt-8">
+                  <h3 className="text-lg font-bold mb-3">Complete Roster Stats</h3>
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-fantasy-light hover:bg-fantasy-light">
+                        <TableHead className="w-[40px]">POS</TableHead>
+                        <TableHead>Player</TableHead>
+                        <TableHead className="text-right"># / Team</TableHead>
+                        <TableHead className="text-right">G</TableHead>
+                        <TableHead className="text-right">A</TableHead>
+                        <TableHead className="text-right">PTS</TableHead>
+                        <TableHead className="text-right">+/-</TableHead>
+                        <TableHead className="text-right">PIM</TableHead>
+                        <TableHead className="text-right">SOG</TableHead>
+                        {activeStat === "advanced" && (
+                          <>
+                            <TableHead className="text-right">PP PTS</TableHead>
+                            <TableHead className="text-right">SH PTS</TableHead>
+                            <TableHead className="text-right">GWG</TableHead>
+                            <TableHead className="text-right">FO%</TableHead>
+                          </>
+                        )}
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {positionOrder.map(position => (
+                        positionGroups[position]?.map((player) => (
+                          <TableRow 
+                            key={player.id} 
+                            className="cursor-pointer hover:bg-fantasy-light"
+                            onClick={() => handlePlayerClick(player)}
+                          >
+                            <TableCell className="font-medium">
+                              <Badge className={`${player.starter ? 'bg-fantasy-primary' : 'bg-fantasy-muted'} text-white`}>
+                                {position === 'Centre' ? 'C' : 
+                                position === 'Right Wing' ? 'RW' : 
+                                position === 'Left Wing' ? 'LW' : 
+                                position === 'Defence' ? 'D' : 'G'}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-full overflow-hidden">
+                                  <img 
+                                    src={player.image} 
+                                    alt={player.name} 
+                                    className="object-cover w-full h-full"
+                                  />
+                                </div>
+                                <div>
+                                  <div className="font-medium">{player.name}</div>
+                                  <div className="text-xs text-fantasy-muted">{player.position}</div>
+                                </div>
                               </div>
-                              <div>
-                                <div className="font-medium">{player.name}</div>
-                                <div className="text-xs text-fantasy-muted">{player.position}</div>
-                              </div>
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="font-medium">#{player.number}</div>
-                            <div className="text-xs text-fantasy-muted">{player.team}</div>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            {position === 'Goalie' ? player.stats.wins : player.stats.goals}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            {position === 'Goalie' ? player.stats.losses : player.stats.assists}
-                          </TableCell>
-                          <TableCell className="text-right font-medium">
-                            {position === 'Goalie' ? player.stats.otl : player.stats.points}
-                          </TableCell>
-                          <TableCell className={`text-right ${
-                            position !== 'Goalie' && player.stats.plusMinus > 0 
-                              ? 'text-fantasy-positive' 
-                              : position !== 'Goalie' && player.stats.plusMinus < 0 
-                                ? 'text-fantasy-danger' 
-                                : ''
-                          }`}>
-                            {position === 'Goalie' ? player.stats.gaa : player.stats.plusMinus > 0 ? `+${player.stats.plusMinus}` : player.stats.plusMinus}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            {position === 'Goalie' ? player.stats.savePct : player.stats.pim}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            {position === 'Goalie' ? player.stats.shutouts : player.stats.shots}
-                          </TableCell>
-                          {activeStat === "advanced" && (
-                            <>
-                              <TableCell className="text-right">{position !== 'Goalie' ? Math.floor(Math.random() * 30) : '-'}</TableCell>
-                              <TableCell className="text-right">{position !== 'Goalie' ? Math.floor(Math.random() * 10) : '-'}</TableCell>
-                              <TableCell className="text-right">{position !== 'Goalie' ? Math.floor(Math.random() * 10) : '-'}</TableCell>
-                              <TableCell className="text-right">{position === 'Centre' ? `${Math.floor(45 + Math.random() * 15)}%` : '-'}</TableCell>
-                            </>
-                          )}
-                        </TableRow>
-                      ))
-                    ))}
-                  </TableBody>
-                </Table>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="font-medium">#{player.number}</div>
+                              <div className="text-xs text-fantasy-muted">{player.team}</div>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {position === 'Goalie' ? player.stats.wins : player.stats.goals}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {position === 'Goalie' ? player.stats.losses : player.stats.assists}
+                            </TableCell>
+                            <TableCell className="text-right font-medium">
+                              {position === 'Goalie' ? player.stats.otl : player.stats.points}
+                            </TableCell>
+                            <TableCell className={`text-right ${
+                              position !== 'Goalie' && player.stats.plusMinus > 0 
+                                ? 'text-fantasy-positive' 
+                                : position !== 'Goalie' && player.stats.plusMinus < 0 
+                                  ? 'text-fantasy-danger' 
+                                  : ''
+                            }`}>
+                              {position === 'Goalie' ? player.stats.gaa : player.stats.plusMinus > 0 ? `+${player.stats.plusMinus}` : player.stats.plusMinus}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {position === 'Goalie' ? player.stats.savePct : player.stats.pim}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {position === 'Goalie' ? player.stats.shutouts : player.stats.shots}
+                            </TableCell>
+                            {activeStat === "advanced" && (
+                              <>
+                                <TableCell className="text-right">{position !== 'Goalie' ? Math.floor(Math.random() * 30) : '-'}</TableCell>
+                                <TableCell className="text-right">{position !== 'Goalie' ? Math.floor(Math.random() * 10) : '-'}</TableCell>
+                                <TableCell className="text-right">{position !== 'Goalie' ? Math.floor(Math.random() * 10) : '-'}</TableCell>
+                                <TableCell className="text-right">{position === 'Centre' ? `${Math.floor(45 + Math.random() * 15)}%` : '-'}</TableCell>
+                              </>
+                            )}
+                          </TableRow>
+                        ))
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
               </TabsContent>
 
+              {/* Stats tab content */}
               <TabsContent value="stats" className="m-0 p-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   <Card className="bg-gradient-to-br from-white to-fantasy-light border-fantasy-border">
@@ -540,6 +634,7 @@ const Roster = () => {
                 </div>
               </TabsContent>
 
+              {/* Trends tab content */}
               <TabsContent value="trends" className="m-0 p-6">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   <Card className="bg-gradient-to-br from-white to-fantasy-light border-fantasy-border">
@@ -649,6 +744,7 @@ const Roster = () => {
                 </div>
               </TabsContent>
 
+              {/* AI GM tab content */}
               <TabsContent value="ai-gm" className="m-0 p-6">
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                   <div className="lg:col-span-2">
