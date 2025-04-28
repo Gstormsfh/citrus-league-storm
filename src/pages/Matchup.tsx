@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
@@ -100,7 +99,6 @@ const Matchup = () => {
   const myTeamPoints = getTeamPoints(myTeam);
   const opponentTeamPoints = getTeamPoints(opponentTeam);
 
-  // Filter players by starter status
   const myStarters = myTeam.filter(p => p.isStarter);
   const myBench = myTeam.filter(p => !p.isStarter);
   const opponentStarters = opponentTeam.filter(p => p.isStarter);
