@@ -112,7 +112,7 @@ const Matchup = () => {
     <div className="min-h-screen bg-fantasy-background">
       <Navbar />
       <main className="container mx-auto px-4 pt-28 pb-16">
-        <div className="max-w-4xl mx-auto">
+        <div className="max-w-7xl mx-auto">
           <div className="text-center mb-8 animate-fade-in">
             <h1 className="text-3xl md:text-5xl font-bold mb-2 vibrant-gradient-2 bg-clip-text text-transparent">
               This Week's Matchup
@@ -178,11 +178,11 @@ const Matchup = () => {
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            <TableHead className="w-[120px]">Position</TableHead>
-                            <TableHead>Player</TableHead>
-                            <TableHead className="text-right">Pts</TableHead>
-                            <TableHead className="text-right">Games Left</TableHead>
-                            <TableHead className="text-center w-[100px]">Status</TableHead>
+                            <TableHead className="w-[80px]">Position</TableHead>
+                            <TableHead className="min-w-[200px]">Player</TableHead>
+                            <TableHead className="text-right w-[80px]">Pts</TableHead>
+                            <TableHead className="text-right w-[100px]">Games Left</TableHead>
+                            <TableHead className="text-center w-[120px]">Status</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -210,6 +210,15 @@ const Matchup = () => {
                       <div className="p-4 bg-fantasy-light/50">
                         <h3 className="text-sm font-medium text-fantasy-muted mb-2">Bench</h3>
                         <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-[80px]">Position</TableHead>
+                              <TableHead className="min-w-[200px]">Player</TableHead>
+                              <TableHead className="text-right w-[80px]">Pts</TableHead>
+                              <TableHead className="text-right w-[100px]">Games Left</TableHead>
+                              <TableHead className="text-center w-[120px]">Status</TableHead>
+                            </TableRow>
+                          </TableHeader>
                           <TableBody>
                             {myBench.map(player => (
                               <TableRow key={player.id}>
@@ -244,11 +253,11 @@ const Matchup = () => {
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            <TableHead className="w-[120px]">Position</TableHead>
-                            <TableHead>Player</TableHead>
-                            <TableHead className="text-right">Pts</TableHead>
-                            <TableHead className="text-right">Games Left</TableHead>
-                            <TableHead className="text-center w-[100px]">Status</TableHead>
+                            <TableHead className="w-[80px]">Position</TableHead>
+                            <TableHead className="min-w-[200px]">Player</TableHead>
+                            <TableHead className="text-right w-[80px]">Pts</TableHead>
+                            <TableHead className="text-right w-[100px]">Games Left</TableHead>
+                            <TableHead className="text-center w-[120px]">Status</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -276,6 +285,15 @@ const Matchup = () => {
                       <div className="p-4 bg-fantasy-light/50">
                         <h3 className="text-sm font-medium text-fantasy-muted mb-2">Bench</h3>
                         <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-[80px]">Position</TableHead>
+                              <TableHead className="min-w-[200px]">Player</TableHead>
+                              <TableHead className="text-right w-[80px]">Pts</TableHead>
+                              <TableHead className="text-right w-[100px]">Games Left</TableHead>
+                              <TableHead className="text-center w-[120px]">Status</TableHead>
+                            </TableRow>
+                          </TableHeader>
                           <TableBody>
                             {opponentBench.map(player => (
                               <TableRow key={player.id}>
