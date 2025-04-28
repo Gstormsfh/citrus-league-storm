@@ -109,67 +109,75 @@ const Matchup = () => {
   const opponentDailyPoints = [18.9, 20.4, 22.1, 22.5, 19.3, 26.8, 38.7];
 
   return (
-    <div className="min-h-screen bg-fantasy-background">
+    <div className="min-h-screen bg-gradient-to-b from-white to-fantasy-light/30">
       <Navbar />
       <main className="container mx-auto px-4 pt-28 pb-16">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-8 animate-fade-in">
-            <h1 className="text-3xl md:text-5xl font-bold mb-2 vibrant-gradient-2 bg-clip-text text-transparent">
+            <h1 className="text-4xl md:text-6xl font-bold mb-4 bg-gradient-to-r from-fantasy-primary to-fantasy-secondary bg-clip-text text-transparent">
               This Week's Matchup
             </h1>
-            <p className="text-lg text-fantasy-dark">
+            <p className="text-lg text-fantasy-dark/80">
               Citrus Crushers vs. Thunder Titans
             </p>
           </div>
           
-          <Card className="mb-8 overflow-hidden border-fantasy-border animate-fade-in">
+          <Card className="mb-8 overflow-hidden border-fantasy-border shadow-lg animate-fade-in">
             <CardContent className="p-0">
-              <div className="flex flex-col md:flex-row items-center justify-between bg-gradient-to-r from-[#FFF1DB] to-[#FFE5C4] p-6">
-                <div className="flex flex-col items-center md:items-start mb-4 md:mb-0">
-                  <div className="text-sm text-fantasy-muted mb-1">Your Team</div>
+              <div className="flex flex-col md:flex-row items-center justify-between bg-gradient-to-br from-fantasy-light via-white to-fantasy-light p-8 border-b border-fantasy-border">
+                <div className="flex flex-col items-center md:items-start mb-4 md:mb-0 transition-all hover:scale-105">
+                  <div className="text-sm text-fantasy-muted mb-1 uppercase tracking-wider">Your Team</div>
                   <div className="text-3xl font-bold text-fantasy-primary">Citrus Crushers</div>
-                  <div className="text-fantasy-muted mt-1">7-3 Record</div>
+                  <div className="text-fantasy-muted mt-1 flex items-center gap-1">
+                    <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-fantasy-positive/10 text-fantasy-positive text-xs font-bold">7</span>
+                    <span className="text-fantasy-muted">-</span>
+                    <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-fantasy-danger/10 text-fantasy-danger text-xs font-bold">3</span>
+                  </div>
                 </div>
                 
-                <div className="flex items-center gap-3 md:gap-6">
-                  <div className="text-5xl font-bold text-fantasy-dark">{myTeamPoints}</div>
-                  <div className="text-2xl text-fantasy-muted">-</div>
-                  <div className="text-5xl font-bold text-fantasy-dark">{opponentTeamPoints}</div>
+                <div className="flex items-center gap-6 py-4 px-8 rounded-full bg-white shadow-md transition-transform hover:scale-105">
+                  <div className="text-5xl font-bold bg-gradient-to-r from-fantasy-primary to-fantasy-secondary bg-clip-text text-transparent">{myTeamPoints}</div>
+                  <div className="text-2xl text-fantasy-muted">vs</div>
+                  <div className="text-5xl font-bold bg-gradient-to-r from-fantasy-dark to-fantasy-muted bg-clip-text text-transparent">{opponentTeamPoints}</div>
                 </div>
                 
-                <div className="flex flex-col items-center md:items-end mt-4 md:mt-0">
-                  <div className="text-sm text-fantasy-muted mb-1">Opponent</div>
+                <div className="flex flex-col items-center md:items-end mt-4 md:mt-0 transition-all hover:scale-105">
+                  <div className="text-sm text-fantasy-muted mb-1 uppercase tracking-wider">Opponent</div>
                   <div className="text-3xl font-bold text-fantasy-dark">Thunder Titans</div>
-                  <div className="text-fantasy-muted mt-1">9-1 Record</div>
+                  <div className="text-fantasy-muted mt-1 flex items-center gap-1">
+                    <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-fantasy-positive/10 text-fantasy-positive text-xs font-bold">9</span>
+                    <span className="text-fantasy-muted">-</span>
+                    <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-fantasy-danger/10 text-fantasy-danger text-xs font-bold">1</span>
+                  </div>
                 </div>
               </div>
               
-              <div className="p-4 bg-fantasy-light">
-                <div className="text-sm font-medium mb-2">Matchup Progress</div>
-                <div className="flex gap-2 items-center">
-                  <div className="text-xs text-fantasy-muted">Mon</div>
+              <div className="p-6 bg-white/50 backdrop-blur-sm">
+                <div className="text-sm font-medium mb-3 text-fantasy-dark/70">Week Progress</div>
+                <div className="flex gap-4 items-center">
+                  <div className="text-xs font-medium text-fantasy-primary">Mon</div>
                   <Progress 
                     value={70} 
-                    className="h-2 flex-1" 
-                    indicatorClassName="bg-fantasy-primary"
+                    className="h-3 flex-1 rounded-full overflow-hidden border border-fantasy-border/20" 
+                    indicatorClassName="bg-gradient-to-r from-fantasy-primary to-fantasy-secondary"
                   />
-                  <div className="text-xs text-fantasy-muted">Sun</div>
+                  <div className="text-xs font-medium text-fantasy-primary">Sun</div>
                 </div>
               </div>
             </CardContent>
           </Card>
           
           <Tabs defaultValue="lineup" className="mb-8 animate-fade-in">
-            <TabsList className="w-full max-w-md mx-auto grid grid-cols-3 bg-fantasy-light">
-              <TabsTrigger value="lineup">Lineup</TabsTrigger>
-              <TabsTrigger value="dailyPoints">Daily Points</TabsTrigger>
-              <TabsTrigger value="matchupHistory">History</TabsTrigger>
+            <TabsList className="w-full max-w-md mx-auto grid grid-cols-3 bg-white border border-fantasy-border/20 rounded-full p-1">
+              <TabsTrigger value="lineup" className="rounded-full data-[state=active]:bg-fantasy-primary data-[state=active]:text-white">Lineup</TabsTrigger>
+              <TabsTrigger value="dailyPoints" className="rounded-full data-[state=active]:bg-fantasy-primary data-[state=active]:text-white">Daily Points</TabsTrigger>
+              <TabsTrigger value="matchupHistory" className="rounded-full data-[state=active]:bg-fantasy-primary data-[state=active]:text-white">History</TabsTrigger>
             </TabsList>
             
-            <TabsContent value="lineup" className="mt-6">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <Card className="border-fantasy-border overflow-hidden">
-                  <CardHeader className="bg-fantasy-primary/10 py-3">
+            <TabsContent value="lineup" className="mt-8">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <Card className="border-fantasy-border overflow-hidden shadow-lg hover:shadow-xl transition-shadow">
+                  <CardHeader className="bg-gradient-to-r from-fantasy-primary/10 to-fantasy-primary/5 py-4">
                     <CardTitle className="text-center text-fantasy-primary">My Team</CardTitle>
                   </CardHeader>
                   <CardContent className="p-0">
@@ -243,8 +251,8 @@ const Matchup = () => {
                   </CardContent>
                 </Card>
                 
-                <Card className="border-fantasy-border overflow-hidden">
-                  <CardHeader className="bg-fantasy-muted/20 py-3">
+                <Card className="border-fantasy-border overflow-hidden shadow-lg hover:shadow-xl transition-shadow">
+                  <CardHeader className="bg-gradient-to-r from-fantasy-dark/10 to-fantasy-dark/5 py-4">
                     <CardTitle className="text-center text-fantasy-dark">Opponent's Team</CardTitle>
                   </CardHeader>
                   <CardContent className="p-0">
@@ -320,7 +328,7 @@ const Matchup = () => {
               </div>
             </TabsContent>
             
-            <TabsContent value="dailyPoints" className="mt-6">
+            <TabsContent value="dailyPoints" className="mt-8">
               <Card>
                 <CardHeader>
                   <CardTitle>Daily Points Breakdown</CardTitle>
@@ -370,7 +378,7 @@ const Matchup = () => {
               </Card>
             </TabsContent>
             
-            <TabsContent value="matchupHistory" className="mt-6">
+            <TabsContent value="matchupHistory" className="mt-8">
               <Card>
                 <CardHeader>
                   <CardTitle>Matchup History</CardTitle>
@@ -435,10 +443,10 @@ const Matchup = () => {
             </TabsContent>
           </Tabs>
           
-          <div className="fixed bottom-0 left-0 right-0 bg-fantasy-primary/90 text-white py-2 px-4 backdrop-blur-sm">
+          <div className="fixed bottom-0 left-0 right-0 bg-gradient-to-r from-fantasy-primary/90 to-fantasy-secondary/90 text-white py-3 backdrop-blur-md">
             <div className="container mx-auto flex items-center justify-center">
-              <div className="animate-pulse mr-2">⚡</div>
-              <div className="text-sm font-medium">{updates[currentUpdateIndex]}</div>
+              <div className="animate-bounce mr-2">⚡</div>
+              <div className="text-sm font-medium animate-fade-in">{updates[currentUpdateIndex]}</div>
             </div>
           </div>
         </div>
