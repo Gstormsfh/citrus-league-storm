@@ -1,25 +1,13 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Progress } from "@/components/ui/progress";
-import { ArrowRight } from 'lucide-react';
-
-type MatchupPlayerStatus = "In Game" | "Final" | "Yet to Play";
-
-type MatchupPlayer = {
-  id: number;
-  name: string;
-  position: string;
-  team: string;
-  points: number;
-  gamesRemaining: number;
-  status: MatchupPlayerStatus;
-  isStarter: boolean;
-};
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { TeamCard } from "@/components/matchup/TeamCard";
+import { ScoreCard } from "@/components/matchup/ScoreCard";
+import { DailyPointsChart } from "@/components/matchup/DailyPointsChart";
+import { MatchupHistory } from "@/components/matchup/MatchupHistory";
+import { LiveUpdates } from "@/components/matchup/LiveUpdates";
+import { MatchupPlayer } from "@/components/matchup/types";
 
 const Matchup = () => {
   const [myTeam, setMyTeam] = useState<MatchupPlayer[]>([
@@ -66,31 +54,12 @@ const Matchup = () => {
     { id: 119, name: "Juuse Saros", position: "G", team: "NSH", points: 17.6, gamesRemaining: 0, status: "Final", isStarter: false },
   ]);
 
-  const [updates, setUpdates] = useState<string[]>([
+  const [updates] = useState<string[]>([
     "Connor McDavid scored a goal! +5 points.",
     "David Pastrnak with an assist! +3 points.",
     "Igor Shesterkin made a save! +0.2 points.",
     "Adam Fox with a power play assist! +4 points."
   ]);
-
-  const [currentUpdateIndex, setCurrentUpdateIndex] = useState(0);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setCurrentUpdateIndex(prev => (prev + 1) % updates.length);
-    }, 5000);
-    
-    return () => clearInterval(interval);
-  }, [updates.length]);
-
-  const getStatusColor = (status: MatchupPlayerStatus) => {
-    switch (status) {
-      case "In Game": return "bg-fantasy-secondary text-fantasy-dark animate-pulse";
-      case "Final": return "bg-fantasy-muted/60 text-fantasy-dark";
-      case "Yet to Play": return "bg-fantasy-light text-fantasy-dark";
-      default: return "bg-fantasy-muted/60 text-fantasy-dark";
-    }
-  };
 
   const getTeamPoints = (team: MatchupPlayer[]) => {
     return team.reduce((sum, player) => sum + player.points, 0).toFixed(1);
@@ -122,50 +91,14 @@ const Matchup = () => {
             </p>
           </div>
           
-          <Card className="mb-8 overflow-hidden border-fantasy-border shadow-lg animate-fade-in">
-            <CardContent className="p-0">
-              <div className="flex flex-col md:flex-row items-center justify-between bg-gradient-to-br from-fantasy-light via-white to-fantasy-light p-8 border-b border-fantasy-border">
-                <div className="flex flex-col items-center md:items-start mb-4 md:mb-0 transition-all hover:scale-105">
-                  <div className="text-sm text-fantasy-muted mb-1 uppercase tracking-wider">Your Team</div>
-                  <div className="text-3xl font-bold text-fantasy-primary">Citrus Crushers</div>
-                  <div className="text-fantasy-muted mt-1 flex items-center gap-1">
-                    <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-fantasy-positive/10 text-fantasy-positive text-xs font-bold">7</span>
-                    <span className="text-fantasy-muted">-</span>
-                    <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-fantasy-danger/10 text-fantasy-danger text-xs font-bold">3</span>
-                  </div>
-                </div>
-                
-                <div className="flex items-center gap-6 py-4 px-8 rounded-full bg-white shadow-md transition-transform hover:scale-105">
-                  <div className="text-5xl font-bold bg-gradient-to-r from-fantasy-primary to-fantasy-secondary bg-clip-text text-transparent">{myTeamPoints}</div>
-                  <div className="text-2xl text-fantasy-muted">vs</div>
-                  <div className="text-5xl font-bold bg-gradient-to-r from-fantasy-dark to-fantasy-muted bg-clip-text text-transparent">{opponentTeamPoints}</div>
-                </div>
-                
-                <div className="flex flex-col items-center md:items-end mt-4 md:mt-0 transition-all hover:scale-105">
-                  <div className="text-sm text-fantasy-muted mb-1 uppercase tracking-wider">Opponent</div>
-                  <div className="text-3xl font-bold text-fantasy-dark">Thunder Titans</div>
-                  <div className="text-fantasy-muted mt-1 flex items-center gap-1">
-                    <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-fantasy-positive/10 text-fantasy-positive text-xs font-bold">9</span>
-                    <span className="text-fantasy-muted">-</span>
-                    <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-fantasy-danger/10 text-fantasy-danger text-xs font-bold">1</span>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="p-6 bg-white/50 backdrop-blur-sm">
-                <div className="text-sm font-medium mb-3 text-fantasy-dark/70">Week Progress</div>
-                <div className="flex gap-4 items-center">
-                  <div className="text-xs font-medium text-fantasy-primary">Mon</div>
-                  <Progress 
-                    value={70} 
-                    className="h-3 flex-1 rounded-full overflow-hidden border border-fantasy-border/20" 
-                    indicatorClassName="bg-gradient-to-r from-fantasy-primary to-fantasy-secondary"
-                  />
-                  <div className="text-xs font-medium text-fantasy-primary">Sun</div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <ScoreCard
+            myTeamName="Citrus Crushers"
+            myTeamRecord={{ wins: 7, losses: 3 }}
+            opponentTeamName="Thunder Titans"
+            opponentTeamRecord={{ wins: 9, losses: 1 }}
+            myTeamPoints={myTeamPoints}
+            opponentTeamPoints={opponentTeamPoints}
+          />
           
           <Tabs defaultValue="lineup" className="mb-8 animate-fade-in">
             <TabsList className="w-full max-w-md mx-auto grid grid-cols-3 bg-white border border-fantasy-border/20 rounded-full p-1">
@@ -176,279 +109,35 @@ const Matchup = () => {
             
             <TabsContent value="lineup" className="mt-8">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                <Card className="border-fantasy-border overflow-hidden shadow-lg hover:shadow-xl transition-shadow">
-                  <CardHeader className="bg-gradient-to-r from-fantasy-primary/10 to-fantasy-primary/5 py-4">
-                    <CardTitle className="text-center text-fantasy-primary">My Team</CardTitle>
-                  </CardHeader>
-                  <CardContent className="p-0">
-                    <div className="p-4 border-b border-fantasy-border bg-white">
-                      <h3 className="text-sm font-medium text-fantasy-muted mb-2">Starters</h3>
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead className="w-[80px]">Position</TableHead>
-                            <TableHead className="min-w-[200px]">Player</TableHead>
-                            <TableHead className="text-right w-[80px]">Pts</TableHead>
-                            <TableHead className="text-right w-[100px]">Games Left</TableHead>
-                            <TableHead className="text-center w-[120px]">Status</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {myStarters.map(player => (
-                            <TableRow key={player.id}>
-                              <TableCell className="font-medium">{player.position}</TableCell>
-                              <TableCell>
-                                <div className="font-medium">{player.name}</div>
-                                <div className="text-xs text-fantasy-muted">{player.team}</div>
-                              </TableCell>
-                              <TableCell className="text-right">{player.points}</TableCell>
-                              <TableCell className="text-right">{player.gamesRemaining}</TableCell>
-                              <TableCell className="text-center">
-                                <Badge className={getStatusColor(player.status)}>
-                                  {player.status}
-                                </Badge>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
-                    
-                    {myBench.length > 0 && (
-                      <div className="p-4 bg-fantasy-light/50">
-                        <h3 className="text-sm font-medium text-fantasy-muted mb-2">Bench</h3>
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead className="w-[80px]">Position</TableHead>
-                              <TableHead className="min-w-[200px]">Player</TableHead>
-                              <TableHead className="text-right w-[80px]">Pts</TableHead>
-                              <TableHead className="text-right w-[100px]">Games Left</TableHead>
-                              <TableHead className="text-center w-[120px]">Status</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {myBench.map(player => (
-                              <TableRow key={player.id}>
-                                <TableCell className="font-medium">{player.position}</TableCell>
-                                <TableCell>
-                                  <div className="font-medium">{player.name}</div>
-                                  <div className="text-xs text-fantasy-muted">{player.team}</div>
-                                </TableCell>
-                                <TableCell className="text-right">{player.points}</TableCell>
-                                <TableCell className="text-right">{player.gamesRemaining}</TableCell>
-                                <TableCell className="text-center">
-                                  <Badge className={getStatusColor(player.status)}>
-                                    {player.status}
-                                  </Badge>
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-                
-                <Card className="border-fantasy-border overflow-hidden shadow-lg hover:shadow-xl transition-shadow">
-                  <CardHeader className="bg-gradient-to-r from-fantasy-dark/10 to-fantasy-dark/5 py-4">
-                    <CardTitle className="text-center text-fantasy-dark">Opponent's Team</CardTitle>
-                  </CardHeader>
-                  <CardContent className="p-0">
-                    <div className="p-4 border-b border-fantasy-border bg-white">
-                      <h3 className="text-sm font-medium text-fantasy-muted mb-2">Starters</h3>
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead className="w-[80px]">Position</TableHead>
-                            <TableHead className="min-w-[200px]">Player</TableHead>
-                            <TableHead className="text-right w-[80px]">Pts</TableHead>
-                            <TableHead className="text-right w-[100px]">Games Left</TableHead>
-                            <TableHead className="text-center w-[120px]">Status</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {opponentStarters.map(player => (
-                            <TableRow key={player.id}>
-                              <TableCell className="font-medium">{player.position}</TableCell>
-                              <TableCell>
-                                <div className="font-medium">{player.name}</div>
-                                <div className="text-xs text-fantasy-muted">{player.team}</div>
-                              </TableCell>
-                              <TableCell className="text-right">{player.points}</TableCell>
-                              <TableCell className="text-right">{player.gamesRemaining}</TableCell>
-                              <TableCell className="text-center">
-                                <Badge className={getStatusColor(player.status)}>
-                                  {player.status}
-                                </Badge>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
-                    
-                    {opponentBench.length > 0 && (
-                      <div className="p-4 bg-fantasy-light/50">
-                        <h3 className="text-sm font-medium text-fantasy-muted mb-2">Bench</h3>
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead className="w-[80px]">Position</TableHead>
-                              <TableHead className="min-w-[200px]">Player</TableHead>
-                              <TableHead className="text-right w-[80px]">Pts</TableHead>
-                              <TableHead className="text-right w-[100px]">Games Left</TableHead>
-                              <TableHead className="text-center w-[120px]">Status</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {opponentBench.map(player => (
-                              <TableRow key={player.id}>
-                                <TableCell className="font-medium">{player.position}</TableCell>
-                                <TableCell>
-                                  <div className="font-medium">{player.name}</div>
-                                  <div className="text-xs text-fantasy-muted">{player.team}</div>
-                                </TableCell>
-                                <TableCell className="text-right">{player.points}</TableCell>
-                                <TableCell className="text-right">{player.gamesRemaining}</TableCell>
-                                <TableCell className="text-center">
-                                  <Badge className={getStatusColor(player.status)}>
-                                    {player.status}
-                                  </Badge>
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
+                <TeamCard
+                  title="My Team"
+                  starters={myStarters}
+                  bench={myBench}
+                  gradientClass="bg-gradient-to-r from-fantasy-primary/10 to-fantasy-primary/5"
+                />
+                <TeamCard
+                  title="Opponent's Team"
+                  starters={opponentStarters}
+                  bench={opponentBench}
+                  gradientClass="bg-gradient-to-r from-fantasy-dark/10 to-fantasy-dark/5"
+                />
               </div>
             </TabsContent>
             
             <TabsContent value="dailyPoints" className="mt-8">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Daily Points Breakdown</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-7 gap-2 mb-6">
-                    {dayLabels.map((day, index) => (
-                      <div key={day} className="text-center">
-                        <div className="bg-fantasy-light rounded-t-md py-1 text-xs font-medium">
-                          {day}
-                        </div>
-                        <div className="flex flex-col">
-                          <div className="h-[100px] bg-fantasy-primary/20 relative">
-                            <div 
-                              className="absolute bottom-0 left-0 right-0 bg-fantasy-primary"
-                              style={{ height: `${(myDailyPoints[index] / 50) * 100}%` }}
-                            ></div>
-                            <div className="absolute bottom-1 left-0 right-0 text-xs text-white font-bold">
-                              {myDailyPoints[index]}
-                            </div>
-                          </div>
-                          <div className="h-[100px] bg-fantasy-muted/20 relative">
-                            <div 
-                              className="absolute bottom-0 left-0 right-0 bg-fantasy-muted"
-                              style={{ height: `${(opponentDailyPoints[index] / 50) * 100}%` }}
-                            ></div>
-                            <div className="absolute bottom-1 left-0 right-0 text-xs text-white font-bold">
-                              {opponentDailyPoints[index]}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  
-                  <div className="flex justify-center gap-8">
-                    <div className="flex items-center">
-                      <div className="w-3 h-3 bg-fantasy-primary mr-2"></div>
-                      <span className="text-sm">My Team</span>
-                    </div>
-                    <div className="flex items-center">
-                      <div className="w-3 h-3 bg-fantasy-muted mr-2"></div>
-                      <span className="text-sm">Opponent</span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+              <DailyPointsChart
+                dayLabels={dayLabels}
+                myDailyPoints={myDailyPoints}
+                opponentDailyPoints={opponentDailyPoints}
+              />
             </TabsContent>
             
             <TabsContent value="matchupHistory" className="mt-8">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Matchup History</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between p-3 bg-fantasy-light rounded-md">
-                      <div>
-                        <span className="block text-sm mb-1">Week 4, 2024</span>
-                        <div className="flex items-center">
-                          <span className="font-medium">Citrus Crushers</span>
-                          <span className="mx-2 text-fantasy-positive font-bold">W</span>
-                          <span>148-132</span>
-                        </div>
-                      </div>
-                      <div className="text-fantasy-muted">vs. Thunder Titans</div>
-                    </div>
-                    
-                    <div className="flex items-center justify-between p-3 bg-fantasy-light rounded-md">
-                      <div>
-                        <span className="block text-sm mb-1">Week 11, 2023</span>
-                        <div className="flex items-center">
-                          <span className="font-medium">Citrus Crushers</span>
-                          <span className="mx-2 text-fantasy-danger font-bold">L</span>
-                          <span>118-135</span>
-                        </div>
-                      </div>
-                      <div className="text-fantasy-muted">vs. Thunder Titans</div>
-                    </div>
-                    
-                    <div className="flex items-center justify-between p-3 bg-fantasy-light rounded-md">
-                      <div>
-                        <span className="block text-sm mb-1">Week 2, 2023</span>
-                        <div className="flex items-center">
-                          <span className="font-medium">Citrus Crushers</span>
-                          <span className="mx-2 text-fantasy-positive font-bold">W</span>
-                          <span>157-145</span>
-                        </div>
-                      </div>
-                      <div className="text-fantasy-muted">vs. Thunder Titans</div>
-                    </div>
-                  </div>
-                  
-                  <div className="mt-6 text-center">
-                    <div className="inline-flex items-center bg-fantasy-light rounded-lg p-2">
-                      <div className="px-3 py-1 text-center">
-                        <div className="text-xl font-bold">2</div>
-                        <div className="text-xs text-fantasy-muted">WINS</div>
-                      </div>
-                      <div className="px-3 py-1 border-l border-r border-fantasy-border text-center">
-                        <div className="text-xl font-bold">1</div>
-                        <div className="text-xs text-fantasy-muted">LOSS</div>
-                      </div>
-                      <div className="px-3 py-1 text-center">
-                        <div className="text-xl font-bold">66%</div>
-                        <div className="text-xs text-fantasy-muted">WIN RATE</div>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+              <MatchupHistory />
             </TabsContent>
           </Tabs>
           
-          <div className="fixed bottom-0 left-0 right-0 bg-gradient-to-r from-fantasy-primary/90 to-fantasy-secondary/90 text-white py-3 backdrop-blur-md">
-            <div className="container mx-auto flex items-center justify-center">
-              <div className="animate-bounce mr-2">⚡</div>
-              <div className="text-sm font-medium animate-fade-in">{updates[currentUpdateIndex]}</div>
-            </div>
-          </div>
+          <LiveUpdates updates={updates} />
         </div>
       </main>
       <Footer />
