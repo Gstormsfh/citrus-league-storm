@@ -3,8 +3,9 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 
-type Player = {
+export type Player = {
   id: number;
   name: string;
   position: string;
@@ -21,10 +22,12 @@ type Player = {
 
 type PlayerCardProps = {
   player: Player;
-  onClick: () => void;
+  onClick?: () => void;
+  draggable?: boolean;
+  className?: string;
 };
 
-export const PlayerCard = ({ player, onClick }: PlayerCardProps) => {
+export const PlayerCard = ({ player, onClick, draggable = true, className }: PlayerCardProps) => {
   const {
     attributes,
     listeners,
@@ -33,10 +36,10 @@ export const PlayerCard = ({ player, onClick }: PlayerCardProps) => {
     transition,
   } = useSortable({ id: player.id });
 
-  const style = {
+  const style = draggable ? {
     transform: CSS.Transform.toString(transform),
     transition,
-  };
+  } : undefined;
 
   const getAbbreviation = (position: string) => {
     switch (position) {
@@ -51,17 +54,21 @@ export const PlayerCard = ({ player, onClick }: PlayerCardProps) => {
 
   const isGoalie = player.position === 'Goalie';
 
+  const dragProps = draggable ? {
+    ...attributes,
+    ...listeners,
+  } : {};
+
   return (
     <Card
-      ref={setNodeRef}
+      ref={draggable ? setNodeRef : undefined}
       style={style}
-      {...attributes}
-      {...listeners}
-      className={`overflow-hidden cursor-pointer border ${
+      {...dragProps}
+      className={cn(`overflow-hidden cursor-pointer border ${
         player.starter 
           ? "border-fantasy-primary shadow-md" 
           : "border-fantasy-border"
-      } transition-all hover:shadow-lg`}
+      } transition-all hover:shadow-lg`, className)}
       onClick={onClick}
     >
       <div className="aspect-square relative">

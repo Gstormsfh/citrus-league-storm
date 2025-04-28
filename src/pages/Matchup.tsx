@@ -1,349 +1,435 @@
 
+import { useState, useEffect } from "react";
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
-import { Button } from '@/components/ui/button';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Progress } from "@/components/ui/progress";
+import { ArrowRight } from 'lucide-react';
+
+type MatchupPlayerStatus = "In Game" | "Final" | "Yet to Play";
+
+type MatchupPlayer = {
+  id: number;
+  name: string;
+  position: string;
+  team: string;
+  points: number;
+  gamesRemaining: number;
+  status: MatchupPlayerStatus;
+  isStarter: boolean;
+};
 
 const Matchup = () => {
+  const [myTeam, setMyTeam] = useState<MatchupPlayer[]>([
+    { id: 1, name: "Connor McDavid", position: "C", team: "EDM", points: 32.5, gamesRemaining: 2, status: "In Game", isStarter: true },
+    { id: 2, name: "Leon Draisaitl", position: "C", team: "EDM", points: 28.2, gamesRemaining: 1, status: "Yet to Play", isStarter: true },
+    { id: 3, name: "Auston Matthews", position: "C", team: "TOR", points: 25.7, gamesRemaining: 0, status: "Final", isStarter: true },
+    { id: 4, name: "Nathan MacKinnon", position: "C", team: "COL", points: 22.8, gamesRemaining: 2, status: "Yet to Play", isStarter: true },
+    { id: 5, name: "David Pastrnak", position: "RW", team: "BOS", points: 21.4, gamesRemaining: 1, status: "In Game", isStarter: true },
+    { id: 6, name: "Mikko Rantanen", position: "RW", team: "COL", points: 18.9, gamesRemaining: 2, status: "Yet to Play", isStarter: true },
+    { id: 7, name: "Kirill Kaprizov", position: "LW", team: "MIN", points: 17.5, gamesRemaining: 0, status: "Final", isStarter: true },
+    { id: 8, name: "Alex Ovechkin", position: "LW", team: "WSH", points: 16.2, gamesRemaining: 0, status: "Final", isStarter: true },
+    { id: 9, name: "Cale Makar", position: "D", team: "COL", points: 15.7, gamesRemaining: 2, status: "Yet to Play", isStarter: true },
+    { id: 10, name: "Adam Fox", position: "D", team: "NYR", points: 13.8, gamesRemaining: 1, status: "In Game", isStarter: true },
+    { id: 11, name: "Roman Josi", position: "D", team: "NSH", points: 11.5, gamesRemaining: 0, status: "Final", isStarter: true },
+    { id: 12, name: "Victor Hedman", position: "D", team: "TBL", points: 10.7, gamesRemaining: 1, status: "Yet to Play", isStarter: true },
+    { id: 13, name: "Andrei Vasilevskiy", position: "G", team: "TBL", points: 24.8, gamesRemaining: 1, status: "Yet to Play", isStarter: true },
+    { id: 14, name: "Igor Shesterkin", position: "G", team: "NYR", points: 23.2, gamesRemaining: 1, status: "In Game", isStarter: true },
+    { id: 15, name: "Matt Duchene", position: "C", team: "DAL", points: 8.5, gamesRemaining: 2, status: "Yet to Play", isStarter: false },
+    { id: 16, name: "Mitch Marner", position: "RW", team: "TOR", points: 14.8, gamesRemaining: 0, status: "Final", isStarter: false },
+    { id: 17, name: "Brady Tkachuk", position: "LW", team: "OTT", points: 12.3, gamesRemaining: 1, status: "Yet to Play", isStarter: false },
+    { id: 18, name: "Quinn Hughes", position: "D", team: "VAN", points: 9.7, gamesRemaining: 2, status: "Yet to Play", isStarter: false },
+    { id: 19, name: "Jacob Markstrom", position: "G", team: "CGY", points: 18.5, gamesRemaining: 0, status: "Final", isStarter: false },
+  ]);
+
+  const [opponentTeam, setOpponentTeam] = useState<MatchupPlayer[]>([
+    { id: 101, name: "Sidney Crosby", position: "C", team: "PIT", points: 29.7, gamesRemaining: 1, status: "Yet to Play", isStarter: true },
+    { id: 102, name: "Nikita Kucherov", position: "RW", team: "TBL", points: 27.9, gamesRemaining: 1, status: "Yet to Play", isStarter: true },
+    { id: 103, name: "Artemi Panarin", position: "LW", team: "NYR", points: 26.2, gamesRemaining: 1, status: "In Game", isStarter: true },
+    { id: 104, name: "Brad Marchand", position: "LW", team: "BOS", points: 22.1, gamesRemaining: 1, status: "In Game", isStarter: true },
+    { id: 105, name: "Elias Pettersson", position: "C", team: "VAN", points: 20.8, gamesRemaining: 2, status: "Yet to Play", isStarter: true },
+    { id: 106, name: "Jack Hughes", position: "C", team: "NJD", points: 19.5, gamesRemaining: 0, status: "Final", isStarter: true },
+    { id: 107, name: "William Nylander", position: "RW", team: "TOR", points: 18.2, gamesRemaining: 0, status: "Final", isStarter: true },
+    { id: 108, name: "Matthew Tkachuk", position: "RW", team: "FLA", points: 17.8, gamesRemaining: 2, status: "Yet to Play", isStarter: true },
+    { id: 109, name: "Brent Burns", position: "D", team: "CAR", points: 13.2, gamesRemaining: 0, status: "Final", isStarter: true },
+    { id: 110, name: "Dougie Hamilton", position: "D", team: "NJD", points: 12.5, gamesRemaining: 0, status: "Final", isStarter: true },
+    { id: 111, name: "Shea Theodore", position: "D", team: "VGK", points: 11.8, gamesRemaining: 1, status: "In Game", isStarter: true },
+    { id: 112, name: "Moritz Seider", position: "D", team: "DET", points: 9.9, gamesRemaining: 2, status: "Yet to Play", isStarter: true },
+    { id: 113, name: "Connor Hellebuyck", position: "G", team: "WPG", points: 26.3, gamesRemaining: 2, status: "Yet to Play", isStarter: true },
+    { id: 114, name: "Ilya Sorokin", position: "G", team: "NYI", points: 22.7, gamesRemaining: 1, status: "Yet to Play", isStarter: true },
+    { id: 115, name: "Tim Stützle", position: "C", team: "OTT", points: 10.4, gamesRemaining: 1, status: "Yet to Play", isStarter: false },
+    { id: 116, name: "Cole Caufield", position: "RW", team: "MTL", points: 9.8, gamesRemaining: 0, status: "Final", isStarter: false },
+    { id: 117, name: "Timo Meier", position: "LW", team: "NJD", points: 11.2, gamesRemaining: 0, status: "Final", isStarter: false },
+    { id: 118, name: "Rasmus Dahlin", position: "D", team: "BUF", points: 10.1, gamesRemaining: 2, status: "Yet to Play", isStarter: false },
+    { id: 119, name: "Juuse Saros", position: "G", team: "NSH", points: 17.6, gamesRemaining: 0, status: "Final", isStarter: false },
+  ]);
+
+  const [updates, setUpdates] = useState<string[]>([
+    "Connor McDavid scored a goal! +5 points.",
+    "David Pastrnak with an assist! +3 points.",
+    "Igor Shesterkin made a save! +0.2 points.",
+    "Adam Fox with a power play assist! +4 points."
+  ]);
+
+  const [currentUpdateIndex, setCurrentUpdateIndex] = useState(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentUpdateIndex(prev => (prev + 1) % updates.length);
+    }, 5000);
+    
+    return () => clearInterval(interval);
+  }, [updates.length]);
+
+  const getStatusColor = (status: MatchupPlayerStatus) => {
+    switch (status) {
+      case "In Game": return "bg-fantasy-secondary text-fantasy-dark animate-pulse";
+      case "Final": return "bg-fantasy-muted/60 text-fantasy-dark";
+      case "Yet to Play": return "bg-fantasy-light text-fantasy-dark";
+      default: return "bg-fantasy-muted/60 text-fantasy-dark";
+    }
+  };
+
+  const getTeamPoints = (team: MatchupPlayer[]) => {
+    return team.reduce((sum, player) => sum + player.points, 0).toFixed(1);
+  };
+
+  const myTeamPoints = getTeamPoints(myTeam);
+  const opponentTeamPoints = getTeamPoints(opponentTeam);
+
+  // Filter players by starter status
+  const myStarters = myTeam.filter(p => p.isStarter);
+  const myBench = myTeam.filter(p => !p.isStarter);
+  const opponentStarters = opponentTeam.filter(p => p.isStarter);
+  const opponentBench = opponentTeam.filter(p => !p.isStarter);
+
+  const dayLabels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  const myDailyPoints = [15.2, 22.8, 18.5, 29.1, 24.7, 30.2, 42.8];
+  const opponentDailyPoints = [18.9, 20.4, 22.1, 22.5, 19.3, 26.8, 38.7];
+
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-fantasy-background">
       <Navbar />
-      <main className="pt-24 pb-16">
-        <div className="container mx-auto px-4">
-          <div className="max-w-3xl mx-auto text-center mb-10 animated-element">
-            <h1 className="text-4xl md:text-5xl font-bold mb-4 vibrant-gradient-2 bg-clip-text text-transparent">
-              Week 11 Matchup
+      <main className="container mx-auto px-4 pt-28 pb-16">
+        <div className="max-w-4xl mx-auto">
+          <div className="text-center mb-8 animate-fade-in">
+            <h1 className="text-3xl md:text-5xl font-bold mb-2 vibrant-gradient-2 bg-clip-text text-transparent">
+              This Week's Matchup
             </h1>
-            <p className="text-lg text-muted-foreground">
-              Your Citrus Crushers vs. Touchdown Titans
+            <p className="text-lg text-fantasy-dark">
+              Citrus Crushers vs. Thunder Titans
             </p>
           </div>
           
-          <div className="bg-card border rounded-xl shadow-md p-6 mb-8 animated-element">
-            <div className="flex flex-col md:flex-row items-center justify-center gap-4 md:gap-10">
-              <div className="flex flex-col items-center">
-                <div className="h-20 w-20 rounded-full overflow-hidden mb-2">
-                  <img src="https://images.unsplash.com/photo-1617777938240-9a1d8e3ba07c?q=80&w=400&auto=format&fit=crop" alt="Your Team" className="h-full w-full object-cover" />
-                </div>
-                <h3 className="text-lg font-bold">Citrus Crushers</h3>
-                <p className="text-muted-foreground text-sm">You (7-3)</p>
-              </div>
-              
-              <div className="flex items-center gap-4">
-                <div className="text-center">
-                  <div className="text-3xl font-bold">87</div>
-                  <div className="text-xs text-muted-foreground">PROJECTED</div>
-                </div>
-                <div className="text-lg font-bold">VS</div>
-                <div className="text-center">
-                  <div className="text-3xl font-bold">82</div>
-                  <div className="text-xs text-muted-foreground">PROJECTED</div>
-                </div>
-              </div>
-              
-              <div className="flex flex-col items-center">
-                <div className="h-20 w-20 rounded-full overflow-hidden mb-2">
-                  <img src="https://images.unsplash.com/photo-1606131731446-5568d87113aa?q=80&w=400&auto=format&fit=crop" alt="Opponent Team" className="h-full w-full object-cover" />
-                </div>
-                <h3 className="text-lg font-bold">Touchdown Titans</h3>
-                <p className="text-muted-foreground text-sm">Alex Johnson (9-1)</p>
-              </div>
-            </div>
-            
-            <div className="mt-8">
-              <div className="bg-muted/30 rounded-lg p-4">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <span className="text-sm font-medium">Matchup Chance:</span>
-                  </div>
-                  <div className="text-sm font-medium">58% - 42%</div>
-                </div>
-                <div className="h-2 bg-muted mt-2 rounded-full overflow-hidden">
-                  <div className="h-full bg-primary" style={{ width: '58%' }}></div>
-                </div>
-              </div>
-            </div>
-          </div>
-          
-          <Tabs defaultValue="lineups" className="mb-8 animated-element">
-            <TabsList className="w-full max-w-md mx-auto grid grid-cols-3">
-              <TabsTrigger value="lineups">Lineups</TabsTrigger>
-              <TabsTrigger value="players">Players</TabsTrigger>
-              <TabsTrigger value="matchups">Matchups</TabsTrigger>
-            </TabsList>
-            <TabsContent value="lineups" className="mt-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Your Lineup</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      <PlayerLineupItem 
-                        position="QB" 
-                        name="Patrick Mahomes" 
-                        team="KC" 
-                        opponent="vs LV" 
-                        projection={24.5} 
-                      />
-                      <PlayerLineupItem 
-                        position="RB" 
-                        name="Christian McCaffrey" 
-                        team="SF" 
-                        opponent="vs SEA" 
-                        projection={18.7} 
-                      />
-                      <PlayerLineupItem 
-                        position="RB" 
-                        name="Saquon Barkley" 
-                        team="PHI" 
-                        opponent="@ DAL" 
-                        projection={16.3} 
-                      />
-                      <PlayerLineupItem 
-                        position="WR" 
-                        name="Justin Jefferson" 
-                        team="MIN" 
-                        opponent="vs DET" 
-                        projection={21.2} 
-                      />
-                      <PlayerLineupItem 
-                        position="WR" 
-                        name="CeeDee Lamb" 
-                        team="DAL" 
-                        opponent="vs PHI" 
-                        projection={19.8} 
-                      />
-                      <PlayerLineupItem 
-                        position="TE" 
-                        name="Travis Kelce" 
-                        team="KC" 
-                        opponent="vs LV" 
-                        projection={14.3} 
-                      />
-                      <PlayerLineupItem 
-                        position="FLEX" 
-                        name="DeVonta Smith" 
-                        team="PHI" 
-                        opponent="@ DAL" 
-                        projection={13.1} 
-                      />
-                      <PlayerLineupItem 
-                        position="D/ST" 
-                        name="49ers" 
-                        team="SF" 
-                        opponent="vs SEA" 
-                        projection={8.2} 
-                      />
-                      <PlayerLineupItem 
-                        position="K" 
-                        name="Justin Tucker" 
-                        team="BAL" 
-                        opponent="@ PIT" 
-                        projection={8.4} 
-                      />
-                    </div>
-                    <div className="mt-4 pt-4 border-t border-border flex justify-between">
-                      <span className="font-semibold">Total</span>
-                      <span className="font-semibold">144.5 pts</span>
-                    </div>
-                  </CardContent>
-                </Card>
-                
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Opponent's Lineup</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      <PlayerLineupItem 
-                        position="QB" 
-                        name="Josh Allen" 
-                        team="BUF" 
-                        opponent="vs MIA" 
-                        projection={22.1} 
-                      />
-                      <PlayerLineupItem 
-                        position="RB" 
-                        name="Derrick Henry" 
-                        team="BAL" 
-                        opponent="@ PIT" 
-                        projection={17.2} 
-                      />
-                      <PlayerLineupItem 
-                        position="RB" 
-                        name="Breece Hall" 
-                        team="NYJ" 
-                        opponent="vs NE" 
-                        projection={14.8} 
-                      />
-                      <PlayerLineupItem 
-                        position="WR" 
-                        name="Tyreek Hill" 
-                        team="MIA" 
-                        opponent="@ BUF" 
-                        projection={20.5} 
-                      />
-                      <PlayerLineupItem 
-                        position="WR" 
-                        name="Amon-Ra St. Brown" 
-                        team="DET" 
-                        opponent="@ MIN" 
-                        projection={18.9} 
-                      />
-                      <PlayerLineupItem 
-                        position="TE" 
-                        name="Mark Andrews" 
-                        team="BAL" 
-                        opponent="@ PIT" 
-                        projection={12.7} 
-                      />
-                      <PlayerLineupItem 
-                        position="FLEX" 
-                        name="Jaylen Waddle" 
-                        team="MIA" 
-                        opponent="@ BUF" 
-                        projection={13.5} 
-                      />
-                      <PlayerLineupItem 
-                        position="D/ST" 
-                        name="Eagles" 
-                        team="PHI" 
-                        opponent="@ DAL" 
-                        projection={7.4} 
-                      />
-                      <PlayerLineupItem 
-                        position="K" 
-                        name="Evan McPherson" 
-                        team="CIN" 
-                        opponent="vs TEN" 
-                        projection={7.8} 
-                      />
-                    </div>
-                    <div className="mt-4 pt-4 border-t border-border flex justify-between">
-                      <span className="font-semibold">Total</span>
-                      <span className="font-semibold">134.9 pts</span>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            </TabsContent>
-            
-            <TabsContent value="players" className="mt-6">
-              <div className="text-center py-12">
-                <h3 className="text-2xl font-semibold mb-2">Player Comparison Coming Soon</h3>
-                <p className="text-muted-foreground mb-6">
-                  Detailed player-by-player comparison will be available in the next update.
-                </p>
-                <Button className="btn-vibrant-orange">View Lineup</Button>
-              </div>
-            </TabsContent>
-            
-            <TabsContent value="matchups" className="mt-6">
-              <div className="text-center py-12">
-                <h3 className="text-2xl font-semibold mb-2">Position Matchups Coming Soon</h3>
-                <p className="text-muted-foreground mb-6">
-                  Detailed position-by-position matchup analysis will be available in the next update.
-                </p>
-                <Button className="btn-vibrant-orange">View Lineup</Button>
-              </div>
-            </TabsContent>
-          </Tabs>
-          
-          <Card className="mb-8 animated-element">
-            <CardHeader>
-              <CardTitle>Matchup History</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between p-3 bg-muted/30 rounded-md">
-                  <div>
-                    <span className="block text-sm mb-1">Week 4, 2024</span>
-                    <div className="flex items-center">
-                      <span className="font-medium">Citrus Crushers</span>
-                      <span className="mx-2 text-green-600 font-bold">W</span>
-                      <span>148-132</span>
-                    </div>
-                  </div>
-                  <div className="text-muted-foreground">vs. Touchdown Titans</div>
+          <Card className="mb-8 overflow-hidden border-fantasy-border animate-fade-in">
+            <CardContent className="p-0">
+              <div className="flex flex-col md:flex-row items-center justify-between bg-gradient-to-r from-[#FFF1DB] to-[#FFE5C4] p-6">
+                <div className="flex flex-col items-center md:items-start mb-4 md:mb-0">
+                  <div className="text-sm text-fantasy-muted mb-1">Your Team</div>
+                  <div className="text-3xl font-bold text-fantasy-primary">Citrus Crushers</div>
+                  <div className="text-fantasy-muted mt-1">7-3 Record</div>
                 </div>
                 
-                <div className="flex items-center justify-between p-3 bg-muted/30 rounded-md">
-                  <div>
-                    <span className="block text-sm mb-1">Week 11, 2023</span>
-                    <div className="flex items-center">
-                      <span className="font-medium">Citrus Crushers</span>
-                      <span className="mx-2 text-red-600 font-bold">L</span>
-                      <span>118-135</span>
-                    </div>
-                  </div>
-                  <div className="text-muted-foreground">vs. Touchdown Titans</div>
+                <div className="flex items-center gap-3 md:gap-6">
+                  <div className="text-5xl font-bold text-fantasy-dark">{myTeamPoints}</div>
+                  <div className="text-2xl text-fantasy-muted">-</div>
+                  <div className="text-5xl font-bold text-fantasy-dark">{opponentTeamPoints}</div>
                 </div>
                 
-                <div className="flex items-center justify-between p-3 bg-muted/30 rounded-md">
-                  <div>
-                    <span className="block text-sm mb-1">Week 2, 2023</span>
-                    <div className="flex items-center">
-                      <span className="font-medium">Citrus Crushers</span>
-                      <span className="mx-2 text-green-600 font-bold">W</span>
-                      <span>157-145</span>
-                    </div>
-                  </div>
-                  <div className="text-muted-foreground">vs. Touchdown Titans</div>
+                <div className="flex flex-col items-center md:items-end mt-4 md:mt-0">
+                  <div className="text-sm text-fantasy-muted mb-1">Opponent</div>
+                  <div className="text-3xl font-bold text-fantasy-dark">Thunder Titans</div>
+                  <div className="text-fantasy-muted mt-1">9-1 Record</div>
                 </div>
               </div>
               
-              <div className="mt-6 text-center">
-                <div className="inline-flex items-center bg-muted/50 rounded-lg p-2">
-                  <div className="px-3 py-1 text-center">
-                    <div className="text-xl font-bold">2</div>
-                    <div className="text-xs text-muted-foreground">WINS</div>
-                  </div>
-                  <div className="px-3 py-1 border-l border-r border-border text-center">
-                    <div className="text-xl font-bold">1</div>
-                    <div className="text-xs text-muted-foreground">LOSS</div>
-                  </div>
-                  <div className="px-3 py-1 text-center">
-                    <div className="text-xl font-bold">66%</div>
-                    <div className="text-xs text-muted-foreground">WIN RATE</div>
-                  </div>
+              <div className="p-4 bg-fantasy-light">
+                <div className="text-sm font-medium mb-2">Matchup Progress</div>
+                <div className="flex gap-2 items-center">
+                  <div className="text-xs text-fantasy-muted">Mon</div>
+                  <Progress 
+                    value={70} 
+                    className="h-2 flex-1" 
+                    indicatorClassName="bg-fantasy-primary"
+                  />
+                  <div className="text-xs text-fantasy-muted">Sun</div>
                 </div>
               </div>
             </CardContent>
           </Card>
+          
+          <Tabs defaultValue="lineup" className="mb-8 animate-fade-in">
+            <TabsList className="w-full max-w-md mx-auto grid grid-cols-3 bg-fantasy-light">
+              <TabsTrigger value="lineup">Lineup</TabsTrigger>
+              <TabsTrigger value="dailyPoints">Daily Points</TabsTrigger>
+              <TabsTrigger value="matchupHistory">History</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="lineup" className="mt-6">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <Card className="border-fantasy-border overflow-hidden">
+                  <CardHeader className="bg-fantasy-primary/10 py-3">
+                    <CardTitle className="text-center text-fantasy-primary">My Team</CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    <div className="p-4 border-b border-fantasy-border bg-white">
+                      <h3 className="text-sm font-medium text-fantasy-muted mb-2">Starters</h3>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="w-[120px]">Position</TableHead>
+                            <TableHead>Player</TableHead>
+                            <TableHead className="text-right">Pts</TableHead>
+                            <TableHead className="text-right">Games Left</TableHead>
+                            <TableHead className="text-center w-[100px]">Status</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {myStarters.map(player => (
+                            <TableRow key={player.id}>
+                              <TableCell className="font-medium">{player.position}</TableCell>
+                              <TableCell>
+                                <div className="font-medium">{player.name}</div>
+                                <div className="text-xs text-fantasy-muted">{player.team}</div>
+                              </TableCell>
+                              <TableCell className="text-right">{player.points}</TableCell>
+                              <TableCell className="text-right">{player.gamesRemaining}</TableCell>
+                              <TableCell className="text-center">
+                                <Badge className={getStatusColor(player.status)}>
+                                  {player.status}
+                                </Badge>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                    
+                    {myBench.length > 0 && (
+                      <div className="p-4 bg-fantasy-light/50">
+                        <h3 className="text-sm font-medium text-fantasy-muted mb-2">Bench</h3>
+                        <Table>
+                          <TableBody>
+                            {myBench.map(player => (
+                              <TableRow key={player.id}>
+                                <TableCell className="font-medium">{player.position}</TableCell>
+                                <TableCell>
+                                  <div className="font-medium">{player.name}</div>
+                                  <div className="text-xs text-fantasy-muted">{player.team}</div>
+                                </TableCell>
+                                <TableCell className="text-right">{player.points}</TableCell>
+                                <TableCell className="text-right">{player.gamesRemaining}</TableCell>
+                                <TableCell className="text-center">
+                                  <Badge className={getStatusColor(player.status)}>
+                                    {player.status}
+                                  </Badge>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+                
+                <Card className="border-fantasy-border overflow-hidden">
+                  <CardHeader className="bg-fantasy-muted/20 py-3">
+                    <CardTitle className="text-center text-fantasy-dark">Opponent's Team</CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    <div className="p-4 border-b border-fantasy-border bg-white">
+                      <h3 className="text-sm font-medium text-fantasy-muted mb-2">Starters</h3>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="w-[120px]">Position</TableHead>
+                            <TableHead>Player</TableHead>
+                            <TableHead className="text-right">Pts</TableHead>
+                            <TableHead className="text-right">Games Left</TableHead>
+                            <TableHead className="text-center w-[100px]">Status</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {opponentStarters.map(player => (
+                            <TableRow key={player.id}>
+                              <TableCell className="font-medium">{player.position}</TableCell>
+                              <TableCell>
+                                <div className="font-medium">{player.name}</div>
+                                <div className="text-xs text-fantasy-muted">{player.team}</div>
+                              </TableCell>
+                              <TableCell className="text-right">{player.points}</TableCell>
+                              <TableCell className="text-right">{player.gamesRemaining}</TableCell>
+                              <TableCell className="text-center">
+                                <Badge className={getStatusColor(player.status)}>
+                                  {player.status}
+                                </Badge>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                    
+                    {opponentBench.length > 0 && (
+                      <div className="p-4 bg-fantasy-light/50">
+                        <h3 className="text-sm font-medium text-fantasy-muted mb-2">Bench</h3>
+                        <Table>
+                          <TableBody>
+                            {opponentBench.map(player => (
+                              <TableRow key={player.id}>
+                                <TableCell className="font-medium">{player.position}</TableCell>
+                                <TableCell>
+                                  <div className="font-medium">{player.name}</div>
+                                  <div className="text-xs text-fantasy-muted">{player.team}</div>
+                                </TableCell>
+                                <TableCell className="text-right">{player.points}</TableCell>
+                                <TableCell className="text-right">{player.gamesRemaining}</TableCell>
+                                <TableCell className="text-center">
+                                  <Badge className={getStatusColor(player.status)}>
+                                    {player.status}
+                                  </Badge>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
+            
+            <TabsContent value="dailyPoints" className="mt-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Daily Points Breakdown</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-7 gap-2 mb-6">
+                    {dayLabels.map((day, index) => (
+                      <div key={day} className="text-center">
+                        <div className="bg-fantasy-light rounded-t-md py-1 text-xs font-medium">
+                          {day}
+                        </div>
+                        <div className="flex flex-col">
+                          <div className="h-[100px] bg-fantasy-primary/20 relative">
+                            <div 
+                              className="absolute bottom-0 left-0 right-0 bg-fantasy-primary"
+                              style={{ height: `${(myDailyPoints[index] / 50) * 100}%` }}
+                            ></div>
+                            <div className="absolute bottom-1 left-0 right-0 text-xs text-white font-bold">
+                              {myDailyPoints[index]}
+                            </div>
+                          </div>
+                          <div className="h-[100px] bg-fantasy-muted/20 relative">
+                            <div 
+                              className="absolute bottom-0 left-0 right-0 bg-fantasy-muted"
+                              style={{ height: `${(opponentDailyPoints[index] / 50) * 100}%` }}
+                            ></div>
+                            <div className="absolute bottom-1 left-0 right-0 text-xs text-white font-bold">
+                              {opponentDailyPoints[index]}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  
+                  <div className="flex justify-center gap-8">
+                    <div className="flex items-center">
+                      <div className="w-3 h-3 bg-fantasy-primary mr-2"></div>
+                      <span className="text-sm">My Team</span>
+                    </div>
+                    <div className="flex items-center">
+                      <div className="w-3 h-3 bg-fantasy-muted mr-2"></div>
+                      <span className="text-sm">Opponent</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+            
+            <TabsContent value="matchupHistory" className="mt-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Matchup History</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between p-3 bg-fantasy-light rounded-md">
+                      <div>
+                        <span className="block text-sm mb-1">Week 4, 2024</span>
+                        <div className="flex items-center">
+                          <span className="font-medium">Citrus Crushers</span>
+                          <span className="mx-2 text-fantasy-positive font-bold">W</span>
+                          <span>148-132</span>
+                        </div>
+                      </div>
+                      <div className="text-fantasy-muted">vs. Thunder Titans</div>
+                    </div>
+                    
+                    <div className="flex items-center justify-between p-3 bg-fantasy-light rounded-md">
+                      <div>
+                        <span className="block text-sm mb-1">Week 11, 2023</span>
+                        <div className="flex items-center">
+                          <span className="font-medium">Citrus Crushers</span>
+                          <span className="mx-2 text-fantasy-danger font-bold">L</span>
+                          <span>118-135</span>
+                        </div>
+                      </div>
+                      <div className="text-fantasy-muted">vs. Thunder Titans</div>
+                    </div>
+                    
+                    <div className="flex items-center justify-between p-3 bg-fantasy-light rounded-md">
+                      <div>
+                        <span className="block text-sm mb-1">Week 2, 2023</span>
+                        <div className="flex items-center">
+                          <span className="font-medium">Citrus Crushers</span>
+                          <span className="mx-2 text-fantasy-positive font-bold">W</span>
+                          <span>157-145</span>
+                        </div>
+                      </div>
+                      <div className="text-fantasy-muted">vs. Thunder Titans</div>
+                    </div>
+                  </div>
+                  
+                  <div className="mt-6 text-center">
+                    <div className="inline-flex items-center bg-fantasy-light rounded-lg p-2">
+                      <div className="px-3 py-1 text-center">
+                        <div className="text-xl font-bold">2</div>
+                        <div className="text-xs text-fantasy-muted">WINS</div>
+                      </div>
+                      <div className="px-3 py-1 border-l border-r border-fantasy-border text-center">
+                        <div className="text-xl font-bold">1</div>
+                        <div className="text-xs text-fantasy-muted">LOSS</div>
+                      </div>
+                      <div className="px-3 py-1 text-center">
+                        <div className="text-xl font-bold">66%</div>
+                        <div className="text-xs text-fantasy-muted">WIN RATE</div>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+          
+          <div className="fixed bottom-0 left-0 right-0 bg-fantasy-primary/90 text-white py-2 px-4 backdrop-blur-sm">
+            <div className="container mx-auto flex items-center justify-center">
+              <div className="animate-pulse mr-2">⚡</div>
+              <div className="text-sm font-medium">{updates[currentUpdateIndex]}</div>
+            </div>
+          </div>
         </div>
       </main>
       <Footer />
     </div>
   );
 };
-
-const PlayerLineupItem = ({ 
-  position, 
-  name, 
-  team, 
-  opponent, 
-  projection 
-}: { 
-  position: string; 
-  name: string; 
-  team: string; 
-  opponent: string; 
-  projection: number;
-}) => (
-  <div className="flex items-center justify-between border-b border-border pb-2">
-    <div className="flex items-center">
-      <div className="w-8 text-xs font-medium bg-muted/50 rounded-md h-6 flex items-center justify-center mr-2">
-        {position}
-      </div>
-      <div>
-        <div className="font-medium">{name}</div>
-        <div className="text-xs text-muted-foreground">{team} {opponent}</div>
-      </div>
-    </div>
-    <div className="font-medium">{projection}</div>
-  </div>
-);
 
 export default Matchup;
