@@ -4,7 +4,7 @@ import { Play, ArrowRight } from 'lucide-react';
 
 const CtaSection = () => {
   return (
-    <section className="section-padding relative overflow-hidden bg-gradient-to-br from-citrus-green to-primary">
+    <section className="section-padding relative overflow-hidden bg-gradient-to-br from-[hsl(var(--vibrant-green))] to-[hsl(var(--vibrant-orange))]">
       {/* Background decorations */}
       <div className="absolute top-0 left-0 right-0 bottom-0">
         <div className="absolute top-10 left-10 w-64 h-64 rounded-full bg-white opacity-10"></div>
