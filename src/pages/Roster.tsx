@@ -3,28 +3,11 @@ import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { ChevronDown, ChevronRight, Star, TrendingUp, TrendingDown, BarChart } from 'lucide-react';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { Star, TrendingUp, TrendingDown, BarChart } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { 
-  DndContext, 
-  closestCenter, 
-  KeyboardSensor, 
-  PointerSensor, 
-  useSensor, 
-  useSensors,
-  DragEndEvent
-} from '@dnd-kit/core';
-import {
-  arrayMove,
-  SortableContext,
-  sortableKeyboardCoordinates,
-  verticalListSortingStrategy,
-} from '@dnd-kit/sortable';
-import { PlayerCard } from '@/components/gm-office/PlayerCard';
+import PlayerStatsModal from '@/components/PlayerStatsModal';
 
 // Sample player data - hockey themed
 const players = [
@@ -251,36 +234,6 @@ const Roster = () => {
   const [selectedPlayer, setSelectedPlayer] = useState<typeof players[0] | null>(null);
   const [isPlayerDialogOpen, setIsPlayerDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("roster");
-  const [activeStat, setActiveStat] = useState("standard");
-  const [rosterPlayers, setRosterPlayers] = useState(players);
-  
-  const sensors = useSensors(
-    useSensor(PointerSensor),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
-  );
-
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-    
-    if (active.id !== over?.id) {
-      setRosterPlayers((items) => {
-        const oldIndex = items.findIndex((item) => item.id === active.id);
-        const newIndex = items.findIndex((item) => item.id === over?.id);
-        
-        const newItems = arrayMove(items, oldIndex, newIndex);
-        
-        // Toggle starter status if dragging between sections
-        if ((items[oldIndex].starter && !items[newIndex].starter) || 
-            (!items[oldIndex].starter && items[newIndex].starter)) {
-          newItems[oldIndex] = { ...newItems[oldIndex], starter: !newItems[oldIndex].starter };
-        }
-        
-        return newItems;
-      });
-    }
-  };
 
   const handlePlayerClick = (player: typeof players[0]) => {
     setSelectedPlayer(player);
@@ -288,7 +241,7 @@ const Roster = () => {
   };
 
   // Group players by position
-  const positionGroups = rosterPlayers.reduce((groups: Record<string, typeof players>, player) => {
+  const positionGroups = players.reduce((groups: Record<string, typeof players>, player) => {
     if (!groups[player.position]) {
       groups[player.position] = [];
     }
@@ -296,7 +249,7 @@ const Roster = () => {
     return groups;
   }, {});
 
-  // Sort players by starter status
+  // Sort players by starter status within each position
   Object.keys(positionGroups).forEach(position => {
     positionGroups[position].sort((a, b) => {
       if (a.starter && !b.starter) return -1;
@@ -306,43 +259,50 @@ const Roster = () => {
   });
 
   const positionOrder = ['Centre', 'Right Wing', 'Left Wing', 'Defence', 'Goalie'];
+  const positionLabels: Record<string, string> = {
+    'Centre': 'Centers',
+    'Right Wing': 'Right Wingers', 
+    'Left Wing': 'Left Wingers',
+    'Defence': 'Defencemen',
+    'Goalie': 'Goalies'
+  };
 
   return (
-    <div className="min-h-screen bg-fantasy-background text-fantasy-dark">
+    <div className="min-h-screen bg-background text-foreground">
       <Navbar />
       
       <main className="pt-24 pb-16">
         <div className="container max-w-7xl mx-auto px-4">
-          {/* Fantasy Team Header - similar to the example image */}
-          <div className="bg-white rounded-lg shadow-md border border-fantasy-border p-4 mb-6">
+          {/* Fantasy Team Header */}
+          <div className="bg-card rounded-lg shadow-md border p-4 mb-6">
             <div className="flex flex-col md:flex-row justify-between items-center gap-4">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-full bg-fantasy-primary flex items-center justify-center text-white text-2xl font-bold">
+                <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-2xl font-bold">
                   HC
                 </div>
                 <div>
-                  <h1 className="text-2xl font-bold text-fantasy-dark">Hockey Champions</h1>
-                  <div className="text-fantasy-muted text-sm">Manager: John Smith</div>
+                  <h1 className="text-2xl font-bold">Hockey Champions</h1>
+                  <div className="text-muted-foreground text-sm">Manager: John Smith</div>
                 </div>
               </div>
 
               <div className="flex items-center gap-3">
                 <div className="text-center px-4 py-2">
-                  <div className="text-sm text-fantasy-muted">Record</div>
+                  <div className="text-sm text-muted-foreground">Record</div>
                   <div className="font-bold">{teamStats.record}</div>
                 </div>
                 <div className="text-center px-4 py-2">
-                  <div className="text-sm text-fantasy-muted">Points</div>
+                  <div className="text-sm text-muted-foreground">Points</div>
                   <div className="font-bold">{teamStats.points}</div>
                 </div>
                 <div className="text-center px-4 py-2">
-                  <div className="text-sm text-fantasy-muted">Standing</div>
+                  <div className="text-sm text-muted-foreground">Standing</div>
                   <div className="font-bold">#3</div>
                 </div>
               </div>
 
               <div>
-                <Button className="bg-fantasy-primary hover:bg-fantasy-primary/90 text-white">
+                <Button>
                   Edit Lineup
                 </Button>
               </div>
@@ -351,678 +311,206 @@ const Roster = () => {
 
           {/* Main Tabs */}
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-            <div className="bg-white rounded-lg shadow-md border border-fantasy-border">
-              <TabsList className="w-full p-0 bg-transparent border-b border-fantasy-border rounded-none gap-0">
+            <div className="bg-card rounded-lg shadow-md border">
+              <TabsList className="w-full p-0 bg-transparent border-b rounded-none gap-0">
                 <TabsTrigger 
                   value="roster" 
-                  className="flex-1 py-4 rounded-none data-[state=active]:bg-white data-[state=active]:border-b-2 data-[state=active]:border-fantasy-primary data-[state=active]:text-fantasy-primary"
+                  className="flex-1 py-4 rounded-none data-[state=active]:bg-card data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:text-primary"
                 >
                   Roster
                 </TabsTrigger>
                 <TabsTrigger 
                   value="stats" 
-                  className="flex-1 py-4 rounded-none data-[state=active]:bg-white data-[state=active]:border-b-2 data-[state=active]:border-fantasy-primary data-[state=active]:text-fantasy-primary"
+                  className="flex-1 py-4 rounded-none data-[state=active]:bg-card data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:text-primary"
                 >
                   Team Stats
                 </TabsTrigger>
                 <TabsTrigger 
                   value="trends" 
-                  className="flex-1 py-4 rounded-none data-[state=active]:bg-white data-[state=active]:border-b-2 data-[state=active]:border-fantasy-primary data-[state=active]:text-fantasy-primary"
+                  className="flex-1 py-4 rounded-none data-[state=active]:bg-card data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:text-primary"
                 >
-                  Trends &amp; Analytics
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="ai-gm" 
-                  className="flex-1 py-4 rounded-none data-[state=active]:bg-white data-[state=active]:border-b-2 data-[state=active]:border-fantasy-primary data-[state=active]:text-fantasy-primary"
-                >
-                  AI GM Tool
+                  Trends & Analytics
                 </TabsTrigger>
               </TabsList>
 
               <TabsContent value="roster" className="m-0 p-6">
-                {/* Secondary tabs for roster view */}
-                <Tabs value={activeStat} onValueChange={setActiveStat} className="mb-4">
-                  <TabsList className="bg-fantasy-background/80 p-1">
-                    <TabsTrigger value="standard" className="data-[state=active]:bg-white data-[state=active]:text-fantasy-primary">
-                      Standard
-                    </TabsTrigger>
-                    <TabsTrigger value="advanced" className="data-[state=active]:bg-white data-[state=active]:text-fantasy-primary">
-                      Advanced
-                    </TabsTrigger>
-                  </TabsList>
-                </Tabs>
-                
-                {/* Drag and drop roster sections */}
-                <DndContext
-                  sensors={sensors}
-                  collisionDetection={closestCenter}
-                  onDragEnd={handleDragEnd}
-                >
-                  <div className="mb-8">
-                    <h2 className="text-lg font-bold mb-3 text-fantasy-primary flex items-center">
-                      <Star className="h-5 w-5 mr-2" /> Starters
-                    </h2>
-                    <SortableContext items={rosterPlayers.filter(p => p.starter).map(p => p.id)} strategy={verticalListSortingStrategy}>
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
-                        {rosterPlayers
-                          .filter(player => player.starter)
-                          .map(player => (
-                            <PlayerCard 
-                              key={player.id} 
-                              player={player}
-                              onClick={() => handlePlayerClick(player)}
-                            />
-                          ))
-                        }
+                {/* Position-based roster layout */}
+                <div className="space-y-8">
+                  {positionOrder.map((position) => {
+                    const positionPlayers = positionGroups[position] || [];
+                    if (positionPlayers.length === 0) return null;
+                    
+                    return (
+                      <div key={position} className="space-y-4">
+                        <h2 className="text-xl font-bold text-primary flex items-center">
+                          {positionLabels[position]}
+                          <Badge variant="secondary" className="ml-2">
+                            {positionPlayers.length}
+                          </Badge>
+                        </h2>
+                        
+                        <div className="bg-card rounded-lg shadow-sm border overflow-hidden">
+                          <Table>
+                            <TableHeader>
+                              <TableRow className="bg-muted/50">
+                                <TableHead className="w-12"></TableHead>
+                                <TableHead>Player</TableHead>
+                                <TableHead className="text-center">Team</TableHead>
+                                {position === 'Goalie' ? (
+                                  <>
+                                    <TableHead className="text-center">W</TableHead>
+                                    <TableHead className="text-center">L</TableHead>
+                                    <TableHead className="text-center">GAA</TableHead>
+                                    <TableHead className="text-center">SV%</TableHead>
+                                    <TableHead className="text-center">SO</TableHead>
+                                  </>
+                                ) : (
+                                  <>
+                                    <TableHead className="text-center">G</TableHead>
+                                    <TableHead className="text-center">A</TableHead>
+                                    <TableHead className="text-center">PTS</TableHead>
+                                    <TableHead className="text-center">+/-</TableHead>
+                                    <TableHead className="text-center">SOG</TableHead>
+                                  </>
+                                )}
+                                <TableHead className="text-center">Status</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {positionPlayers.map((player, index) => (
+                                <TableRow 
+                                  key={player.id}
+                                  className="cursor-pointer hover:bg-muted/30 transition-colors"
+                                  onClick={() => handlePlayerClick(player)}
+                                >
+                                  <TableCell>
+                                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-sm font-bold text-primary">
+                                      {player.number}
+                                    </div>
+                                  </TableCell>
+                                  <TableCell>
+                                    <div className="flex items-center gap-2">
+                                      <div>
+                                        <div className="font-semibold">{player.name}</div>
+                                        <div className="text-sm text-muted-foreground">{position}</div>
+                                      </div>
+                                      {player.starter && (
+                                        <Star className="h-4 w-4 text-yellow-500 fill-current" />
+                                      )}
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="text-center">
+                                    <Badge variant="outline" className="text-xs">
+                                      {player.team.split(' ').pop()}
+                                    </Badge>
+                                  </TableCell>
+                                  {position === 'Goalie' ? (
+                                    <>
+                                      <TableCell className="text-center font-medium">{player.stats.wins}</TableCell>
+                                      <TableCell className="text-center">{player.stats.losses}</TableCell>
+                                      <TableCell className="text-center">{player.stats.gaa}</TableCell>
+                                      <TableCell className="text-center">{(player.stats.savePct * 100).toFixed(1)}%</TableCell>
+                                      <TableCell className="text-center">{player.stats.shutouts}</TableCell>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <TableCell className="text-center font-medium">{player.stats.goals}</TableCell>
+                                      <TableCell className="text-center font-medium">{player.stats.assists}</TableCell>
+                                      <TableCell className="text-center font-bold text-primary">{player.stats.points}</TableCell>
+                                      <TableCell className="text-center">
+                                        <span className={player.stats.plusMinus > 0 ? 'text-green-600' : player.stats.plusMinus < 0 ? 'text-red-600' : ''}>
+                                          {player.stats.plusMinus > 0 ? '+' : ''}{player.stats.plusMinus}
+                                        </span>
+                                      </TableCell>
+                                      <TableCell className="text-center">{player.stats.shots}</TableCell>
+                                    </>
+                                  )}
+                                  <TableCell className="text-center">
+                                    <Badge variant={player.starter ? "default" : "secondary"} className="text-xs">
+                                      {player.starter ? "Starter" : "Bench"}
+                                    </Badge>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
                       </div>
-                    </SortableContext>
-                  </div>
-                  
-                  <div>
-                    <h2 className="text-lg font-bold mb-3 text-fantasy-muted flex items-center">
-                      <ChevronRight className="h-5 w-5 mr-2" /> Bench
-                    </h2>
-                    <SortableContext items={rosterPlayers.filter(p => !p.starter).map(p => p.id)} strategy={verticalListSortingStrategy}>
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
-                        {rosterPlayers
-                          .filter(player => !player.starter)
-                          .map(player => (
-                            <PlayerCard 
-                              key={player.id} 
-                              player={player}
-                              onClick={() => handlePlayerClick(player)}
-                            />
-                          ))
-                        }
-                      </div>
-                    </SortableContext>
-                  </div>
-                </DndContext>
-                
-                <div className="mt-8">
-                  <h3 className="text-lg font-bold mb-3">Complete Roster Stats</h3>
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="bg-fantasy-light hover:bg-fantasy-light">
-                        <TableHead className="w-[40px]">POS</TableHead>
-                        <TableHead>Player</TableHead>
-                        <TableHead className="text-right"># / Team</TableHead>
-                        <TableHead className="text-right">G</TableHead>
-                        <TableHead className="text-right">A</TableHead>
-                        <TableHead className="text-right">PTS</TableHead>
-                        <TableHead className="text-right">+/-</TableHead>
-                        <TableHead className="text-right">PIM</TableHead>
-                        <TableHead className="text-right">SOG</TableHead>
-                        {activeStat === "advanced" && (
-                          <>
-                            <TableHead className="text-right">PP PTS</TableHead>
-                            <TableHead className="text-right">SH PTS</TableHead>
-                            <TableHead className="text-right">GWG</TableHead>
-                            <TableHead className="text-right">FO%</TableHead>
-                          </>
-                        )}
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {positionOrder.map(position => (
-                        positionGroups[position]?.map((player) => (
-                          <TableRow 
-                            key={player.id} 
-                            className="cursor-pointer hover:bg-fantasy-light"
-                            onClick={() => handlePlayerClick(player)}
-                          >
-                            <TableCell className="font-medium">
-                              <Badge className={`${player.starter ? 'bg-fantasy-primary' : 'bg-fantasy-muted'} text-white`}>
-                                {position === 'Centre' ? 'C' : 
-                                position === 'Right Wing' ? 'RW' : 
-                                position === 'Left Wing' ? 'LW' : 
-                                position === 'Defence' ? 'D' : 'G'}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-full overflow-hidden">
-                                  <img 
-                                    src={player.image} 
-                                    alt={player.name} 
-                                    className="object-cover w-full h-full"
-                                  />
-                                </div>
-                                <div>
-                                  <div className="font-medium">{player.name}</div>
-                                  <div className="text-xs text-fantasy-muted">{player.position}</div>
-                                </div>
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <div className="font-medium">#{player.number}</div>
-                              <div className="text-xs text-fantasy-muted">{player.team}</div>
-                            </TableCell>
-                            <TableCell className="text-right">
-                              {position === 'Goalie' ? player.stats.wins : player.stats.goals}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              {position === 'Goalie' ? player.stats.losses : player.stats.assists}
-                            </TableCell>
-                            <TableCell className="text-right font-medium">
-                              {position === 'Goalie' ? player.stats.otl : player.stats.points}
-                            </TableCell>
-                            <TableCell className={`text-right ${
-                              position !== 'Goalie' && player.stats.plusMinus > 0 
-                                ? 'text-fantasy-positive' 
-                                : position !== 'Goalie' && player.stats.plusMinus < 0 
-                                  ? 'text-fantasy-danger' 
-                                  : ''
-                            }`}>
-                              {position === 'Goalie' ? player.stats.gaa : player.stats.plusMinus > 0 ? `+${player.stats.plusMinus}` : player.stats.plusMinus}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              {position === 'Goalie' ? player.stats.savePct : player.stats.pim}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              {position === 'Goalie' ? player.stats.shutouts : player.stats.shots}
-                            </TableCell>
-                            {activeStat === "advanced" && (
-                              <>
-                                <TableCell className="text-right">{position !== 'Goalie' ? Math.floor(Math.random() * 30) : '-'}</TableCell>
-                                <TableCell className="text-right">{position !== 'Goalie' ? Math.floor(Math.random() * 10) : '-'}</TableCell>
-                                <TableCell className="text-right">{position !== 'Goalie' ? Math.floor(Math.random() * 10) : '-'}</TableCell>
-                                <TableCell className="text-right">{position === 'Centre' ? `${Math.floor(45 + Math.random() * 15)}%` : '-'}</TableCell>
-                              </>
-                            )}
-                          </TableRow>
-                        ))
-                      ))}
-                    </TableBody>
-                  </Table>
+                    );
+                  })}
                 </div>
               </TabsContent>
 
-              {/* Stats tab content */}
               <TabsContent value="stats" className="m-0 p-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  <Card className="bg-gradient-to-br from-white to-fantasy-light border-fantasy-border">
-                    <CardContent className="pt-6">
-                      <h3 className="text-lg font-semibold text-fantasy-dark mb-4">Team Performance</h3>
-                      <div className="space-y-3">
-                        <div className="flex justify-between items-center">
-                          <span className="text-fantasy-muted">Record</span>
-                          <span className="font-medium">{teamStats.record}</span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-fantasy-muted">Points</span>
-                          <span className="font-medium">{teamStats.points}</span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-fantasy-muted">Last 10 Games</span>
-                          <span className="font-medium">{teamStats.lastTenGames}</span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-fantasy-muted">Current Streak</span>
-                          <span className="font-medium">{teamStats.streak}</span>
-                        </div>
-                      </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                  <Card>
+                    <CardContent className="p-6">
+                      <div className="text-2xl font-bold">{teamStats.goalsFor}</div>
+                      <p className="text-sm text-muted-foreground">Goals For</p>
                     </CardContent>
                   </Card>
-
-                  <Card className="bg-gradient-to-br from-white to-fantasy-light border-fantasy-border">
-                    <CardContent className="pt-6">
-                      <h3 className="text-lg font-semibold text-fantasy-dark mb-4">Offense</h3>
-                      <div className="space-y-3">
-                        <div className="flex justify-between items-center">
-                          <span className="text-fantasy-muted">Goals For</span>
-                          <span className="font-medium">{teamStats.goalsFor}</span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-fantasy-muted">Avg. Goals/Game</span>
-                          <span className="font-medium">{(teamStats.goalsFor / 72).toFixed(2)}</span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-fantasy-muted">Power Play %</span>
-                          <span className="font-medium">{teamStats.powerPlayPct}%</span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-fantasy-muted">Shots/Game</span>
-                          <span className="font-medium">32.4</span>
-                        </div>
-                      </div>
+                  <Card>
+                    <CardContent className="p-6">
+                      <div className="text-2xl font-bold">{teamStats.goalsAgainst}</div>
+                      <p className="text-sm text-muted-foreground">Goals Against</p>
                     </CardContent>
                   </Card>
-
-                  <Card className="bg-gradient-to-br from-white to-fantasy-light border-fantasy-border">
-                    <CardContent className="pt-6">
-                      <h3 className="text-lg font-semibold text-fantasy-dark mb-4">Defense</h3>
-                      <div className="space-y-3">
-                        <div className="flex justify-between items-center">
-                          <span className="text-fantasy-muted">Goals Against</span>
-                          <span className="font-medium">{teamStats.goalsAgainst}</span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-fantasy-muted">Avg. GA/Game</span>
-                          <span className="font-medium">{(teamStats.goalsAgainst / 72).toFixed(2)}</span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-fantasy-muted">Penalty Kill %</span>
-                          <span className="font-medium">{teamStats.penaltyKillPct}%</span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-fantasy-muted">Shots Against/Game</span>
-                          <span className="font-medium">29.7</span>
-                        </div>
-                      </div>
+                  <Card>
+                    <CardContent className="p-6">
+                      <div className="text-2xl font-bold">{teamStats.powerPlayPct}%</div>
+                      <p className="text-sm text-muted-foreground">Power Play %</p>
                     </CardContent>
                   </Card>
-
-                  <Card className="md:col-span-2 lg:col-span-3 bg-gradient-to-br from-white to-fantasy-light border-fantasy-border">
-                    <CardContent className="pt-6">
-                      <h3 className="text-lg font-semibold text-fantasy-dark mb-4">Scoring by Period</h3>
-                      <div className="h-24 flex items-end space-x-1">
-                        {Array.from({ length: 3 }).map((_, i) => (
-                          <div key={i} className="flex-1 flex flex-col items-center">
-                            <div 
-                              className="w-full bg-fantasy-primary rounded-t"
-                              style={{ height: `${Math.max(30, Math.random() * 100)}px` }}
-                            />
-                            <div className="mt-2 text-sm font-medium">
-                              {i === 0 ? '1st' : i === 1 ? '2nd' : '3rd'}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
+                  <Card>
+                    <CardContent className="p-6">
+                      <div className="text-2xl font-bold">{teamStats.penaltyKillPct}%</div>
+                      <p className="text-sm text-muted-foreground">Penalty Kill %</p>
                     </CardContent>
                   </Card>
                 </div>
               </TabsContent>
 
-              {/* Trends tab content */}
               <TabsContent value="trends" className="m-0 p-6">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <Card className="bg-gradient-to-br from-white to-fantasy-light border-fantasy-border">
-                    <CardContent className="pt-6">
-                      <div className="flex justify-between items-center mb-4">
-                        <h3 className="text-lg font-semibold text-fantasy-dark">Recent Trends</h3>
-                        <Badge className="bg-fantasy-secondary text-white">Last 30 days</Badge>
-                      </div>
-                      <div className="space-y-4">
-                        {teamStats.trends.map((trend, i) => (
-                          <div key={i} className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              {trend.direction === "up" ? (
-                                <TrendingUp className="text-fantasy-positive h-5 w-5" />
-                              ) : (
-                                <TrendingDown className="text-fantasy-danger h-5 w-5" />
-                              )}
-                              <span className="font-medium">{trend.stat}</span>
-                            </div>
-                            <span className={trend.direction === "up" ? "text-fantasy-positive font-medium" : "text-fantasy-danger font-medium"}>
-                              {trend.value}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card className="bg-gradient-to-br from-white to-fantasy-light border-fantasy-border">
-                    <CardContent className="pt-6">
-                      <div className="flex justify-between items-center mb-4">
-                        <h3 className="text-lg font-semibold text-fantasy-dark">Scoring Analysis</h3>
-                        <Badge className="bg-fantasy-tertiary text-white">Full Season</Badge>
-                      </div>
-                      <div className="space-y-4">
-                        <div className="space-y-1">
-                          <div className="flex justify-between text-sm">
-                            <span className="text-fantasy-muted">Even Strength</span>
-                            <span className="font-medium">68%</span>
-                          </div>
-                          <div className="w-full bg-fantasy-border rounded-full h-2">
-                            <div className="bg-fantasy-primary rounded-full h-2" style={{ width: "68%" }}></div>
-                          </div>
-                        </div>
-                        
-                        <div className="space-y-1">
-                          <div className="flex justify-between text-sm">
-                            <span className="text-fantasy-muted">Power Play</span>
-                            <span className="font-medium">24%</span>
-                          </div>
-                          <div className="w-full bg-fantasy-border rounded-full h-2">
-                            <div className="bg-fantasy-secondary rounded-full h-2" style={{ width: "24%" }}></div>
-                          </div>
-                        </div>
-                        
-                        <div className="space-y-1">
-                          <div className="flex justify-between text-sm">
-                            <span className="text-fantasy-muted">Short-handed</span>
-                            <span className="font-medium">5%</span>
-                          </div>
-                          <div className="w-full bg-fantasy-border rounded-full h-2">
-                            <div className="bg-fantasy-tertiary rounded-full h-2" style={{ width: "5%" }}></div>
-                          </div>
-                        </div>
-                        
-                        <div className="space-y-1">
-                          <div className="flex justify-between text-sm">
-                            <span className="text-fantasy-muted">Empty Net</span>
-                            <span className="font-medium">3%</span>
-                          </div>
-                          <div className="w-full bg-fantasy-border rounded-full h-2">
-                            <div className="bg-fantasy-muted rounded-full h-2" style={{ width: "3%" }}></div>
-                          </div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card className="lg:col-span-2 bg-gradient-to-br from-white to-fantasy-light border-fantasy-border">
-                    <CardContent className="pt-6">
-                      <h3 className="text-lg font-semibold text-fantasy-dark mb-4">Top Performers (Last 10 Games)</h3>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                        {players.filter((p, i) => i < 3).map((player) => (
-                          <div key={player.id} className="flex items-center gap-3 p-2 rounded-lg border border-fantasy-border bg-white hover:shadow-md transition-shadow">
-                            <div className="w-12 h-12 rounded-full overflow-hidden">
-                              <img 
-                                src={player.image} 
-                                alt={player.name} 
-                                className="object-cover w-full h-full"
-                              />
-                            </div>
-                            <div>
-                              <div className="font-medium">{player.name}</div>
-                              <div className="text-xs text-fantasy-muted">{player.position}</div>
-                              <div className="text-sm font-medium text-fantasy-primary">
-                                {player.position === 'Goalie' 
-                                  ? `${player.stats.wins} W, ${player.stats.savePct} SV%` 
-                                  : `${player.stats.goals} G, ${player.stats.assists} A, ${player.stats.points} P`
-                                }
+                <div className="space-y-6">
+                  <div>
+                    <h3 className="text-lg font-bold mb-4">Performance Trends</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {teamStats.trends.map((trend, index) => (
+                        <Card key={index}>
+                          <CardContent className="p-4">
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm font-medium">{trend.stat}</span>
+                              <div className="flex items-center">
+                                {trend.direction === 'up' ? (
+                                  <TrendingUp className="h-4 w-4 text-green-500 mr-1" />
+                                ) : (
+                                  <TrendingDown className="h-4 w-4 text-red-500 mr-1" />
+                                )}
+                                <span className={`text-sm ${trend.direction === 'up' ? 'text-green-500' : 'text-red-500'}`}>
+                                  {trend.value}
+                                </span>
                               </div>
                             </div>
-                          </div>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-              </TabsContent>
-
-              {/* AI GM tab content */}
-              <TabsContent value="ai-gm" className="m-0 p-6">
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                  <div className="lg:col-span-2">
-                    <Card className="border-fantasy-border bg-white">
-                      <CardContent className="pt-6">
-                        <div className="flex items-center gap-3 mb-6">
-                          <div className="w-10 h-10 rounded-full bg-fantasy-primary/20 flex items-center justify-center">
-                            <BarChart className="h-5 w-5 text-fantasy-primary" />
-                          </div>
-                          <h3 className="text-xl font-semibold text-fantasy-dark">AI GM Analysis</h3>
-                        </div>
-                        
-                        <div className="space-y-4">
-                          <div className="p-4 rounded-lg border border-fantasy-border bg-fantasy-light">
-                            <h4 className="font-medium mb-2 text-fantasy-dark">Team Assessment</h4>
-                            <p className="text-sm text-fantasy-muted">
-                              Your team is well-balanced but could use more depth at the wing positions. 
-                              Consider acquiring a top-tier winger to complement McDavid and Draisaitl.
-                            </p>
-                          </div>
-                          
-                          <div className="p-4 rounded-lg border border-fantasy-border bg-fantasy-light">
-                            <h4 className="font-medium mb-2 text-fantasy-dark">Recommended Actions</h4>
-                            <ul className="text-sm text-fantasy-muted space-y-2">
-                              <li className="flex items-start gap-2">
-                                <span className="text-fantasy-primary">•</span>
-                                <span>Trade for a scoring winger using your excess defensive depth</span>
-                              </li>
-                              <li className="flex items-start gap-2">
-                                <span className="text-fantasy-primary">•</span>
-                                <span>Consider starting Shesterkin against upcoming opponent Toronto (favorable matchup)</span>
-                              </li>
-                              <li className="flex items-start gap-2">
-                                <span className="text-fantasy-primary">•</span>
-                                <span>Monitor Tkachuk's PIM count - may impact your team's performance negatively</span>
-                              </li>
-                            </ul>
-                          </div>
-
-                          <div className="p-4 rounded-lg border border-fantasy-border bg-fantasy-light">
-                            <h4 className="font-medium mb-2 text-fantasy-dark">Power Play Optimization</h4>
-                            <p className="text-sm text-fantasy-muted">
-                              Suggested PP1 unit: McDavid, Draisaitl, Pastrnak, Makar, and Kaprizov.
-                              This combination maximizes one-timer opportunities from the left side.
-                            </p>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </div>
-
-                  <div className="space-y-6">
-                    <Card className="border-fantasy-border bg-white">
-                      <CardContent className="pt-6">
-                        <h3 className="text-lg font-semibold text-fantasy-dark mb-4">Trade Finder</h3>
-                        <div className="space-y-3">
-                          <div className="flex justify-between items-center">
-                            <span>Target Position</span>
-                            <Badge className="bg-fantasy-secondary">RW</Badge>
-                          </div>
-                          <div className="flex justify-between items-center">
-                            <span>Available Assets</span>
-                            <span className="font-medium">3</span>
-                          </div>
-                          <Button className="w-full bg-fantasy-primary hover:bg-fantasy-primary/90 text-white mt-2">
-                            Find Trade Options
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-
-                    <Card className="border-fantasy-border bg-white">
-                      <CardContent className="pt-6">
-                        <h3 className="text-lg font-semibold text-fantasy-dark mb-4">Upcoming Schedule</h3>
-                        <div className="space-y-3">
-                          {Array.from({ length: 3 }).map((_, i) => (
-                            <div key={i} className="flex items-center gap-3 p-2 rounded-lg border border-fantasy-border hover:bg-fantasy-light transition-colors">
-                              <div className="w-10 h-10 flex items-center justify-center bg-fantasy-primary/10 rounded-full">
-                                <div className="text-xs font-medium">
-                                  {i === 0 ? 'TUE' : i === 1 ? 'THU' : 'SAT'}
-                                </div>
-                              </div>
-                              <div>
-                                <div className="text-sm font-medium">vs {i === 0 ? 'TOR' : i === 1 ? 'MTL' : 'BOS'}</div>
-                                <div className="text-xs text-fantasy-muted">{i === 0 ? 'Home' : i === 1 ? 'Away' : 'Home'}</div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </CardContent>
-                    </Card>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
                   </div>
                 </div>
               </TabsContent>
             </div>
           </Tabs>
         </div>
+        
+        {/* Enhanced Player Stats Modal */}
+        <PlayerStatsModal
+          player={selectedPlayer}
+          isOpen={isPlayerDialogOpen}
+          onClose={() => setIsPlayerDialogOpen(false)}
+        />
       </main>
-
+      
       <Footer />
-
-      {/* Player Details Dialog */}
-      <Dialog open={isPlayerDialogOpen} onOpenChange={setIsPlayerDialogOpen}>
-        <DialogContent className="sm:max-w-[600px] p-0 overflow-hidden bg-white">
-          {selectedPlayer && (
-            <div>
-              <div className="relative h-40 bg-gradient-to-r from-fantasy-primary to-fantasy-tertiary flex items-end overflow-hidden">
-                <div className="absolute top-4 right-4">
-                  <Badge 
-                    variant="outline" 
-                    className={`font-bold px-3 py-1 ${selectedPlayer.starter ? 
-                      'bg-fantasy-tertiary/90 text-white border-white/30' : 
-                      'bg-fantasy-muted/50 text-white border-white/30'}`}
-                  >
-                    {selectedPlayer.starter ? 'Starter' : 'Bench'}
-                  </Badge>
-                </div>
-                <div className="p-6 pb-0 flex items-end gap-4 relative z-10">
-                  <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-white shadow-lg translate-y-8 transition-transform duration-300 hover:scale-105">
-                    <img 
-                      src={selectedPlayer.image} 
-                      alt={selectedPlayer.name} 
-                      className="h-full w-full object-cover" 
-                    />
-                  </div>
-                  <div className="text-white mb-4">
-                    <h2 className="text-2xl font-bold">{selectedPlayer.name}</h2>
-                    <div className="flex items-center gap-2">
-                      <Badge variant="outline" className="bg-white/20 border-white/30 text-white">
-                        {selectedPlayer.position}
-                      </Badge>
-                      <span className="text-white/90">#{selectedPlayer.number}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-6 pt-12">
-                <Tabs defaultValue="details" className="w-full">
-                  <TabsList className="bg-fantasy-background w-full mb-6">
-                    <TabsTrigger value="details" className="data-[state=active]:bg-fantasy-primary/20 data-[state=active]:text-fantasy-primary">
-                      Player Details
-                    </TabsTrigger>
-                    <TabsTrigger value="stats" className="data-[state=active]:bg-fantasy-primary/20 data-[state=active]:text-fantasy-primary">
-                      Season Stats
-                    </TabsTrigger>
-                    <TabsTrigger value="history" className="data-[state=active]:bg-fantasy-primary/20 data-[state=active]:text-fantasy-primary">
-                      History
-                    </TabsTrigger>
-                  </TabsList>
-                  
-                  <TabsContent value="details">
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-3">
-                        <div className="flex justify-between">
-                          <span className="text-fantasy-muted">Team:</span>
-                          <span className="font-medium">{selectedPlayer.team}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-fantasy-muted">Position:</span>
-                          <span className="font-medium">{selectedPlayer.position}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-fantasy-muted">Number:</span>
-                          <span className="font-medium">#{selectedPlayer.number}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-fantasy-muted">Status:</span>
-                          <span className="font-medium">{selectedPlayer.starter ? 'Starter' : 'Bench'}</span>
-                        </div>
-                      </div>
-
-                      <div className="space-y-3">
-                        <div className="flex justify-between">
-                          <span className="text-fantasy-muted">Height:</span>
-                          <span className="font-medium">{selectedPlayer.height}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-fantasy-muted">Weight:</span>
-                          <span className="font-medium">{selectedPlayer.weight}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-fantasy-muted">Age:</span>
-                          <span className="font-medium">{selectedPlayer.age}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-fantasy-muted">Experience:</span>
-                          <span className="font-medium">{selectedPlayer.experience}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </TabsContent>
-                  
-                  <TabsContent value="stats">
-                    <div className="space-y-4">
-                      <div className="grid grid-cols-3 gap-4">
-                        {selectedPlayer.position === 'Goalie' ? (
-                          <>
-                            <Card className="bg-fantasy-light border-fantasy-border p-4">
-                              <h4 className="text-sm text-fantasy-muted">Wins</h4>
-                              <p className="text-2xl font-bold">{selectedPlayer.stats.wins}</p>
-                            </Card>
-                            <Card className="bg-fantasy-light border-fantasy-border p-4">
-                              <h4 className="text-sm text-fantasy-muted">GAA</h4>
-                              <p className="text-2xl font-bold">{selectedPlayer.stats.gaa}</p>
-                            </Card>
-                            <Card className="bg-fantasy-light border-fantasy-border p-4">
-                              <h4 className="text-sm text-fantasy-muted">Save %</h4>
-                              <p className="text-2xl font-bold">{selectedPlayer.stats.savePct}</p>
-                            </Card>
-                          </>
-                        ) : (
-                          <>
-                            <Card className="bg-fantasy-light border-fantasy-border p-4">
-                              <h4 className="text-sm text-fantasy-muted">Goals</h4>
-                              <p className="text-2xl font-bold">{selectedPlayer.stats.goals}</p>
-                            </Card>
-                            <Card className="bg-fantasy-light border-fantasy-border p-4">
-                              <h4 className="text-sm text-fantasy-muted">Assists</h4>
-                              <p className="text-2xl font-bold">{selectedPlayer.stats.assists}</p>
-                            </Card>
-                            <Card className="bg-fantasy-light border-fantasy-border p-4">
-                              <h4 className="text-sm text-fantasy-muted">Points</h4>
-                              <p className="text-2xl font-bold">{selectedPlayer.stats.points}</p>
-                            </Card>
-                          </>
-                        )}
-                      </div>
-                      
-                      <div className="mt-4 bg-fantasy-light p-4 rounded-md border border-fantasy-border">
-                        <h4 className="text-sm text-fantasy-muted mb-2">Performance Trend</h4>
-                        <div className="h-12 flex items-end gap-1">
-                          {Array.from({length: 10}).map((_, i) => (
-                            <div 
-                              key={i} 
-                              className="bg-gradient-to-t from-fantasy-primary to-fantasy-secondary rounded-sm"
-                              style={{
-                                height: `${Math.max(15, Math.random() * 100)}%`,
-                                width: '8%'
-                              }}
-                            />
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  </TabsContent>
-                  
-                  <TabsContent value="history">
-                    <div className="text-center py-4">
-                      <p className="text-fantasy-muted">Player history data will be available after the season starts</p>
-                    </div>
-                  </TabsContent>
-                </Tabs>
-
-                <div className="border-t border-fantasy-border mt-6 pt-6 flex justify-between">
-                  <Button variant="outline" size="sm" className="border-fantasy-muted text-fantasy-muted hover:bg-fantasy-light" onClick={() => setIsPlayerDialogOpen(false)}>
-                    Close
-                  </Button>
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="sm" className="text-fantasy-danger border-fantasy-danger/30 hover:bg-fantasy-danger/10">
-                      Trade
-                    </Button>
-                    {!selectedPlayer.starter ? (
-                      <Button size="sm" className="bg-fantasy-primary hover:bg-fantasy-primary/90 text-white">
-                        Make Starter
-                      </Button>
-                    ) : (
-                      <Button size="sm" className="bg-fantasy-tertiary hover:bg-fantasy-tertiary/90 text-white">
-                        Move to Bench
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
   );
 };
