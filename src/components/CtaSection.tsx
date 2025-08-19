@@ -13,9 +13,9 @@ const CtaSection = () => {
       
       <div className="container mx-auto relative z-10">
         <div className="max-w-3xl mx-auto text-center text-white">
-          <h2 className="text-3xl md:text-5xl font-bold mb-6 animated-element animate">Join the Freshest Fantasy Experience Today</h2>
+          <h2 className="text-3xl md:text-5xl font-bold mb-6 animated-element animate">Stop Losing to Outdated Fantasy Platforms</h2>
           <p className="text-lg md:text-xl mb-10 text-white/80 animated-element animate">
-            Start your journey with CitrusSports and elevate your fantasy sports game with our innovative platform and AI assistant.
+            We're NHL fanatics who built the projections system we wished existed. Real data, real analysis, real results. No more guessing games.
           </p>
           
           <div className="flex flex-col sm:flex-row gap-4 justify-center animated-element animate">

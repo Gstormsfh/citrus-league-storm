@@ -12,11 +12,12 @@ const HeroSection = () => {
       <div className="container mx-auto px-4 flex flex-col lg:flex-row items-center justify-between py-16 lg:py-24">
         <div className="lg:w-1/2 mb-12 lg:mb-0 lg:pr-12 animate-fade-in">
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold leading-tight mb-6">
-            Fantasy Sports<br/> 
-            <span className="citrus-gradient-text">Reimagined</span>
+            Time to Leave Your<br/> 
+            <span className="citrus-gradient-text">Parents' Fantasy Apps</span><br/>
+            <span className="citrus-gradient-text">In the Past</span>
           </h1>
           <p className="text-lg md:text-xl mb-8 text-foreground/80 max-w-lg">
-            Join the freshest fantasy experience with personalized insights, vibrant design, and Stormy - your AI assistant GM.
+            Built by real NHL fanatics who understand proper projections. Experience next-level fantasy with AI-powered insights that actually work.
           </p>
           
           <div className="flex flex-wrap gap-4">
