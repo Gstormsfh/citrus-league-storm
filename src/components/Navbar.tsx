@@ -78,7 +78,7 @@ const Navbar = () => {
                 <NavigationMenuItem>
                   <NavigationMenuTrigger className={cn(
                     "text-sm font-medium text-foreground/80",
-                    (isActive("/roster") || isActive("/gm-office") || isActive("/team-settings")) && "text-primary"
+                    (isActive("/roster") || isActive("/gm-office") || isActive("/team-settings") || isActive("/draft")) && "text-primary"
                   )}>My Team</NavigationMenuTrigger>
                   <NavigationMenuContent>
                     <div className="w-[320px] p-2 grid gap-2 grid-cols-2">
@@ -95,6 +95,11 @@ const Navbar = () => {
                       <Link to="/team-settings" onClick={closeMobileMenu} className="flex h-full w-full select-none flex-col justify-end rounded-md bg-gradient-to-b from-accent/5 to-accent/10 p-4 no-underline outline-none focus:shadow-sm hover:shadow-sm hover:scale-[1.01] transition-all duration-200">
                         <div className="mb-1 mt-2 text-base font-medium">Team Settings</div>
                         <p className="text-xs leading-tight text-muted-foreground">Customize your team</p>
+                        <ChevronRight className="h-3 w-3 mt-2 text-primary" />
+                      </Link>
+                      <Link to="/draft" onClick={closeMobileMenu} className="flex h-full w-full select-none flex-col justify-end rounded-md bg-gradient-to-b from-primary/5 to-primary/10 p-4 no-underline outline-none focus:shadow-sm hover:shadow-sm hover:scale-[1.01] transition-all duration-200">
+                        <div className="mb-1 mt-2 text-base font-medium">Draft Room</div>
+                        <p className="text-xs leading-tight text-muted-foreground">Live fantasy draft</p>
                         <ChevronRight className="h-3 w-3 mt-2 text-primary" />
                       </Link>
                     </div>
