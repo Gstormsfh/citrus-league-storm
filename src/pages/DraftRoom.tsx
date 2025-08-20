@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
+import { DraftLobby } from '@/components/draft/DraftLobby';
 import { DraftBoard } from '@/components/draft/DraftBoard';
 import { PlayerPool } from '@/components/draft/PlayerPool';
 import { TeamRosters } from '@/components/draft/TeamRosters';
@@ -33,13 +34,32 @@ interface Team {
   picks: DraftPick[];
 }
 
+interface DraftSettings {
+  rounds: number;
+  pickTimeLimit: number;
+  draftOrder: 'standard' | 'serpentine';
+  scoringFormat: 'standard' | 'points' | 'categories';
+}
+
+enum DraftPhase {
+  LOBBY = 'lobby',
+  ACTIVE = 'active',
+  COMPLETED = 'completed'
+}
+
 const DraftRoom = () => {
+  const [draftPhase, setDraftPhase] = useState<DraftPhase>(DraftPhase.LOBBY);
   const [currentPick, setCurrentPick] = useState(1);
   const [currentRound, setCurrentRound] = useState(1);
-  const [timeRemaining, setTimeRemaining] = useState(90); // 90 seconds per pick
-  const [isDraftActive, setIsDraftActive] = useState(true);
+  const [timeRemaining, setTimeRemaining] = useState(90);
   const [selectedPlayer, setSelectedPlayer] = useState<any>(null);
   const [draftHistory, setDraftHistory] = useState<DraftPick[]>([]);
+  const [draftSettings, setDraftSettings] = useState<DraftSettings>({
+    rounds: 16,
+    pickTimeLimit: 90,
+    draftOrder: 'serpentine',
+    scoringFormat: 'standard'
+  });
 
   // Mock teams data
   const teams: Team[] = [
@@ -56,21 +76,21 @@ const DraftRoom = () => {
   const currentTeam = teams[(currentPick - 1) % teams.length];
 
   useEffect(() => {
-    if (!isDraftActive || timeRemaining <= 0) return;
+    if (draftPhase !== DraftPhase.ACTIVE || timeRemaining <= 0) return;
 
     const timer = setInterval(() => {
       setTimeRemaining((prev) => {
         if (prev <= 1) {
           // Auto-draft when time expires
           handleAutoDraft();
-          return 90; // Reset timer
+          return draftSettings.pickTimeLimit; // Reset timer
         }
         return prev - 1;
       });
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [timeRemaining, isDraftActive, currentPick]);
+  }, [timeRemaining, draftPhase, currentPick, draftSettings.pickTimeLimit]);
 
   const handlePlayerDraft = (player: any) => {
     const pick: DraftPick = {
@@ -89,16 +109,16 @@ const DraftRoom = () => {
     
     // Move to next pick
     const nextPick = currentPick + 1;
-    const totalPicks = teams.length * 16; // 16 rounds
+    const totalPicks = teams.length * draftSettings.rounds;
     
     if (nextPick > totalPicks) {
-      setIsDraftActive(false);
+      setDraftPhase(DraftPhase.COMPLETED);
     } else {
       setCurrentPick(nextPick);
       if (nextPick > teams.length * currentRound) {
         setCurrentRound(currentRound + 1);
       }
-      setTimeRemaining(90);
+      setTimeRemaining(draftSettings.pickTimeLimit);
     }
   };
 
@@ -106,6 +126,35 @@ const DraftRoom = () => {
     // Auto-draft logic would go here
     console.log('Auto-drafting for', currentTeam.name);
   };
+
+  const handleStartDraft = (settings: DraftSettings) => {
+    setDraftSettings(settings);
+    setTimeRemaining(settings.pickTimeLimit);
+    setDraftPhase(DraftPhase.ACTIVE);
+  };
+
+  const handleToggleDraft = () => {
+    if (draftPhase === DraftPhase.ACTIVE) {
+      setDraftPhase(DraftPhase.LOBBY);
+    } else if (draftPhase === DraftPhase.LOBBY) {
+      setDraftPhase(DraftPhase.ACTIVE);
+    }
+  };
+
+  // Show lobby if draft hasn't started
+  if (draftPhase === DraftPhase.LOBBY) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navbar />
+        <main className="pt-20">
+          <div className="container mx-auto px-4 py-8">
+            <DraftLobby teams={teams} onStartDraft={handleStartDraft} />
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -125,10 +174,10 @@ const DraftRoom = () => {
                   </div>
                   <div className="flex items-center gap-1">
                     <Trophy className="h-4 w-4" />
-                    <span>16 Rounds</span>
+                    <span>{draftSettings.rounds} Rounds</span>
                   </div>
-                  <Badge variant={isDraftActive ? "default" : "secondary"}>
-                    {isDraftActive ? "Draft Active" : "Draft Complete"}
+                  <Badge variant={draftPhase === DraftPhase.ACTIVE ? "default" : "secondary"}>
+                    {draftPhase === DraftPhase.ACTIVE ? "Draft Active" : "Draft Complete"}
                   </Badge>
                 </div>
               </div>
@@ -136,7 +185,7 @@ const DraftRoom = () => {
               <div className="flex items-center gap-4">
                 <DraftTimer 
                   timeRemaining={timeRemaining}
-                  isActive={isDraftActive}
+                  isActive={draftPhase === DraftPhase.ACTIVE}
                 />
                 <div className="text-center">
                   <div className="text-2xl font-bold text-primary">
@@ -149,7 +198,7 @@ const DraftRoom = () => {
               </div>
             </div>
             
-            {isDraftActive && (
+            {draftPhase === DraftPhase.ACTIVE && (
               <div className="mt-4 p-4 bg-primary/10 rounded-lg border-l-4 border-primary">
                 <div className="flex items-center justify-between">
                   <div>
@@ -208,7 +257,7 @@ const DraftRoom = () => {
                     onPlayerDraft={handlePlayerDraft}
                     selectedPlayer={selectedPlayer}
                     draftedPlayers={draftHistory.map(p => p.playerId)}
-                    isDraftActive={isDraftActive}
+                    isDraftActive={draftPhase === DraftPhase.ACTIVE}
                   />
                 </TabsContent>
 
@@ -237,8 +286,8 @@ const DraftRoom = () => {
             {/* Sidebar */}
             <div className="space-y-6">
               <DraftControls 
-                isDraftActive={isDraftActive}
-                onToggleDraft={() => setIsDraftActive(!isDraftActive)}
+                isDraftActive={draftPhase === DraftPhase.ACTIVE}
+                onToggleDraft={handleToggleDraft}
               />
               
               {selectedPlayer && (
@@ -262,7 +311,7 @@ const DraftRoom = () => {
                         <div className="font-medium">{selectedPlayer.assists}</div>
                       </div>
                     </div>
-                    {isDraftActive && (
+                    {draftPhase === DraftPhase.ACTIVE && (
                       <Button 
                         onClick={() => handlePlayerDraft(selectedPlayer)}
                         className="w-full"
