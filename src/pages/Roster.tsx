@@ -334,110 +334,187 @@ const Roster = () => {
               </TabsList>
 
               <TabsContent value="roster" className="m-0 p-6">
-                {/* Position-based roster layout */}
-                <div className="space-y-8">
-                  {positionOrder.map((position) => {
-                    const positionPlayers = positionGroups[position] || [];
-                    if (positionPlayers.length === 0) return null;
+                <div className="space-y-6">
+                  {/* Starters Section */}
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h2 className="text-xl font-bold text-primary flex items-center gap-2">
+                        <Star className="h-5 w-5 text-yellow-500 fill-current" />
+                        Starters
+                        <Badge variant="secondary" className="ml-2">
+                          {players.filter(p => p.starter).length}
+                        </Badge>
+                      </h2>
+                    </div>
                     
-                    return (
-                      <div key={position} className="space-y-4">
-                        <h2 className="text-xl font-bold text-primary flex items-center">
-                          {positionLabels[position]}
-                          <Badge variant="secondary" className="ml-2">
-                            {positionPlayers.length}
-                          </Badge>
-                        </h2>
-                        
-                        <div className="bg-card rounded-lg shadow-sm border overflow-hidden">
-                          <Table>
-                            <TableHeader>
-                              <TableRow className="bg-muted/50">
-                                <TableHead className="w-12"></TableHead>
-                                <TableHead>Player</TableHead>
-                                <TableHead className="text-center">Team</TableHead>
-                                {position === 'Goalie' ? (
-                                  <>
-                                    <TableHead className="text-center">W</TableHead>
-                                    <TableHead className="text-center">L</TableHead>
-                                    <TableHead className="text-center">GAA</TableHead>
-                                    <TableHead className="text-center">SV%</TableHead>
-                                    <TableHead className="text-center">SO</TableHead>
-                                  </>
-                                ) : (
-                                  <>
-                                    <TableHead className="text-center">G</TableHead>
-                                    <TableHead className="text-center">A</TableHead>
-                                    <TableHead className="text-center">PTS</TableHead>
-                                    <TableHead className="text-center">+/-</TableHead>
-                                    <TableHead className="text-center">SOG</TableHead>
-                                  </>
-                                )}
-                                <TableHead className="text-center">Status</TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {positionPlayers.map((player, index) => (
-                                <TableRow 
-                                  key={player.id}
-                                  className="cursor-pointer hover:bg-muted/30 transition-colors"
-                                  onClick={() => handlePlayerClick(player)}
-                                >
-                                  <TableCell>
-                                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-sm font-bold text-primary">
-                                      {player.number}
-                                    </div>
+                    <div className="bg-card rounded-lg shadow-sm border overflow-hidden">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-muted/50">
+                            <TableHead className="w-12">#</TableHead>
+                            <TableHead className="min-w-[200px]">Player</TableHead>
+                            <TableHead className="text-center w-16">Pos</TableHead>
+                            <TableHead className="text-center w-20">Team</TableHead>
+                            <TableHead className="text-center w-12">G</TableHead>
+                            <TableHead className="text-center w-12">A</TableHead>
+                            <TableHead className="text-center w-16">PTS</TableHead>
+                            <TableHead className="text-center w-12">+/-</TableHead>
+                            <TableHead className="text-center w-16">SOG</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {players.filter(p => p.starter).map((player) => (
+                            <TableRow 
+                              key={player.id}
+                              className="cursor-pointer hover:bg-muted/30 transition-colors"
+                              onClick={() => handlePlayerClick(player)}
+                            >
+                              <TableCell className="font-medium">
+                                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary">
+                                  {player.number}
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex items-center gap-3">
+                                  <div className="flex-1">
+                                    <div className="font-semibold text-sm leading-tight">{player.name}</div>
+                                    <div className="text-xs text-muted-foreground">{player.team}</div>
+                                  </div>
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-center">
+                                <Badge variant="outline" className="text-xs px-1.5 py-0.5 font-medium">
+                                  {player.position === 'Centre' ? 'C' : 
+                                   player.position === 'Right Wing' ? 'RW' :
+                                   player.position === 'Left Wing' ? 'LW' :
+                                   player.position === 'Defence' ? 'D' : 'G'}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-center">
+                                <div className="text-xs font-medium text-muted-foreground">
+                                  {player.team.split(' ').slice(-1)[0]}
+                                </div>
+                              </TableCell>
+                              {player.position === 'Goalie' ? (
+                                <>
+                                  <TableCell className="text-center font-medium text-sm">{player.stats.wins}</TableCell>
+                                  <TableCell className="text-center text-sm">{player.stats.losses}</TableCell>
+                                  <TableCell className="text-center font-bold text-primary text-sm">{player.stats.gaa}</TableCell>
+                                  <TableCell className="text-center text-sm">{(player.stats.savePct * 100).toFixed(1)}%</TableCell>
+                                  <TableCell className="text-center text-sm">{player.stats.shutouts}</TableCell>
+                                </>
+                              ) : (
+                                <>
+                                  <TableCell className="text-center font-medium text-sm">{player.stats.goals}</TableCell>
+                                  <TableCell className="text-center font-medium text-sm">{player.stats.assists}</TableCell>
+                                  <TableCell className="text-center font-bold text-primary text-sm">{player.stats.points}</TableCell>
+                                  <TableCell className="text-center text-sm">
+                                    <span className={`font-medium ${
+                                      player.stats.plusMinus > 0 ? 'text-emerald-600' : 
+                                      player.stats.plusMinus < 0 ? 'text-red-600' : 'text-muted-foreground'
+                                    }`}>
+                                      {player.stats.plusMinus > 0 ? '+' : ''}{player.stats.plusMinus}
+                                    </span>
                                   </TableCell>
-                                  <TableCell>
-                                    <div className="flex items-center gap-2">
-                                      <div>
-                                        <div className="font-semibold">{player.name}</div>
-                                        <div className="text-sm text-muted-foreground">{position}</div>
-                                      </div>
-                                      {player.starter && (
-                                        <Star className="h-4 w-4 text-yellow-500 fill-current" />
-                                      )}
-                                    </div>
+                                  <TableCell className="text-center text-sm">{player.stats.shots}</TableCell>
+                                </>
+                              )}
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+
+                  {/* Bench Section */}
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h2 className="text-xl font-bold text-muted-foreground flex items-center gap-2">
+                        Bench
+                        <Badge variant="outline" className="ml-2">
+                          {players.filter(p => !p.starter).length}
+                        </Badge>
+                      </h2>
+                    </div>
+                    
+                    <div className="bg-card rounded-lg shadow-sm border overflow-hidden">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-muted/30">
+                            <TableHead className="w-12">#</TableHead>
+                            <TableHead className="min-w-[200px]">Player</TableHead>
+                            <TableHead className="text-center w-16">Pos</TableHead>
+                            <TableHead className="text-center w-20">Team</TableHead>
+                            <TableHead className="text-center w-12">G</TableHead>
+                            <TableHead className="text-center w-12">A</TableHead>
+                            <TableHead className="text-center w-16">PTS</TableHead>
+                            <TableHead className="text-center w-12">+/-</TableHead>
+                            <TableHead className="text-center w-16">SOG</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {players.filter(p => !p.starter).map((player) => (
+                            <TableRow 
+                              key={player.id}
+                              className="cursor-pointer hover:bg-muted/30 transition-colors"
+                              onClick={() => handlePlayerClick(player)}
+                            >
+                              <TableCell className="font-medium">
+                                <div className="w-8 h-8 rounded-full bg-muted/20 flex items-center justify-center text-xs font-bold text-muted-foreground">
+                                  {player.number}
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex items-center gap-3">
+                                  <div className="flex-1">
+                                    <div className="font-semibold text-sm leading-tight">{player.name}</div>
+                                    <div className="text-xs text-muted-foreground">{player.team}</div>
+                                  </div>
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-center">
+                                <Badge variant="secondary" className="text-xs px-1.5 py-0.5 font-medium">
+                                  {player.position === 'Centre' ? 'C' : 
+                                   player.position === 'Right Wing' ? 'RW' :
+                                   player.position === 'Left Wing' ? 'LW' :
+                                   player.position === 'Defence' ? 'D' : 'G'}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-center">
+                                <div className="text-xs font-medium text-muted-foreground">
+                                  {player.team.split(' ').slice(-1)[0]}
+                                </div>
+                              </TableCell>
+                              {player.position === 'Goalie' ? (
+                                <>
+                                  <TableCell className="text-center font-medium text-sm">{player.stats.wins}</TableCell>
+                                  <TableCell className="text-center text-sm">{player.stats.losses}</TableCell>
+                                  <TableCell className="text-center font-bold text-primary text-sm">{player.stats.gaa}</TableCell>
+                                  <TableCell className="text-center text-sm">{(player.stats.savePct * 100).toFixed(1)}%</TableCell>
+                                  <TableCell className="text-center text-sm">{player.stats.shutouts}</TableCell>
+                                </>
+                              ) : (
+                                <>
+                                  <TableCell className="text-center font-medium text-sm">{player.stats.goals}</TableCell>
+                                  <TableCell className="text-center font-medium text-sm">{player.stats.assists}</TableCell>
+                                  <TableCell className="text-center font-bold text-primary text-sm">{player.stats.points}</TableCell>
+                                  <TableCell className="text-center text-sm">
+                                    <span className={`font-medium ${
+                                      player.stats.plusMinus > 0 ? 'text-emerald-600' : 
+                                      player.stats.plusMinus < 0 ? 'text-red-600' : 'text-muted-foreground'
+                                    }`}>
+                                      {player.stats.plusMinus > 0 ? '+' : ''}{player.stats.plusMinus}
+                                    </span>
                                   </TableCell>
-                                  <TableCell className="text-center">
-                                    <Badge variant="outline" className="text-xs">
-                                      {player.team.split(' ').pop()}
-                                    </Badge>
-                                  </TableCell>
-                                  {position === 'Goalie' ? (
-                                    <>
-                                      <TableCell className="text-center font-medium">{player.stats.wins}</TableCell>
-                                      <TableCell className="text-center">{player.stats.losses}</TableCell>
-                                      <TableCell className="text-center">{player.stats.gaa}</TableCell>
-                                      <TableCell className="text-center">{(player.stats.savePct * 100).toFixed(1)}%</TableCell>
-                                      <TableCell className="text-center">{player.stats.shutouts}</TableCell>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <TableCell className="text-center font-medium">{player.stats.goals}</TableCell>
-                                      <TableCell className="text-center font-medium">{player.stats.assists}</TableCell>
-                                      <TableCell className="text-center font-bold text-primary">{player.stats.points}</TableCell>
-                                      <TableCell className="text-center">
-                                        <span className={player.stats.plusMinus > 0 ? 'text-green-600' : player.stats.plusMinus < 0 ? 'text-red-600' : ''}>
-                                          {player.stats.plusMinus > 0 ? '+' : ''}{player.stats.plusMinus}
-                                        </span>
-                                      </TableCell>
-                                      <TableCell className="text-center">{player.stats.shots}</TableCell>
-                                    </>
-                                  )}
-                                  <TableCell className="text-center">
-                                    <Badge variant={player.starter ? "default" : "secondary"} className="text-xs">
-                                      {player.starter ? "Starter" : "Bench"}
-                                    </Badge>
-                                  </TableCell>
-                                </TableRow>
-                              ))}
-                            </TableBody>
-                          </Table>
-                        </div>
-                      </div>
-                    );
-                  })}
+                                  <TableCell className="text-center text-sm">{player.stats.shots}</TableCell>
+                                </>
+                              )}
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
                 </div>
               </TabsContent>
 
