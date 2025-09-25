@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Bookmark, Calendar, ChevronRight, MessageSquare, Share2, ThumbsUp } from "lucide-react";
+import { Bookmark, Calendar, ChevronRight, MessageSquare, Share2, ThumbsUp, TrendingUp, Target } from "lucide-react";
 
 // Mock news data
 const newsData = [
@@ -191,40 +191,268 @@ const News = () => {
               </div>
             </TabsContent>
             
-            {/* Other tabs content - these would be filled with filtered content */}
             <TabsContent value="analysis" className="mt-0">
-              <div className="text-center py-16">
-                <h3 className="text-xl font-medium mb-2">Analysis Articles</h3>
-                <p className="text-muted-foreground">
-                  Detailed breakdowns and analysis of fantasy performances and trends.
-                </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+                  <CardContent className="p-6">
+                    <Badge className="mb-3 bg-blue-100 text-blue-800 border-0">Deep Dive</Badge>
+                    <h3 className="font-bold text-lg mb-2">Connor McDavid's Elite Performance Analysis</h3>
+                    <p className="text-muted-foreground text-sm mb-4">
+                      Breaking down McDavid's point production rate and advanced metrics that make him the #1 fantasy asset.
+                    </p>
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <span>By Fantasy Pro • 2 hours ago</span>
+                      <span className="flex items-center gap-1"><TrendingUp className="h-3 w-3" /> Must Read</span>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+                  <CardContent className="p-6">
+                    <Badge className="mb-3 bg-purple-100 text-purple-800 border-0">Analytics</Badge>
+                    <h3 className="font-bold text-lg mb-2">Goalie Usage Rate Impact on Fantasy</h3>
+                    <p className="text-muted-foreground text-sm mb-4">
+                      How starter/backup dynamics affect fantasy goalie performance and which tandems to target.
+                    </p>
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <span>By Stats Guru • 4 hours ago</span>
+                      <span className="flex items-center gap-1"><TrendingUp className="h-3 w-3" /> Hot Take</span>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+                  <CardContent className="p-6">
+                    <Badge className="mb-3 bg-green-100 text-green-800 border-0">Power Play</Badge>
+                    <h3 className="font-bold text-lg mb-2">Top PP Unit Changes This Week</h3>
+                    <p className="text-muted-foreground text-sm mb-4">
+                      Line shuffles that could create new fantasy value and players to watch on the man advantage.
+                    </p>
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <span>By Line Watch • 6 hours ago</span>
+                      <span className="flex items-center gap-1"><TrendingUp className="h-3 w-3" /> Trending</span>
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
             </TabsContent>
             
             <TabsContent value="injuries" className="mt-0">
-              <div className="text-center py-16">
-                <h3 className="text-xl font-medium mb-2">Injury Updates</h3>
-                <p className="text-muted-foreground">
-                  Latest injury news and impact analysis on fantasy-relevant players.
-                </p>
+              <div className="space-y-4">
+                <Card className="border-l-4 border-l-red-500">
+                  <CardContent className="p-6">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Badge variant="destructive" className="text-xs">Day-to-Day</Badge>
+                          <span className="text-sm text-muted-foreground">Updated 30 min ago</span>
+                        </div>
+                        <h3 className="font-bold text-lg mb-2">Auston Matthews - Upper Body Injury</h3>
+                        <p className="text-muted-foreground mb-3">
+                          Missed morning skate, questionable for tonight's game vs Edmonton. Monitor warmups closely.
+                        </p>
+                        <div className="flex items-center gap-4 text-sm">
+                          <span className="text-muted-foreground">Fantasy Impact: <strong className="text-foreground">High</strong></span>
+                          <span className="text-muted-foreground">Return Timeline: <strong className="text-foreground">1-2 games</strong></span>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-l-4 border-l-yellow-500">
+                  <CardContent className="p-6">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Badge variant="outline" className="text-xs border-yellow-500 text-yellow-700">Week-to-Week</Badge>
+                          <span className="text-sm text-muted-foreground">Updated 2 hours ago</span>
+                        </div>
+                        <h3 className="font-bold text-lg mb-2">Cale Makar - Shoulder Injury</h3>
+                        <p className="text-muted-foreground mb-3">
+                          Expected to miss 2-3 weeks. Devon Toews likely to see increased ice time and PP1 opportunities.
+                        </p>
+                        <div className="flex items-center gap-4 text-sm">
+                          <span className="text-muted-foreground">Fantasy Impact: <strong className="text-foreground">Very High</strong></span>
+                          <span className="text-muted-foreground">Return Timeline: <strong className="text-foreground">2-3 weeks</strong></span>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-l-4 border-l-green-500">
+                  <CardContent className="p-6">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Badge className="text-xs bg-green-100 text-green-800 border-0">Returning</Badge>
+                          <span className="text-sm text-muted-foreground">Updated 45 min ago</span>
+                        </div>
+                        <h3 className="font-bold text-lg mb-2">David Pastrnak - Back to Practice</h3>
+                        <p className="text-muted-foreground mb-3">
+                          Full contact practice today. Expected to return Thursday vs Rangers on top line with fresh legs.
+                        </p>
+                        <div className="flex items-center gap-4 text-sm">
+                          <span className="text-muted-foreground">Fantasy Impact: <strong className="text-foreground">Positive</strong></span>
+                          <span className="text-muted-foreground">Return Timeline: <strong className="text-foreground">Next game</strong></span>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
             </TabsContent>
             
             <TabsContent value="strategy" className="mt-0">
-              <div className="text-center py-16">
-                <h3 className="text-xl font-medium mb-2">Strategy Guides</h3>
-                <p className="text-muted-foreground">
-                  Tips, strategies, and best practices to maximize your fantasy team's performance.
-                </p>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Target className="h-5 w-5 text-primary" />
+                      Weekly Strategy Focus
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="p-4 rounded-lg bg-primary/5 border border-primary/20">
+                      <h4 className="font-semibold mb-2">🔥 Hot Tip: Goalie Streamers</h4>
+                      <p className="text-sm text-muted-foreground mb-3">
+                        Target backup goalies getting starts against weaker offensive teams. 
+                        This week: Kahkonen vs ARI, Hill vs CHI.
+                      </p>
+                      <Badge className="bg-primary/10 text-primary border-0 text-xs">Win Rate: 73%</Badge>
+                    </div>
+                    
+                    <div className="p-4 rounded-lg bg-blue-50 border border-blue-200">
+                      <h4 className="font-semibold mb-2">📊 Line Combination Watch</h4>
+                      <p className="text-sm text-muted-foreground mb-3">
+                        Monitor morning skates for line shuffles. New combinations often lead to 
+                        short-term fantasy spikes before defenses adjust.
+                      </p>
+                      <Badge variant="outline" className="border-blue-500 text-blue-700 text-xs">Success Rate: 65%</Badge>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Waiver Wire Targets</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between p-3 rounded-lg border bg-card">
+                        <div>
+                          <div className="font-medium">Tyler Bertuzzi</div>
+                          <div className="text-sm text-muted-foreground">LW/RW - TOR</div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-sm font-medium text-green-600">+23% rostered</div>
+                          <div className="text-xs text-muted-foreground">PP1 role</div>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center justify-between p-3 rounded-lg border bg-card">
+                        <div>
+                          <div className="font-medium">Ukko-Pekka Luukkonen</div>
+                          <div className="text-sm text-muted-foreground">G - BUF</div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-sm font-medium text-green-600">+18% rostered</div>
+                          <div className="text-xs text-muted-foreground">Hot streak</div>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center justify-between p-3 rounded-lg border bg-card">
+                        <div>
+                          <div className="font-medium">Mason Marchment</div>
+                          <div className="text-sm text-muted-foreground">LW/RW - DAL</div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-sm font-medium text-green-600">+15% rostered</div>
+                          <div className="text-xs text-muted-foreground">Line promotion</div>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
             </TabsContent>
             
             <TabsContent value="trades" className="mt-0">
-              <div className="text-center py-16">
-                <h3 className="text-xl font-medium mb-2">Trade Analysis</h3>
-                <p className="text-muted-foreground">
-                  Evaluations of trade opportunities, targets, and strategies.
-                </p>
+              <div className="space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Trade Market Pulse</CardTitle>
+                    <CardDescription>Current market trends and player values</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                      <div className="text-center p-4 rounded-lg bg-green-50 border border-green-200">
+                        <div className="text-2xl font-bold text-green-600">📈</div>
+                        <div className="text-sm font-medium mt-2">Buyers Market</div>
+                        <div className="text-xs text-muted-foreground">Centers & Goalies</div>
+                      </div>
+                      <div className="text-center p-4 rounded-lg bg-red-50 border border-red-200">
+                        <div className="text-2xl font-bold text-red-600">📉</div>
+                        <div className="text-sm font-medium mt-2">Sellers Market</div>
+                        <div className="text-xs text-muted-foreground">Defensemen</div>
+                      </div>
+                      <div className="text-center p-4 rounded-lg bg-yellow-50 border border-yellow-200">
+                        <div className="text-2xl font-bold text-yellow-600">⚖️</div>
+                        <div className="text-sm font-medium mt-2">Stable</div>
+                        <div className="text-xs text-muted-foreground">Wingers</div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg">Trade Targets 🎯</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="p-3 rounded-lg border-l-4 border-l-green-500 bg-green-50/50">
+                        <div className="font-medium">Buy Low: Elias Pettersson</div>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          Slow start but usage remains elite. Perfect sell-high opportunity for nervous owners.
+                        </p>
+                        <div className="text-xs text-green-700 mt-2">Target Price: Mid-tier C + prospect</div>
+                      </div>
+                      
+                      <div className="p-3 rounded-lg border-l-4 border-l-blue-500 bg-blue-50/50">
+                        <div className="font-medium">Acquire: Power Play Specialists</div>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          PP time is the strongest predictor of fantasy success. Target Quinn Hughes, Evan Bouchard.
+                        </p>
+                        <div className="text-xs text-blue-700 mt-2">ROI: +35% points on average</div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg">Sell High 💰</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="p-3 rounded-lg border-l-4 border-l-orange-500 bg-orange-50/50">
+                        <div className="font-medium">Cash In: Hot Streaks</div>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          Players on 5+ game point streaks typically regress. Package with consistent performer.
+                        </p>
+                        <div className="text-xs text-orange-700 mt-2">Window: 2-3 games usually</div>
+                      </div>
+                      
+                      <div className="p-3 rounded-lg border-l-4 border-l-red-500 bg-red-50/50">
+                        <div className="font-medium">Move: Aging Veterans</div>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          Players 32+ often hit walls mid-season. Sell while production is still strong.
+                        </p>
+                        <div className="text-xs text-red-700 mt-2">Risk: Injury and decline</div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
               </div>
             </TabsContent>
           </Tabs>
