@@ -18,6 +18,7 @@ import GMOffice from "./pages/GMOffice";
 import TeamSettings from "./pages/TeamSettings";
 import News from "./pages/News";
 import DraftRoom from "./pages/DraftRoom";
+import Profile from "./pages/Profile";
 import "./App.css";
 
 // Configure with a higher stale time to prevent unnecessary refetches
@@ -49,6 +50,7 @@ const App = () => (
           <Route path="/team-settings" element={<TeamSettings />} />
           <Route path="/news" element={<News />} />
           <Route path="/draft" element={<DraftRoom />} />
+          <Route path="/profile" element={<Profile />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

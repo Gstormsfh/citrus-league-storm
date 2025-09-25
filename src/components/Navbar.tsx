@@ -252,8 +252,10 @@ const Navbar = () => {
               </PopoverTrigger>
               <PopoverContent align="end" className="w-48 p-1.5">
                 <div className="flex flex-col space-y-1">
-                  <Button variant="ghost" className="justify-start text-xs h-8">
-                    <CircleUser className="h-3.5 w-3.5 mr-2" /> Profile
+                  <Button variant="ghost" className="justify-start text-xs h-8" asChild>
+                    <Link to="/profile">
+                      <CircleUser className="h-3.5 w-3.5 mr-2" /> Profile
+                    </Link>
                   </Button>
                   <Button variant="ghost" className="justify-start text-xs h-8">
                     <Settings className="h-3.5 w-3.5 mr-2" /> Settings
@@ -409,8 +411,10 @@ const Navbar = () => {
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-2 mt-3">
-                <Button variant="outline" size="sm" className="w-full text-xs h-8">
-                  <User className="h-3.5 w-3.5 mr-1.5" /> Profile
+                <Button variant="outline" size="sm" className="w-full text-xs h-8" asChild>
+                  <Link to="/profile">
+                    <User className="h-3.5 w-3.5 mr-1.5" /> Profile
+                  </Link>
                 </Button>
                 <Button variant="outline" size="sm" className="w-full text-xs h-8 text-destructive hover:text-destructive border-destructive/30 hover:bg-destructive/5">
                   <LogOut className="h-3.5 w-3.5 mr-1.5" /> Log out
