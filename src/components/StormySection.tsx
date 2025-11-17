@@ -1,20 +1,22 @@
 
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { useEffect, useRef, useState } from 'react';
-import { Brain, Zap, Sparkles } from 'lucide-react';
+import { Brain, Zap, Sparkles, Send } from 'lucide-react';
+import { toast } from 'sonner';
 
 const demoMessages = [
   {
-    question: "Who should I start at flex this week? I have Diontae Johnson vs CHI or Kenneth Walker vs DET?",
-    answer: "I'd recommend starting Kenneth Walker against Detroit. The Lions' defense allows the 3rd most fantasy points to RBs this season, and Walker has seen 15+ carries in his last three games. Johnson's target share is promising, but Chicago's defense has been strong against WR2s."
+    question: "Who should I start at center this week? I have Elias Pettersson vs BOS or Sebastian Aho vs NYR?",
+    answer: "I'd recommend starting Sebastian Aho against New York. The Rangers' defense has been vulnerable against top-line centers, allowing the 5th most fantasy points to Cs this season. Aho has 3+ points in his last four games and faces a tired Rangers team on a back-to-back. Pettersson's matchup with Boston's strong defensive system is tougher."
   },
   {
-    question: "What's Tyler Lockett's outlook for rest of season?",
-    answer: "Tyler Lockett's rest-of-season outlook is cautiously optimistic. While his target share has decreased with Jaxon Smith-Njigba's emergence, he maintains red zone value. Expect WR3 production with occasional boom weeks, particularly in favorable matchups against ATL (Week 12) and LAR (Week 15)."
+    question: "What's Connor McDavid's outlook for rest of season?",
+    answer: "McDavid's rest-of-season outlook is elite as always. He's entering his prime scoring months (January-March historically his best) and the Oilers' power play is firing on all cylinders. Expect continued dominance with favorable matchups against ARI (Week 18) and CHI (Week 20). He's a lock for 100+ points barring injury."
   },
   {
-    question: "Should I trade Justin Jefferson for Tyreek Hill and Rhamondre Stevenson?",
-    answer: "Yes, I would make that trade. While Jefferson is elite, Hill is currently the WR1 in fantasy with consistent production. Adding Stevenson gives you a solid RB2 with upside in the Patriots' offense. The combined value outweighs what Jefferson alone provides, especially if you need depth."
+    question: "Should I trade Auston Matthews for Nathan MacKinnon and Tage Thompson?",
+    answer: "Yes, I would make that trade. While Matthews is a goal-scoring machine, MacKinnon is currently leading the league in points with consistent multi-point games. Adding Thompson gives you a top-line center with elite power play time. The combined value and depth outweighs Matthews alone, especially with his recent injury history."
   }
 ];
 
@@ -24,6 +26,8 @@ const StormySection = () => {
   const [isAnimating, setIsAnimating] = useState(false);
   const [displayedAnswer, setDisplayedAnswer] = useState("");
   const [demoInterval, setDemoInterval] = useState<number | null>(null);
+  const [userInput, setUserInput] = useState("");
+  const [isInteractive, setIsInteractive] = useState(false);
 
   // Typewriter effect
   useEffect(() => {
@@ -67,6 +71,36 @@ const StormySection = () => {
   const navigateDemo = (index: number) => {
     if (demoInterval) clearInterval(demoInterval);
     setActiveDemo(index);
+    setIsInteractive(false);
+  };
+
+  // Handle user input submission
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!userInput.trim()) return;
+    
+    setIsInteractive(true);
+    if (demoInterval) clearInterval(demoInterval);
+    
+    // Simulate AI response
+    setIsAnimating(true);
+    setDisplayedAnswer("");
+    
+    const response = "Thanks for asking! This is a demo version of Stormy. In the full app, I'll analyze your roster, league settings, and matchup data to provide personalized NHL fantasy advice. Sign up to get started!";
+    let index = 0;
+    
+    const interval = window.setInterval(() => {
+      setDisplayedAnswer(prev => prev + response[index]);
+      index++;
+      
+      if (index === response.length) {
+        clearInterval(interval);
+        setIsAnimating(false);
+      }
+    }, 20);
+    
+    toast.success("Demo response - Sign up for full AI analysis!");
+    setUserInput("");
   };
 
   return (
@@ -129,41 +163,78 @@ const StormySection = () => {
               </div>
               
               <div className="p-5 h-[320px] overflow-y-auto">
-                <div className="mb-4">
-                  <div className="bg-citrus-green-light/30 rounded-lg rounded-tl-none p-4 max-w-[85%]">
-                    <p className="text-sm text-foreground/80">{demoMessages[activeDemo].question}</p>
-                  </div>
-                </div>
-                
-                <div className="flex flex-col">
-                  <div className="flex items-end space-x-2">
-                    <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
-                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4 text-white">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
-                      </svg>
+                {!isInteractive ? (
+                  <>
+                    <div className="mb-4">
+                      <div className="bg-citrus-green-light/30 rounded-lg rounded-tl-none p-4 max-w-[85%]">
+                        <p className="text-sm text-foreground/80">{demoMessages[activeDemo].question}</p>
+                      </div>
                     </div>
-                    <div className="bg-white rounded-lg rounded-bl-none p-4 max-w-[85%] shadow-sm border border-gray-100">
-                      <p className="text-sm">{displayedAnswer}</p>
-                      {isAnimating && (
-                        <span className="inline-block w-2 h-4 bg-primary animate-pulse ml-1"></span>
-                      )}
+                    
+                    <div className="flex flex-col">
+                      <div className="flex items-end space-x-2">
+                        <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4 text-white">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
+                          </svg>
+                        </div>
+                        <div className="bg-white rounded-lg rounded-bl-none p-4 max-w-[85%] shadow-sm border border-gray-100">
+                          <p className="text-sm">{displayedAnswer}</p>
+                          {isAnimating && (
+                            <span className="inline-block w-2 h-4 bg-primary animate-pulse ml-1"></span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex flex-col">
+                    <div className="flex items-end space-x-2 mb-4">
+                      <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4 text-white">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
+                        </svg>
+                      </div>
+                      <div className="bg-white rounded-lg rounded-bl-none p-4 max-w-[85%] shadow-sm border border-gray-100">
+                        <p className="text-sm">{displayedAnswer}</p>
+                        {isAnimating && (
+                          <span className="inline-block w-2 h-4 bg-primary animate-pulse ml-1"></span>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
               </div>
               
-              <div className="p-4 border-t border-gray-100 flex justify-center">
-                <div className="flex space-x-2">
-                  {demoMessages.map((_, index) => (
-                    <button
-                      key={index}
-                      onClick={() => navigateDemo(index)}
-                      className={`w-2 h-2 rounded-full ${
-                        activeDemo === index ? 'bg-primary' : 'bg-gray-300'
-                      }`}
-                    />
-                  ))}
-                </div>
+              <div className="p-4 border-t border-gray-100">
+                <form onSubmit={handleSubmit} className="flex gap-2 mb-3">
+                  <Input
+                    type="text"
+                    placeholder="Ask Stormy about your fantasy team..."
+                    value={userInput}
+                    onChange={(e) => setUserInput(e.target.value)}
+                    className="flex-1"
+                  />
+                  <Button type="submit" size="icon" disabled={!userInput.trim()}>
+                    <Send className="h-4 w-4" />
+                  </Button>
+                </form>
+                
+                {!isInteractive && (
+                  <div className="flex justify-center">
+                    <div className="flex space-x-2">
+                      {demoMessages.map((_, index) => (
+                        <button
+                          key={index}
+                          onClick={() => navigateDemo(index)}
+                          className={`w-2 h-2 rounded-full transition-colors ${
+                            activeDemo === index ? 'bg-primary' : 'bg-gray-300'
+                          }`}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
