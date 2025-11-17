@@ -12,12 +12,11 @@ const HeroSection = () => {
       <div className="container mx-auto px-4 flex flex-col lg:flex-row items-center justify-between py-16 lg:py-24">
         <div className="lg:w-1/2 mb-12 lg:mb-0 lg:pr-12 animate-fade-in">
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold leading-tight mb-6">
-            Time to Leave Your<br/> 
-            <span className="citrus-gradient-text">Parents' Fantasy Apps</span><br/>
-            <span className="citrus-gradient-text">In the Past</span>
+            Leave Your Parents'<br/> 
+            <span className="citrus-gradient-text">Fantasy Apps Behind</span>
           </h1>
           <p className="text-lg md:text-xl mb-8 text-foreground/80 max-w-lg">
-            Built by real NHL fanatics who understand proper projections. Experience next-level fantasy with AI-powered insights that actually work.
+            Built by real NHL fanatics who understand proper projections. Experience next-level fantasy hockey with AI-powered insights that actually work.
           </p>
           
           <div className="flex flex-wrap gap-4">
@@ -54,9 +53,9 @@ const HeroSection = () => {
                   </span>
                   Stormy's Draft Analysis
                 </h3>
-                <p className="text-sm text-foreground/80 mb-2">Your QB selection is strong, but consider:</p>
+                <p className="text-sm text-foreground/80 mb-2">Your center depth is solid, but consider:</p>
                 <div className="bg-citrus-peach-light rounded-lg p-3 text-sm">
-                  "Travis Kelce is consistently undervalued at this ADP. Consider grabbing him in round 2 for massive positional advantage."
+                  "Auston Matthews is consistently undervalued at this ADP. Consider grabbing him in round 2 for massive positional advantage and elite goal scoring."
                 </div>
               </div>
               
