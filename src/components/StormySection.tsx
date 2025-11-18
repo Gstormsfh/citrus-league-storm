@@ -40,10 +40,10 @@ const StormySection = () => {
     let index = 0;
     
     const interval = window.setInterval(() => {
-      setDisplayedAnswer(prev => prev + answer[index]);
       index++;
+      setDisplayedAnswer(answer.slice(0, index));
       
-      if (index === answer.length) {
+      if (index >= answer.length) {
         clearInterval(interval);
         setIsAnimating(false);
       }
@@ -82,10 +82,10 @@ const StormySection = () => {
     let index = 0;
     
     const interval = window.setInterval(() => {
-      setDisplayedAnswer(prev => prev + response[index]);
       index++;
+      setDisplayedAnswer(response.slice(0, index));
       
-      if (index === response.length) {
+      if (index >= response.length) {
         clearInterval(interval);
         setIsAnimating(false);
       }
