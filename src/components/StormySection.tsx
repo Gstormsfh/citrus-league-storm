@@ -54,22 +54,17 @@ const StormySection = () => {
   
   // Auto-rotate demos
   useEffect(() => {
+    if (isInteractive) return;
+    
     const interval = window.setInterval(() => {
-      if (!isAnimating) {
-        setActiveDemo(prev => (prev + 1) % demoMessages.length);
-      }
-    }, 10000);
+      setActiveDemo(prev => (prev + 1) % demoMessages.length);
+    }, 12000);
     
-    setDemoInterval(interval);
-    
-    return () => {
-      if (demoInterval) clearInterval(demoInterval);
-    };
-  }, [isAnimating]);
+    return () => clearInterval(interval);
+  }, [isInteractive]);
   
   // Manual demo navigation
   const navigateDemo = (index: number) => {
-    if (demoInterval) clearInterval(demoInterval);
     setActiveDemo(index);
     setIsInteractive(false);
   };
@@ -80,9 +75,6 @@ const StormySection = () => {
     if (!userInput.trim()) return;
     
     setIsInteractive(true);
-    if (demoInterval) clearInterval(demoInterval);
-    
-    // Simulate AI response
     setIsAnimating(true);
     setDisplayedAnswer("");
     
@@ -121,22 +113,22 @@ const StormySection = () => {
 
             <div className="space-y-5 animated-element animate">
               <div className="flex items-start space-x-3">
-                <div className="mt-1 bg-primary/20 rounded-full p-1">
-                  <Zap size={16} className="text-primary" />
+                <div className="mt-1 bg-primary/20 rounded-full p-2">
+                  <Zap size={20} className="text-primary" />
                 </div>
                 <div>
-                  <h3 className="font-medium">Instant Analysis</h3>
-                  <p className="text-sm text-foreground/70">Get immediate answers to your fantasy questions, 24/7</p>
+                  <h3 className="font-semibold text-lg">Instant Analysis</h3>
+                  <p className="text-sm text-foreground/70">Get immediate answers to your fantasy hockey questions, 24/7</p>
                 </div>
               </div>
               
               <div className="flex items-start space-x-3">
-                <div className="mt-1 bg-primary/20 rounded-full p-1">
-                  <Sparkles size={16} className="text-primary" />
+                <div className="mt-1 bg-primary/20 rounded-full p-2">
+                  <Sparkles size={20} className="text-primary" />
                 </div>
                 <div>
-                  <h3 className="font-medium">Personalized Insights</h3>
-                  <p className="text-sm text-foreground/70">Stormy learns your preferences and league settings over time</p>
+                  <h3 className="font-semibold text-lg">Personalized Insights</h3>
+                  <p className="text-sm text-foreground/70">Learns your league settings, roster, and preferences to give tailored advice</p>
                 </div>
               </div>
             </div>
@@ -162,58 +154,54 @@ const StormySection = () => {
                 </div>
               </div>
               
-              <div className="p-5 h-[320px] overflow-y-auto">
+              <div className="p-5 h-[360px] overflow-y-auto space-y-4">
                 {!isInteractive ? (
                   <>
-                    <div className="mb-4">
-                      <div className="bg-citrus-green-light/30 rounded-lg rounded-tl-none p-4 max-w-[85%]">
-                        <p className="text-sm text-foreground/80">{demoMessages[activeDemo].question}</p>
+                    <div className="flex justify-end">
+                      <div className="bg-primary/10 rounded-lg rounded-tr-none p-4 max-w-[85%]">
+                        <p className="text-sm font-medium">{demoMessages[activeDemo].question}</p>
                       </div>
                     </div>
                     
-                    <div className="flex flex-col">
-                      <div className="flex items-end space-x-2">
-                        <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
-                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4 text-white">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
-                          </svg>
-                        </div>
-                        <div className="bg-white rounded-lg rounded-bl-none p-4 max-w-[85%] shadow-sm border border-gray-100">
-                          <p className="text-sm">{displayedAnswer}</p>
-                          {isAnimating && (
-                            <span className="inline-block w-2 h-4 bg-primary animate-pulse ml-1"></span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </>
-                ) : (
-                  <div className="flex flex-col">
-                    <div className="flex items-end space-x-2 mb-4">
-                      <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
+                    <div className="flex items-start space-x-2">
+                      <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0 mt-1">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4 text-white">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
                         </svg>
                       </div>
-                      <div className="bg-white rounded-lg rounded-bl-none p-4 max-w-[85%] shadow-sm border border-gray-100">
-                        <p className="text-sm">{displayedAnswer}</p>
+                      <div className="bg-white rounded-lg rounded-tl-none p-4 max-w-[85%] shadow-sm border border-border">
+                        <p className="text-sm leading-relaxed">{displayedAnswer}</p>
                         {isAnimating && (
-                          <span className="inline-block w-2 h-4 bg-primary animate-pulse ml-1"></span>
+                          <span className="inline-block w-1.5 h-4 bg-primary animate-pulse ml-1 align-middle"></span>
                         )}
                       </div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex items-start space-x-2">
+                    <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0 mt-1">
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4 text-white">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
+                      </svg>
+                    </div>
+                    <div className="bg-white rounded-lg rounded-tl-none p-4 max-w-[85%] shadow-sm border border-border">
+                      <p className="text-sm leading-relaxed">{displayedAnswer}</p>
+                      {isAnimating && (
+                        <span className="inline-block w-1.5 h-4 bg-primary animate-pulse ml-1 align-middle"></span>
+                      )}
                     </div>
                   </div>
                 )}
               </div>
               
-              <div className="p-4 border-t border-gray-100">
+              <div className="p-4 border-t border-border bg-muted/30">
                 <form onSubmit={handleSubmit} className="flex gap-2 mb-3">
                   <Input
                     type="text"
-                    placeholder="Ask Stormy about your fantasy team..."
+                    placeholder="Ask Stormy about your fantasy hockey team..."
                     value={userInput}
                     onChange={(e) => setUserInput(e.target.value)}
-                    className="flex-1"
+                    className="flex-1 bg-background"
                   />
                   <Button type="submit" size="icon" disabled={!userInput.trim()}>
                     <Send className="h-4 w-4" />
@@ -221,18 +209,17 @@ const StormySection = () => {
                 </form>
                 
                 {!isInteractive && (
-                  <div className="flex justify-center">
-                    <div className="flex space-x-2">
-                      {demoMessages.map((_, index) => (
-                        <button
-                          key={index}
-                          onClick={() => navigateDemo(index)}
-                          className={`w-2 h-2 rounded-full transition-colors ${
-                            activeDemo === index ? 'bg-primary' : 'bg-gray-300'
-                          }`}
-                        />
-                      ))}
-                    </div>
+                  <div className="flex justify-center gap-2">
+                    {demoMessages.map((_, index) => (
+                      <button
+                        key={index}
+                        onClick={() => navigateDemo(index)}
+                        className={`w-2.5 h-2.5 rounded-full transition-all duration-300 ${
+                          activeDemo === index ? 'bg-primary scale-110' : 'bg-muted-foreground/30 hover:bg-muted-foreground/50'
+                        }`}
+                        aria-label={`View demo ${index + 1}`}
+                      />
+                    ))}
                   </div>
                 )}
               </div>
