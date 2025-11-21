@@ -76,7 +76,7 @@ const GMOffice = () => {
       <Navbar />
       <main className="pt-24 pb-16">
         <div className="container mx-auto px-4">
-          <div className="max-w-3xl mx-auto text-center mb-12 animated-element">
+          <div className="max-w-3xl mx-auto text-center mb-12">
             <h1 className="text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-[hsl(var(--vibrant-orange))] via-primary to-[hsl(var(--vibrant-purple))] inline-block text-transparent bg-clip-text">
               GM's Office
             </h1>
@@ -85,7 +85,7 @@ const GMOffice = () => {
             </p>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animated-element">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {gmActions.map((action, index) => (
               <Link 
                 key={action.title} 
