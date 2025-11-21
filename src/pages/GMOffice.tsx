@@ -10,7 +10,7 @@ const gmActions = [
     description: "Get personalized advice and insights from your AI GM",
     icon: Brain,
     gradient: "from-[hsl(var(--vibrant-purple))] to-primary",
-    link: "#stormy"
+    link: "/gm-office/stormy"
   },
   {
     title: "Make a Trade",
@@ -93,13 +93,14 @@ const GMOffice = () => {
                 className="group"
                 style={{ animationDelay: `${index * 50}ms` }}
               >
-                <Card className="h-full transition-all duration-300 hover:shadow-lg hover:scale-105 hover:border-primary/50 cursor-pointer">
-                  <CardHeader>
-                    <div className={`w-12 h-12 rounded-lg bg-gradient-to-br ${action.gradient} flex items-center justify-center mb-4 group-hover:scale-110 transition-transform`}>
-                      <action.icon className="h-6 w-6 text-white" />
+                <Card className="h-full transition-all duration-300 hover:shadow-xl hover:scale-105 border-2 hover:border-primary/70 cursor-pointer overflow-hidden relative">
+                  <div className={`absolute top-0 left-0 w-full h-32 bg-gradient-to-br ${action.gradient} opacity-10`} />
+                  <CardHeader className="relative">
+                    <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${action.gradient} flex items-center justify-center mb-4 group-hover:scale-110 group-hover:rotate-3 transition-all duration-300 shadow-lg`}>
+                      <action.icon className="h-8 w-8 text-white" />
                     </div>
-                    <CardTitle className="text-xl">{action.title}</CardTitle>
-                    <CardDescription className="text-sm">
+                    <CardTitle className="text-xl group-hover:text-primary transition-colors">{action.title}</CardTitle>
+                    <CardDescription className="text-sm mt-2">
                       {action.description}
                     </CardDescription>
                   </CardHeader>
