@@ -20,6 +20,10 @@ import TeamSettings from "./pages/TeamSettings";
 import News from "./pages/News";
 import DraftRoom from "./pages/DraftRoom";
 import Profile from "./pages/Profile";
+import TeamAnalytics from "./pages/TeamAnalytics";
+import WaiverWire from "./pages/WaiverWire";
+import ScheduleManager from "./pages/ScheduleManager";
+import TradeAnalyzer from "./pages/TradeAnalyzer";
 import "./App.css";
 
 // Configure with a higher stale time to prevent unnecessary refetches
@@ -53,6 +57,10 @@ const App = () => (
           <Route path="/news" element={<News />} />
           <Route path="/draft" element={<DraftRoom />} />
           <Route path="/profile" element={<Profile />} />
+          <Route path="/team-analytics" element={<TeamAnalytics />} />
+          <Route path="/waiver-wire" element={<WaiverWire />} />
+          <Route path="/schedule-manager" element={<ScheduleManager />} />
+          <Route path="/trade-analyzer" element={<TradeAnalyzer />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

@@ -31,21 +31,21 @@ const gmActions = [
     description: "Deep dive into your team's performance metrics",
     icon: BarChart3,
     gradient: "from-green-500 to-emerald-500",
-    link: "#analytics"
+    link: "/team-analytics"
   },
   {
     title: "Waiver Wire",
     description: "Manage waiver claims and priorities",
     icon: TrendingUp,
     gradient: "from-indigo-500 to-purple-500",
-    link: "#waiver"
+    link: "/waiver-wire"
   },
   {
     title: "Schedule Manager",
     description: "View upcoming matchups and plan your lineup",
     icon: Calendar,
     gradient: "from-rose-500 to-orange-500",
-    link: "#schedule"
+    link: "/schedule-manager"
   },
   {
     title: "Player News",
@@ -66,7 +66,7 @@ const gmActions = [
     description: "Evaluate trade proposals with advanced analytics",
     icon: FileText,
     gradient: "from-teal-500 to-green-500",
-    link: "#trade-analyzer"
+    link: "/trade-analyzer"
   }
 ];
 
