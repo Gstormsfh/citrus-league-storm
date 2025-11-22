@@ -9,63 +9,63 @@ const gmActions = [
     title: "Stormy AI Assistant",
     description: "Get personalized advice and insights from your AI GM",
     icon: Brain,
-    gradient: "from-[hsl(var(--vibrant-purple))] to-primary",
+    gradient: "from-purple-500 to-pink-500",
     link: "/gm-office/stormy"
   },
   {
     title: "Make a Trade",
     description: "Propose and negotiate trades with league managers",
     icon: ArrowLeftRight,
-    gradient: "from-primary to-[hsl(var(--vibrant-orange))]",
+    gradient: "from-blue-500 to-cyan-500",
     link: "/roster"
   },
   {
     title: "Free Agents",
     description: "Browse and claim available players",
     icon: Users,
-    gradient: "from-[hsl(var(--vibrant-orange))] to-[hsl(var(--citrus-yellow))]",
+    gradient: "from-orange-500 to-amber-500",
     link: "/free-agents"
   },
   {
     title: "Team Analytics",
     description: "Deep dive into your team's performance metrics",
     icon: BarChart3,
-    gradient: "from-[hsl(var(--citrus-green))] to-primary",
+    gradient: "from-green-500 to-emerald-500",
     link: "#analytics"
   },
   {
     title: "Waiver Wire",
     description: "Manage waiver claims and priorities",
     icon: TrendingUp,
-    gradient: "from-primary to-[hsl(var(--vibrant-purple))]",
+    gradient: "from-indigo-500 to-purple-500",
     link: "#waiver"
   },
   {
     title: "Schedule Manager",
     description: "View upcoming matchups and plan your lineup",
     icon: Calendar,
-    gradient: "from-[hsl(var(--vibrant-orange))] to-primary",
+    gradient: "from-rose-500 to-orange-500",
     link: "#schedule"
   },
   {
     title: "Player News",
     description: "Stay updated on injuries and lineup changes",
     icon: Bell,
-    gradient: "from-[hsl(var(--vibrant-purple))] to-[hsl(var(--citrus-green))]",
+    gradient: "from-violet-500 to-fuchsia-500",
     link: "/news"
   },
   {
     title: "League Standings",
     description: "Track rankings and playoff positioning",
     icon: ListChecks,
-    gradient: "from-[hsl(var(--citrus-yellow))] to-[hsl(var(--vibrant-orange))]",
+    gradient: "from-yellow-500 to-orange-500",
     link: "/standings"
   },
   {
     title: "Trade Analyzer",
     description: "Evaluate trade proposals with advanced analytics",
     icon: FileText,
-    gradient: "from-primary to-[hsl(var(--citrus-green))]",
+    gradient: "from-teal-500 to-green-500",
     link: "#trade-analyzer"
   }
 ];
