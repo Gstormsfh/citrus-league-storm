@@ -1,14 +1,17 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { Switch } from '@/components/ui/switch';
+import { Textarea } from '@/components/ui/textarea';
+import { useToast } from '@/hooks/use-toast';
 import { 
   User, 
   Settings, 
@@ -26,11 +29,39 @@ import {
   Bell,
   Shield,
   CreditCard,
-  History
+  History,
+  Lock,
+  Smartphone,
+  Check,
+  Crown
 } from 'lucide-react';
 
 const Profile = () => {
+  const { toast } = useToast();
   const [isEditing, setIsEditing] = useState(false);
+  
+  // Animation observer setup
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('animate');
+          }
+        });
+      },
+      { threshold: 0.1 }
+    );
+
+    const animatedElements = document.querySelectorAll('.animated-element');
+    animatedElements.forEach(el => observer.observe(el));
+
+    return () => {
+      animatedElements.forEach(el => observer.unobserve(el));
+    };
+  }, []);
+  
+  // User & Team Data
   const [formData, setFormData] = useState({
     firstName: 'John',
     lastName: 'Smith',
@@ -39,7 +70,25 @@ const Profile = () => {
     location: 'New York, NY',
     bio: 'Fantasy sports enthusiast with 8+ years of experience. Love analyzing player stats and finding hidden gems.',
     teamName: 'Thunder Bolts',
-    favoriteTeam: 'New York Giants'
+    teamAbbr: 'TB',
+    favoriteTeam: 'New York Rangers',
+    teamDescription: 'A fierce competitor with a zesty strategy.'
+  });
+
+  // Password Management
+  const [passwords, setPasswords] = useState({
+    current: '',
+    new: '',
+    confirm: ''
+  });
+
+  // Preferences
+  const [preferences, setPreferences] = useState({
+    autoLineup: false,
+    emailNotifications: true,
+    pushNotifications: true,
+    darkMode: false,
+    publicProfile: true
   });
 
   const userStats = {
@@ -71,9 +120,31 @@ const Profile = () => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
+  const handlePreferenceChange = (field: string, value: boolean) => {
+    setPreferences(prev => ({ ...prev, [field]: value }));
+    toast({
+      title: "Preference updated",
+      description: "Your settings have been saved automatically.",
+    });
+  };
+
   const handleSave = () => {
     setIsEditing(false);
-    // Here you would save to your backend
+    toast({
+      title: "Profile updated",
+      description: "Your profile information has been saved successfully.",
+      variant: "default"
+    });
+  };
+
+  const handlePasswordChange = (e: React.FormEvent) => {
+    e.preventDefault();
+    toast({
+      title: "Password updated",
+      description: "Your password has been changed successfully.",
+      variant: "default"
+    });
+    setPasswords({ current: '', new: '', confirm: '' });
   };
 
   return (
@@ -85,14 +156,14 @@ const Profile = () => {
             <Tabs defaultValue="overview" className="space-y-8">
               <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
                 <div className="flex items-center gap-4 animated-element">
-                  <div className="relative">
-                    <Avatar className="h-20 w-20 border-4 border-primary/20">
+                  <div className="relative group">
+                    <Avatar className="h-24 w-24 border-4 border-primary/20">
                       <AvatarImage src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?q=80&w=400&auto=format&fit=crop" alt="John Smith" />
-                      <AvatarFallback className="text-xl font-bold bg-primary/10 text-primary">JS</AvatarFallback>
+                      <AvatarFallback className="text-2xl font-bold bg-primary/10 text-primary">JS</AvatarFallback>
                     </Avatar>
-                    <Button size="icon" className="absolute -bottom-1 -right-1 h-8 w-8 rounded-full shadow-lg">
-                      <Camera className="h-4 w-4" />
-                    </Button>
+                    <div className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                      <Camera className="h-6 w-6 text-white" />
+                    </div>
                   </div>
                   <div>
                     <h1 className="text-3xl font-bold">{formData.firstName} {formData.lastName}</h1>
@@ -100,20 +171,20 @@ const Profile = () => {
                       <Users className="h-4 w-4" />
                       {formData.teamName} • League Member since 2016
                     </p>
-                    <div className="flex items-center gap-2 mt-2">
+                        <div className="flex items-center gap-2 mt-2">
                       <Badge variant="secondary" className="bg-primary/10 text-primary border-0">
                         <Trophy className="h-3 w-3 mr-1" />
-                        2x Champion
+                        2x Stanley Cup
                       </Badge>
                       <Badge variant="outline">Premium Member</Badge>
                     </div>
                   </div>
                 </div>
                 
-                <TabsList className="animated-element">
+                <TabsList className="animated-element w-full lg:w-auto grid grid-cols-4 lg:flex">
                   <TabsTrigger value="overview">Overview</TabsTrigger>
                   <TabsTrigger value="stats">Statistics</TabsTrigger>
-                  <TabsTrigger value="achievements">Achievements</TabsTrigger>
+                  <TabsTrigger value="achievements">Trophies</TabsTrigger>
                   <TabsTrigger value="settings">Settings</TabsTrigger>
                 </TabsList>
               </div>
@@ -171,15 +242,39 @@ const Profile = () => {
                         <div className="space-y-3">
                           <div className="flex items-center gap-2 text-sm">
                             <Mail className="h-4 w-4 text-muted-foreground" />
-                            <span>{formData.email}</span>
+                            {isEditing ? (
+                              <Input 
+                                value={formData.email} 
+                                onChange={(e) => handleInputChange('email', e.target.value)}
+                                className="h-8"
+                              />
+                            ) : (
+                              <span>{formData.email}</span>
+                            )}
                           </div>
                           <div className="flex items-center gap-2 text-sm">
                             <Phone className="h-4 w-4 text-muted-foreground" />
-                            <span>{formData.phone}</span>
+                            {isEditing ? (
+                              <Input 
+                                value={formData.phone} 
+                                onChange={(e) => handleInputChange('phone', e.target.value)}
+                                className="h-8"
+                              />
+                            ) : (
+                              <span>{formData.phone}</span>
+                            )}
                           </div>
                           <div className="flex items-center gap-2 text-sm">
                             <MapPin className="h-4 w-4 text-muted-foreground" />
-                            <span>{formData.location}</span>
+                            {isEditing ? (
+                              <Input 
+                                value={formData.location} 
+                                onChange={(e) => handleInputChange('location', e.target.value)}
+                                className="h-8"
+                              />
+                            ) : (
+                              <span>{formData.location}</span>
+                            )}
                           </div>
                         </div>
 
@@ -188,11 +283,11 @@ const Profile = () => {
                         <div>
                           <Label htmlFor="bio">Bio</Label>
                           {isEditing ? (
-                            <textarea
+                            <Textarea
                               id="bio"
                               value={formData.bio}
                               onChange={(e) => handleInputChange('bio', e.target.value)}
-                              className="w-full min-h-[80px] rounded-md border border-input bg-background px-3 py-2 text-sm resize-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 mt-1"
+                              className="w-full min-h-[80px] mt-1"
                             />
                           ) : (
                             <p className="text-sm text-muted-foreground mt-1">{formData.bio}</p>
@@ -283,7 +378,7 @@ const Profile = () => {
                           <p className="font-medium">{formData.teamName}</p>
                         </div>
                         <div>
-                          <Label className="text-xs text-muted-foreground">Favorite NFL Team</Label>
+                          <Label className="text-xs text-muted-foreground">Favorite NHL Team</Label>
                           <p className="font-medium">{formData.favoriteTeam}</p>
                         </div>
                       </CardContent>
@@ -384,57 +479,217 @@ const Profile = () => {
 
               <TabsContent value="settings" className="space-y-6">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <Card className="animated-element">
+                  {/* Account Settings */}
+                  <Card className="animated-element lg:col-span-2">
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
-                        <Bell className="h-5 w-5" />
-                        Notifications
+                        <User className="h-5 w-5" />
+                        Account Settings
                       </CardTitle>
-                      <CardDescription>Manage your notification preferences</CardDescription>
+                      <CardDescription>Manage your account details and login</CardDescription>
                     </CardHeader>
-                    <CardContent className="space-y-4">
-                      {[
-                        { label: 'Trade offers', description: 'Get notified when you receive trade offers' },
-                        { label: 'Lineup reminders', description: 'Weekly reminders to set your lineup' },
-                        { label: 'Injury updates', description: 'Player injury and status updates' },
-                        { label: 'League announcements', description: 'Important league communications' }
-                      ].map((setting, index) => (
-                        <div key={index} className="flex items-center justify-between py-2">
-                          <div>
-                            <div className="text-sm font-medium">{setting.label}</div>
-                            <div className="text-xs text-muted-foreground">{setting.description}</div>
+                    <CardContent className="space-y-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-4">
+                          <h3 className="text-sm font-medium">Personal Information</h3>
+                          <div className="space-y-2">
+                            <Label htmlFor="account-email">Email Address</Label>
+                            <Input 
+                              id="account-email" 
+                              value={formData.email} 
+                              onChange={(e) => handleInputChange('email', e.target.value)}
+                            />
                           </div>
-                          <Button variant="outline" size="sm">Enable</Button>
+                          <div className="space-y-2">
+                            <Label htmlFor="account-name">Display Name</Label>
+                            <Input 
+                              id="account-name" 
+                              value={`${formData.firstName} ${formData.lastName}`} 
+                              readOnly
+                              className="bg-muted"
+                            />
+                            <p className="text-xs text-muted-foreground">To change your name, please visit the Overview tab.</p>
+                          </div>
                         </div>
-                      ))}
+
+                        <div className="space-y-4">
+                          <h3 className="text-sm font-medium">Security</h3>
+                          <form onSubmit={handlePasswordChange} className="space-y-3">
+                            <div className="space-y-2">
+                              <Label htmlFor="current-password">Current Password</Label>
+                              <Input 
+                                id="current-password" 
+                                type="password" 
+                                value={passwords.current}
+                                onChange={(e) => setPasswords(p => ({...p, current: e.target.value}))}
+                              />
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                              <div className="space-y-2">
+                                <Label htmlFor="new-password">New Password</Label>
+                                <Input 
+                                  id="new-password" 
+                                  type="password"
+                                  value={passwords.new}
+                                  onChange={(e) => setPasswords(p => ({...p, new: e.target.value}))}
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label htmlFor="confirm-password">Confirm</Label>
+                                <Input 
+                                  id="confirm-password" 
+                                  type="password"
+                                  value={passwords.confirm}
+                                  onChange={(e) => setPasswords(p => ({...p, confirm: e.target.value}))}
+                                />
+                              </div>
+                            </div>
+                            <Button type="submit" variant="outline" size="sm" className="w-full">
+                              Update Password
+                            </Button>
+                          </form>
+                        </div>
+                      </div>
                     </CardContent>
                   </Card>
 
+                  {/* Team Settings */}
                   <Card className="animated-element">
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
                         <Shield className="h-5 w-5" />
-                        Privacy & Security
+                        Team Settings
                       </CardTitle>
-                      <CardDescription>Manage your account security</CardDescription>
+                      <CardDescription>Customize your team identity</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                      <Button variant="outline" className="w-full justify-start">
-                        <Settings className="h-4 w-4 mr-2" />
-                        Change Password
-                      </Button>
-                      <Button variant="outline" className="w-full justify-start">
-                        <Mail className="h-4 w-4 mr-2" />
-                        Update Email
-                      </Button>
-                      <Button variant="outline" className="w-full justify-start">
-                        <CreditCard className="h-4 w-4 mr-2" />
-                        Billing Information
-                      </Button>
+                      <div className="space-y-2">
+                        <Label htmlFor="team-name">Team Name</Label>
+                        <Input 
+                          id="team-name" 
+                          value={formData.teamName} 
+                          onChange={(e) => handleInputChange('teamName', e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="team-abbr">Abbreviation (3-4 chars)</Label>
+                        <Input 
+                          id="team-abbr" 
+                          value={formData.teamAbbr} 
+                          maxLength={4}
+                          onChange={(e) => handleInputChange('teamAbbr', e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="team-desc">Team Slogan/Bio</Label>
+                        <Textarea 
+                          id="team-desc" 
+                          value={formData.teamDescription} 
+                          onChange={(e) => handleInputChange('teamDescription', e.target.value)}
+                          className="min-h-[80px]"
+                        />
+                      </div>
+                      <Button onClick={() => toast({ title: "Team settings saved" })}>Save Team Details</Button>
+                    </CardContent>
+                  </Card>
+
+                  {/* Game Preferences */}
+                  <Card className="animated-element">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Settings className="h-5 w-5" />
+                        Game Preferences
+                      </CardTitle>
+                      <CardDescription>Manage automation and gameplay</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-0.5">
+                          <Label className="text-base">Auto-Set Lineups</Label>
+                          <p className="text-sm text-muted-foreground">
+                            Automatically optimize lineup based on projections
+                          </p>
+                        </div>
+                        <Switch
+                          checked={preferences.autoLineup}
+                          onCheckedChange={(c) => handlePreferenceChange('autoLineup', c)}
+                        />
+                      </div>
                       <Separator />
-                      <Button variant="destructive" className="w-full">
-                        Delete Account
-                      </Button>
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-0.5">
+                          <Label className="text-base">Email Notifications</Label>
+                          <p className="text-sm text-muted-foreground">
+                            Receive weekly summaries and alerts
+                          </p>
+                        </div>
+                        <Switch
+                          checked={preferences.emailNotifications}
+                          onCheckedChange={(c) => handlePreferenceChange('emailNotifications', c)}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-0.5">
+                          <Label className="text-base">Push Notifications</Label>
+                          <p className="text-sm text-muted-foreground">
+                            Live scoring and injury alerts
+                          </p>
+                        </div>
+                        <Switch
+                          checked={preferences.pushNotifications}
+                          onCheckedChange={(c) => handlePreferenceChange('pushNotifications', c)}
+                        />
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Subscription Plan */}
+                  <Card className="animated-element lg:col-span-2">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Crown className="h-5 w-5 text-primary" />
+                        Subscription Plan
+                      </CardTitle>
+                      <CardDescription>Manage your membership</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="bg-primary/5 rounded-lg p-6 border border-primary/20 flex flex-col md:flex-row items-center justify-between gap-4">
+                        <div className="flex items-center gap-4">
+                          <div className="h-12 w-12 rounded-full bg-primary/20 flex items-center justify-center text-primary">
+                            <Crown className="h-6 w-6" />
+                          </div>
+                          <div>
+                            <h3 className="text-lg font-bold flex items-center gap-2">
+                              Premium Plan
+                              <span className="bg-primary text-primary-foreground text-xs px-2 py-0.5 rounded-full">Active</span>
+                            </h3>
+                            <p className="text-sm text-muted-foreground">Billed annually • Next billing date: Aug 15, 2026</p>
+                          </div>
+                        </div>
+                        <div className="flex gap-3 w-full md:w-auto">
+                          <Button variant="outline" className="flex-1 md:flex-none">Change Plan</Button>
+                          <Button variant="ghost" className="text-destructive hover:text-destructive hover:bg-destructive/10 flex-1 md:flex-none">Cancel</Button>
+                        </div>
+                      </div>
+                      
+                      <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="flex items-start gap-2 text-sm">
+                          <Check className="h-4 w-4 text-primary mt-0.5" />
+                          <span>Advanced Stats</span>
+                        </div>
+                        <div className="flex items-start gap-2 text-sm">
+                          <Check className="h-4 w-4 text-primary mt-0.5" />
+                          <span>Ad-free Experience</span>
+                        </div>
+                        <div className="flex items-start gap-2 text-sm">
+                          <Check className="h-4 w-4 text-primary mt-0.5" />
+                          <span>Priority Support</span>
+                        </div>
+                        <div className="flex items-start gap-2 text-sm">
+                          <Check className="h-4 w-4 text-primary mt-0.5" />
+                          <span>Trade Analyzer</span>
+                        </div>
+                      </div>
                     </CardContent>
                   </Card>
                 </div>

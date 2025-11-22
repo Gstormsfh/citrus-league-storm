@@ -91,9 +91,6 @@ const StartersGrid = ({ players, slotAssignments = {}, onPlayerClick, className 
       <div className="flex items-center justify-between mb-1">
         <h2 className="text-lg font-bold flex items-center gap-2">
           Starting Lineup
-          <Badge variant="secondary" className="ml-2 text-xs">
-            {players.length} players
-          </Badge>
         </h2>
       </div>
 

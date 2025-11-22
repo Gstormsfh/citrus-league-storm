@@ -20,7 +20,7 @@ const CtaSection = () => {
           
           <div className="flex flex-col sm:flex-row gap-4 justify-center animated-element animate">
             <Button size="lg" className="bg-white text-primary hover:bg-white/90 rounded-full text-base px-8">
-              Sign Up Free <ArrowRight size={18} className="ml-2" />
+              Start Your Season <ArrowRight size={18} className="ml-2" />
             </Button>
             <Button size="lg" variant="outline" className="bg-transparent text-white border-white hover:bg-white/10 rounded-full text-base px-8">
               <Play size={18} className="mr-2" /> Watch Demo
@@ -28,7 +28,7 @@ const CtaSection = () => {
           </div>
           
           <p className="mt-6 text-sm text-white/70 animated-element animate">
-            No credit card required. Free plan available forever.
+            No credit card required. Free puck drop available forever.
           </p>
         </div>
       </div>

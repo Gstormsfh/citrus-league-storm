@@ -5,7 +5,7 @@ import Footer from '../components/Footer';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { TrendingUp, TrendingDown, Wand2 } from 'lucide-react';
+import { TrendingUp, TrendingDown, Wand2, Trophy, Activity, ArrowUpRight, Users } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import PlayerStatsModal from '@/components/PlayerStatsModal';
 import { StartersGrid, BenchGrid, IRSlot, HockeyPlayer } from '@/components/roster';
@@ -473,22 +473,18 @@ const initialPlayers = [
 
 // Sample team stats for analytics section
 const teamStats = {
-  record: "42-22-8",
-  points: 92,
-  goalsFor: 247,
-  goalsAgainst: 198,
-  powerPlayPct: 23.5,
-  penaltyKillPct: 82.4,
-  lastTenGames: "7-2-1",
-  streak: "W3",
-  homeRecord: "22-10-4",
-  awayRecord: "20-12-4",
+  record: "3-1-0",
+  rank: "3rd",
+  totalPoints: 1245.5,
+  avgPoints: 311.4,
+  highScore: 342.8,
+  waiverMoves: 4,
   trends: [
-    { stat: "Goals", direction: "up", value: "+2.4%" },
-    { stat: "Save %", direction: "up", value: "+1.8%" },
-    { stat: "PP%", direction: "down", value: "-3.2%" },
-    { stat: "Shots", direction: "up", value: "+4.1%" },
-    { stat: "PK%", direction: "up", value: "+0.7%" }
+    { stat: "Fantasy Pts", direction: "up", value: "+5.2%" },
+    { stat: "Goalie Stats", direction: "down", value: "-1.5%" },
+    { stat: "Power Play", direction: "up", value: "+8.4%" },
+    { stat: "Peripherals", direction: "up", value: "+2.1%" },
+    { stat: "Consistency", direction: "down", value: "-0.5%" }
   ]
 };
 
@@ -888,12 +884,12 @@ const Roster = () => {
                   <div className="font-bold">{teamStats.record}</div>
                 </div>
                 <div className="text-center px-4 py-2">
-                  <div className="text-sm text-muted-foreground">Points</div>
-                  <div className="font-bold">{teamStats.points}</div>
+                  <div className="text-sm text-muted-foreground">Rank</div>
+                  <div className="font-bold">{teamStats.rank}</div>
                 </div>
                 <div className="text-center px-4 py-2">
-                  <div className="text-sm text-muted-foreground">Standing</div>
-                  <div className="font-bold">#3</div>
+                  <div className="text-sm text-muted-foreground">Total Pts</div>
+                  <div className="font-bold">{teamStats.totalPoints}</div>
                 </div>
               </div>
 
@@ -971,26 +967,42 @@ const Roster = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
                   <Card>
                     <CardContent className="p-6">
-                      <div className="text-2xl font-bold">{teamStats.goalsFor}</div>
-                      <p className="text-sm text-muted-foreground">Goals For</p>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm text-muted-foreground">Season Points</span>
+                        <Trophy className="h-4 w-4 text-yellow-500" />
+                      </div>
+                      <div className="text-2xl font-bold">{teamStats.totalPoints}</div>
+                      <p className="text-xs text-muted-foreground mt-1">Rank: {teamStats.rank}</p>
                     </CardContent>
                   </Card>
                   <Card>
                     <CardContent className="p-6">
-                      <div className="text-2xl font-bold">{teamStats.goalsAgainst}</div>
-                      <p className="text-sm text-muted-foreground">Goals Against</p>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm text-muted-foreground">Avg. Weekly</span>
+                        <Activity className="h-4 w-4 text-blue-500" />
+                      </div>
+                      <div className="text-2xl font-bold">{teamStats.avgPoints}</div>
+                      <p className="text-xs text-muted-foreground mt-1">pts / week</p>
                     </CardContent>
                   </Card>
                   <Card>
                     <CardContent className="p-6">
-                      <div className="text-2xl font-bold">{teamStats.powerPlayPct}%</div>
-                      <p className="text-sm text-muted-foreground">Power Play %</p>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm text-muted-foreground">Highest Score</span>
+                        <ArrowUpRight className="h-4 w-4 text-green-500" />
+                      </div>
+                      <div className="text-2xl font-bold">{teamStats.highScore}</div>
+                      <p className="text-xs text-muted-foreground mt-1">Week 2</p>
                     </CardContent>
                   </Card>
                   <Card>
                     <CardContent className="p-6">
-                      <div className="text-2xl font-bold">{teamStats.penaltyKillPct}%</div>
-                      <p className="text-sm text-muted-foreground">Penalty Kill %</p>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm text-muted-foreground">Moves Made</span>
+                        <Users className="h-4 w-4 text-purple-500" />
+                      </div>
+                      <div className="text-2xl font-bold">{teamStats.waiverMoves}</div>
+                      <p className="text-xs text-muted-foreground mt-1">Waiver/Trades</p>
                     </CardContent>
                   </Card>
                 </div>
@@ -999,7 +1011,7 @@ const Roster = () => {
               <TabsContent value="trends" className="m-0 p-6">
                 <div className="space-y-6">
                   <div>
-                    <h3 className="text-lg font-bold mb-4">Performance Trends</h3>
+                    <h3 className="text-lg font-bold mb-4">Category Trends</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                       {teamStats.trends.map((trend, index) => (
                         <Card key={index}>

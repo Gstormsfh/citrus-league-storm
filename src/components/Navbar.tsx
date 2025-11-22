@@ -78,7 +78,7 @@ const Navbar = () => {
                 <NavigationMenuItem>
                   <NavigationMenuTrigger className={cn(
                     "text-sm font-medium text-foreground/80",
-                    (isActive("/roster") || isActive("/gm-office") || isActive("/team-settings") || isActive("/draft")) && "text-primary"
+                    (isActive("/roster") || isActive("/gm-office")) && "text-primary"
                   )}>My Team</NavigationMenuTrigger>
                   <NavigationMenuContent>
                     <div className="w-[320px] p-2 grid gap-2 grid-cols-2">
@@ -92,16 +92,6 @@ const Navbar = () => {
                         <p className="text-xs leading-tight text-muted-foreground">Team operations center</p>
                         <ChevronRight className="h-3 w-3 mt-2 text-primary" />
                       </Link>
-                      <Link to="/team-settings" onClick={closeMobileMenu} className="flex h-full w-full select-none flex-col justify-end rounded-md bg-gradient-to-b from-accent/5 to-accent/10 p-4 no-underline outline-none focus:shadow-sm hover:shadow-sm hover:scale-[1.01] transition-all duration-200">
-                        <div className="mb-1 mt-2 text-base font-medium">Team Settings</div>
-                        <p className="text-xs leading-tight text-muted-foreground">Customize your team</p>
-                        <ChevronRight className="h-3 w-3 mt-2 text-primary" />
-                      </Link>
-                      <Link to="/draft" onClick={closeMobileMenu} className="flex h-full w-full select-none flex-col justify-end rounded-md bg-gradient-to-b from-primary/5 to-primary/10 p-4 no-underline outline-none focus:shadow-sm hover:shadow-sm hover:scale-[1.01] transition-all duration-200">
-                        <div className="mb-1 mt-2 text-base font-medium">Draft Room</div>
-                        <p className="text-xs leading-tight text-muted-foreground">Live fantasy draft</p>
-                        <ChevronRight className="h-3 w-3 mt-2 text-primary" />
-                      </Link>
                     </div>
                   </NavigationMenuContent>
                 </NavigationMenuItem>
@@ -109,13 +99,18 @@ const Navbar = () => {
                 <NavigationMenuItem>
                   <NavigationMenuTrigger className={cn(
                     "text-sm font-medium text-foreground/80",
-                    (isActive("/matchup") || isActive("/standings") || isActive("/free-agents")) && "text-primary"
+                    (isActive("/matchup") || isActive("/standings") || isActive("/free-agents") || isActive("/draft")) && "text-primary"
                   )}>League</NavigationMenuTrigger>
                   <NavigationMenuContent>
                     <div className="w-[320px] p-2 grid gap-2 grid-cols-2">
                       <Link to="/matchup" onClick={closeMobileMenu} className="flex h-full w-full select-none flex-col justify-end rounded-md bg-gradient-to-b from-primary/5 to-primary/10 p-4 no-underline outline-none focus:shadow-sm hover:shadow-sm hover:scale-[1.01] transition-all duration-200">
                         <div className="mb-1 mt-2 text-base font-medium">Matchup</div>
                         <p className="text-xs leading-tight text-muted-foreground">Current matchups</p>
+                        <ChevronRight className="h-3 w-3 mt-2 text-primary" />
+                      </Link>
+                      <Link to="/draft" onClick={closeMobileMenu} className="flex h-full w-full select-none flex-col justify-end rounded-md bg-gradient-to-b from-accent/5 to-accent/10 p-4 no-underline outline-none focus:shadow-sm hover:shadow-sm hover:scale-[1.01] transition-all duration-200">
+                        <div className="mb-1 mt-2 text-base font-medium">Draft Room</div>
+                        <p className="text-xs leading-tight text-muted-foreground">Live fantasy draft</p>
                         <ChevronRight className="h-3 w-3 mt-2 text-primary" />
                       </Link>
                       <Link to="/standings" onClick={closeMobileMenu} className="flex h-full w-full select-none flex-col justify-end rounded-md bg-gradient-to-b from-secondary/5 to-secondary/10 p-4 no-underline outline-none focus:shadow-sm hover:shadow-sm hover:scale-[1.01] transition-all duration-200">
@@ -258,9 +253,6 @@ const Navbar = () => {
                     </Link>
                   </Button>
                   <Button variant="ghost" className="justify-start text-xs h-8">
-                    <Settings className="h-3.5 w-3.5 mr-2" /> Settings
-                  </Button>
-                  <Button variant="ghost" className="justify-start text-xs h-8">
                     <Users className="h-3.5 w-3.5 mr-2" /> Subscription
                   </Button>
                   <Button variant="ghost" className="justify-start text-xs h-8 text-destructive hover:text-destructive">
@@ -309,13 +301,6 @@ const Navbar = () => {
                     </div>
                     <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
                   </Link>
-                  <Link to="/team-settings" className="flex items-center justify-between p-2.5 rounded-md hover:bg-accent/5" onClick={closeMobileMenu}>
-                    <div className="flex items-center gap-2">
-                      <Settings className="h-4 w-4 text-primary/70" />
-                      <span className="text-sm">Team Settings</span>
-                    </div>
-                    <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
-                  </Link>
                 </MobileNavSection>
                 
                 <MobileNavSection title="League">
@@ -323,6 +308,13 @@ const Navbar = () => {
                     <div className="flex items-center gap-2">
                       <Calendar className="h-4 w-4 text-primary/70" />
                       <span className="text-sm">Matchup</span>
+                    </div>
+                    <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+                  </Link>
+                  <Link to="/draft" className="flex items-center justify-between p-2.5 rounded-md hover:bg-accent/5" onClick={closeMobileMenu}>
+                    <div className="flex items-center gap-2">
+                      <Users className="h-4 w-4 text-primary/70" />
+                      <span className="text-sm">Draft Room</span>
                     </div>
                     <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
                   </Link>
@@ -416,7 +408,7 @@ const Navbar = () => {
                     <User className="h-3.5 w-3.5 mr-1.5" /> Profile
                   </Link>
                 </Button>
-                <Button variant="outline" size="sm" className="w-full text-xs h-8 text-destructive hover:text-destructive border-destructive/30 hover:bg-destructive/5">
+                <Button variant="outline" size="sm" className="col-span-2 w-full text-xs h-8 text-destructive hover:text-destructive border-destructive/30 hover:bg-destructive/5">
                   <LogOut className="h-3.5 w-3.5 mr-1.5" /> Log out
                 </Button>
               </div>

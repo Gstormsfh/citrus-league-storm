@@ -16,7 +16,6 @@ import Matchup from "./pages/Matchup";
 import FreeAgents from "./pages/FreeAgents";
 import GMOffice from "./pages/GMOffice";
 import StormyAssistant from "./pages/StormyAssistant";
-import TeamSettings from "./pages/TeamSettings";
 import News from "./pages/News";
 import DraftRoom from "./pages/DraftRoom";
 import Profile from "./pages/Profile";
@@ -53,7 +52,6 @@ const App = () => (
           <Route path="/free-agents" element={<FreeAgents />} />
           <Route path="/gm-office" element={<GMOffice />} />
           <Route path="/gm-office/stormy" element={<StormyAssistant />} />
-          <Route path="/team-settings" element={<TeamSettings />} />
           <Route path="/news" element={<News />} />
           <Route path="/draft" element={<DraftRoom />} />
           <Route path="/profile" element={<Profile />} />
