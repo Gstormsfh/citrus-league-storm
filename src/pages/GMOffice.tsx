@@ -97,7 +97,7 @@ const GMOffice = () => {
                   <div className={`absolute top-0 left-0 w-full h-32 bg-gradient-to-br ${action.gradient} opacity-10`} />
                   <CardHeader className="relative">
                     <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${action.gradient} flex items-center justify-center mb-4 group-hover:scale-110 group-hover:rotate-3 transition-all duration-300 shadow-lg`}>
-                      <action.icon className="h-8 w-8 text-white" />
+                      <action.icon className="h-8 w-8 text-background" strokeWidth={2.5} />
                     </div>
                     <CardTitle className="text-xl group-hover:text-primary transition-colors">{action.title}</CardTitle>
                     <CardDescription className="text-sm mt-2">
