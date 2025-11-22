@@ -9,63 +9,63 @@ const gmActions = [
     title: "Stormy AI Assistant",
     description: "Get personalized advice and insights from your AI GM",
     icon: Brain,
-    gradient: "from-purple-500 to-pink-500",
+    gradient: "from-primary to-secondary",
     link: "/gm-office/stormy"
   },
   {
     title: "Make a Trade",
     description: "Propose and negotiate trades with league managers",
     icon: ArrowLeftRight,
-    gradient: "from-blue-500 to-cyan-500",
+    gradient: "from-primary to-secondary",
     link: "/roster"
   },
   {
     title: "Free Agents",
     description: "Browse and claim available players",
     icon: Users,
-    gradient: "from-orange-500 to-amber-500",
+    gradient: "from-primary to-secondary",
     link: "/free-agents"
   },
   {
     title: "Team Analytics",
     description: "Deep dive into your team's performance metrics",
     icon: BarChart3,
-    gradient: "from-green-500 to-emerald-500",
+    gradient: "from-primary to-secondary",
     link: "/team-analytics"
   },
   {
     title: "Waiver Wire",
     description: "Manage waiver claims and priorities",
     icon: TrendingUp,
-    gradient: "from-indigo-500 to-purple-500",
+    gradient: "from-primary to-secondary",
     link: "/waiver-wire"
   },
   {
     title: "Schedule Manager",
     description: "View upcoming matchups and plan your lineup",
     icon: Calendar,
-    gradient: "from-rose-500 to-orange-500",
+    gradient: "from-primary to-secondary",
     link: "/schedule-manager"
   },
   {
     title: "Player News",
     description: "Stay updated on injuries and lineup changes",
     icon: Bell,
-    gradient: "from-violet-500 to-fuchsia-500",
+    gradient: "from-primary to-secondary",
     link: "/news"
   },
   {
     title: "League Standings",
     description: "Track rankings and playoff positioning",
     icon: ListChecks,
-    gradient: "from-yellow-500 to-orange-500",
+    gradient: "from-primary to-secondary",
     link: "/standings"
   },
   {
     title: "Trade Analyzer",
     description: "Evaluate trade proposals with advanced analytics",
     icon: FileText,
-    gradient: "from-teal-500 to-green-500",
+    gradient: "from-primary to-secondary",
     link: "/trade-analyzer"
   }
 ];

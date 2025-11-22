@@ -2,10 +2,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { TrendingUp, TrendingDown, Target, Shield, Zap, Star } from 'lucide-react';
+import { TrendingUp, TrendingDown, Target, Shield, Zap, Star, AlertCircle, Clock, User, Ruler, Weight, Calendar, Award, Activity, BarChart3, Users, Timer, Crosshair } from 'lucide-react';
+import { HockeyPlayer } from '@/components/roster/HockeyPlayerCard';
+import { cn } from '@/lib/utils';
 
 interface PlayerStatsModalProps {
-  player: any;
+  player: HockeyPlayer | null;
   isOpen: boolean;
   onClose: () => void;
 }
@@ -14,64 +16,66 @@ const PlayerStatsModal = ({ player, isOpen, onClose }: PlayerStatsModalProps) =>
   if (!player) return null;
 
   const isGoalie = player.position === 'Goalie';
+  const stats = player.stats || {};
 
-  // Advanced stats (simulated for demo)
-  const advancedStats = {
-    corsiFor: 58.2,
-    fenwickFor: 56.8,
-    pdoPercent: 102.3,
-    relativeCorsi: 4.2,
-    oZoneStartPct: 62.1,
-    timeOnIce: '21:34',
-    ppTimeOnIce: '3:42',
-    shTimeOnIce: '0:56',
-    faceoffWinPct: 54.3,
-    hits: 89,
-    blocks: 42,
-    takeaways: 28,
-    giveaways: 19,
-    shotPct: isGoalie ? null : 12.5,
-    savesPct: isGoalie ? 0.915 : null,
-    qualityStarts: isGoalie ? 18 : null,
-    highDangerSaves: isGoalie ? 156 : null
+  // Get status badge info
+  const getStatusInfo = () => {
+    if (!player.status) return null;
+    const statusConfig = {
+      'IR': { label: 'Injury Reserve', variant: 'destructive' as const, icon: AlertCircle, color: 'text-red-500' },
+      'SUSP': { label: 'Suspended', variant: 'destructive' as const, icon: AlertCircle, color: 'text-orange-500' },
+      'GTD': { label: 'Game Time Decision', variant: 'secondary' as const, icon: Clock, color: 'text-yellow-500' },
+      'WVR': { label: 'Waiver', variant: 'outline' as const, icon: AlertCircle, color: 'text-blue-500' },
+    };
+    return statusConfig[player.status];
   };
 
-  const recentForm = [
-    { game: 'vs BOS', points: 2, goals: 1, assists: 1 },
-    { game: 'at NYR', points: 1, goals: 0, assists: 1 },
-    { game: 'vs TOR', points: 3, goals: 2, assists: 1 },
-    { game: 'at MTL', points: 0, goals: 0, assists: 0 },
-    { game: 'vs VAN', points: 1, goals: 1, assists: 0 }
-  ];
+  const statusInfo = getStatusInfo();
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-4">
-            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center text-white text-xl font-bold">
+            <div className="w-20 h-20 rounded-full bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center text-white text-2xl font-bold shadow-lg">
               {player.number}
             </div>
-            <div>
-              <h2 className="text-2xl font-bold">{player.name}</h2>
-              <div className="flex items-center gap-2 mt-1">
-                <Badge variant="secondary">{player.position}</Badge>
-                <span className="text-muted-foreground">{player.team}</span>
-                {player.starter && <Star className="h-4 w-4 text-yellow-500 fill-current" />}
+            <div className="flex-1">
+              <h2 className="text-3xl font-bold">{player.name}</h2>
+              <div className="flex items-center gap-2 mt-2 flex-wrap">
+                <Badge variant="secondary" className="text-sm">{player.position}</Badge>
+                <span className="text-muted-foreground font-medium">{player.team}</span>
+                {player.teamAbbreviation && (
+                  <Badge variant="outline" className="text-xs">{player.teamAbbreviation}</Badge>
+                )}
+                {player.starter && (
+                  <Badge variant="default" className="gap-1">
+                    <Star className="h-3 w-3 fill-current" />
+                    Starter
+                  </Badge>
+                )}
+                {statusInfo && (
+                  <Badge variant={statusInfo.variant} className="gap-1">
+                    <statusInfo.icon className={cn("h-3 w-3", statusInfo.color)} />
+                    {statusInfo.label}
+                  </Badge>
+                )}
               </div>
             </div>
           </DialogTitle>
         </DialogHeader>
 
         <Tabs defaultValue="stats" className="mt-6">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="stats">Season Stats</TabsTrigger>
             <TabsTrigger value="advanced">Advanced</TabsTrigger>
+            <TabsTrigger value="detailed">Detailed</TabsTrigger>
             <TabsTrigger value="recent">Recent Form</TabsTrigger>
             <TabsTrigger value="profile">Profile</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="stats" className="space-y-4">
+          {/* Season Stats Tab */}
+          <TabsContent value="stats" className="space-y-4 mt-4">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {isGoalie ? (
                 <>
@@ -81,9 +85,9 @@ const PlayerStatsModal = ({ player, isOpen, onClose }: PlayerStatsModalProps) =>
                       <Shield className="h-4 w-4 ml-auto text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold">{player.stats.wins}</div>
+                      <div className="text-2xl font-bold">{stats.wins ?? 0}</div>
                       <p className="text-xs text-muted-foreground">
-                        {player.stats.losses}L {player.stats.otl}OT
+                        {stats.losses ?? 0}L {stats.otl ?? 0}OT
                       </p>
                     </CardContent>
                   </Card>
@@ -93,11 +97,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose }: PlayerStatsModalProps) =>
                       <Target className="h-4 w-4 ml-auto text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold">{player.stats.gaa}</div>
-                      <div className="flex items-center text-xs">
-                        <TrendingUp className="h-3 w-3 text-green-500 mr-1" />
-                        <span className="text-green-500">+0.12 vs last month</span>
-                      </div>
+                      <div className="text-2xl font-bold">{stats.gaa?.toFixed(2) ?? '0.00'}</div>
                     </CardContent>
                   </Card>
                   <Card>
@@ -106,19 +106,27 @@ const PlayerStatsModal = ({ player, isOpen, onClose }: PlayerStatsModalProps) =>
                       <Zap className="h-4 w-4 ml-auto text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold">{(player.stats.savePct * 100).toFixed(1)}%</div>
-                      <div className="flex items-center text-xs">
-                        <TrendingDown className="h-3 w-3 text-red-500 mr-1" />
-                        <span className="text-red-500">-1.2% vs last month</span>
+                      <div className="text-2xl font-bold">
+                        {stats.savePct ? (stats.savePct * 100).toFixed(1) : '0.0'}%
                       </div>
                     </CardContent>
                   </Card>
                   <Card>
                     <CardHeader className="flex flex-row items-center space-y-0 pb-2">
                       <CardTitle className="text-sm font-medium">Shutouts</CardTitle>
+                      <Star className="h-4 w-4 ml-auto text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold">{player.stats.shutouts}</div>
+                      <div className="text-2xl font-bold">{stats.shutouts ?? 0}</div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardHeader className="flex flex-row items-center space-y-0 pb-2">
+                      <CardTitle className="text-sm font-medium">Games Played</CardTitle>
+                      <Activity className="h-4 w-4 ml-auto text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">{stats.gamesPlayed ?? 0}</div>
                     </CardContent>
                   </Card>
                 </>
@@ -130,11 +138,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose }: PlayerStatsModalProps) =>
                       <Target className="h-4 w-4 ml-auto text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold">{player.stats.goals}</div>
-                      <div className="flex items-center text-xs">
-                        <TrendingUp className="h-3 w-3 text-green-500 mr-1" />
-                        <span className="text-green-500">+12% vs last season</span>
-                      </div>
+                      <div className="text-2xl font-bold">{stats.goals ?? 0}</div>
                     </CardContent>
                   </Card>
                   <Card>
@@ -143,11 +147,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose }: PlayerStatsModalProps) =>
                       <Zap className="h-4 w-4 ml-auto text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold">{player.stats.assists}</div>
-                      <div className="flex items-center text-xs">
-                        <TrendingUp className="h-3 w-3 text-green-500 mr-1" />
-                        <span className="text-green-500">+8% vs last season</span>
-                      </div>
+                      <div className="text-2xl font-bold">{stats.assists ?? 0}</div>
                     </CardContent>
                   </Card>
                   <Card>
@@ -156,44 +156,45 @@ const PlayerStatsModal = ({ player, isOpen, onClose }: PlayerStatsModalProps) =>
                       <Star className="h-4 w-4 ml-auto text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold">{player.stats.points}</div>
-                      <p className="text-xs text-muted-foreground">
-                        Rank: #3 in position
-                      </p>
+                      <div className="text-2xl font-bold">{stats.points ?? (stats.goals ?? 0) + (stats.assists ?? 0)}</div>
                     </CardContent>
                   </Card>
                   <Card>
                     <CardHeader className="flex flex-row items-center space-y-0 pb-2">
                       <CardTitle className="text-sm font-medium">+/-</CardTitle>
+                      <TrendingUp className="h-4 w-4 ml-auto text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold">{player.stats.plusMinus > 0 ? '+' : ''}{player.stats.plusMinus}</div>
-                      <div className="flex items-center text-xs">
-                        {player.stats.plusMinus > 0 ? (
-                          <TrendingUp className="h-3 w-3 text-green-500 mr-1" />
-                        ) : (
-                          <TrendingDown className="h-3 w-3 text-red-500 mr-1" />
-                        )}
+                      <div className={cn(
+                        "text-2xl font-bold",
+                        (stats.plusMinus ?? 0) > 0 && "text-green-600",
+                        (stats.plusMinus ?? 0) < 0 && "text-red-600"
+                      )}>
+                        {(stats.plusMinus ?? 0) > 0 ? '+' : ''}{stats.plusMinus ?? 0}
                       </div>
                     </CardContent>
                   </Card>
                   <Card>
                     <CardHeader className="flex flex-row items-center space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Shots</CardTitle>
+                      <CardTitle className="text-sm font-medium">Shots on Goal</CardTitle>
+                      <Crosshair className="h-4 w-4 ml-auto text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold">{player.stats.shots}</div>
-                      <p className="text-xs text-muted-foreground">
-                        {advancedStats.shotPct}% shooting
-                      </p>
+                      <div className="text-2xl font-bold">{stats.shots ?? 0}</div>
+                      {stats.shots && stats.goals && (
+                        <p className="text-xs text-muted-foreground">
+                          {((stats.goals / stats.shots) * 100).toFixed(1)}% shooting
+                        </p>
+                      )}
                     </CardContent>
                   </Card>
                   <Card>
                     <CardHeader className="flex flex-row items-center space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">PIM</CardTitle>
+                      <CardTitle className="text-sm font-medium">Games Played</CardTitle>
+                      <Activity className="h-4 w-4 ml-auto text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold">{player.stats.pim}</div>
+                      <div className="text-2xl font-bold">{stats.gamesPlayed ?? 0}</div>
                     </CardContent>
                   </Card>
                 </>
@@ -201,32 +202,37 @@ const PlayerStatsModal = ({ player, isOpen, onClose }: PlayerStatsModalProps) =>
             </div>
           </TabsContent>
 
-          <TabsContent value="advanced" className="space-y-4">
+          {/* Advanced Stats Tab */}
+          <TabsContent value="advanced" className="space-y-4 mt-4">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {isGoalie ? (
                 <>
                   <Card>
                     <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-medium">Quality Starts</CardTitle>
+                      <CardTitle className="text-sm font-medium">Save Percentage</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold">{advancedStats.qualityStarts}</div>
+                      <div className="text-2xl font-bold">
+                        {stats.savePct ? (stats.savePct * 100).toFixed(2) : '0.00'}%
+                      </div>
                     </CardContent>
                   </Card>
                   <Card>
                     <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-medium">High Danger Saves</CardTitle>
+                      <CardTitle className="text-sm font-medium">Goals Against Average</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold">{advancedStats.highDangerSaves}</div>
+                      <div className="text-2xl font-bold">{stats.gaa?.toFixed(2) ?? '0.00'}</div>
                     </CardContent>
                   </Card>
                   <Card>
                     <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-medium">PDO%</CardTitle>
+                      <CardTitle className="text-sm font-medium">Record</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold">{advancedStats.pdoPercent}%</div>
+                      <div className="text-2xl font-bold">
+                        {stats.wins ?? 0}-{stats.losses ?? 0}-{stats.otl ?? 0}
+                      </div>
                     </CardContent>
                   </Card>
                 </>
@@ -234,44 +240,15 @@ const PlayerStatsModal = ({ player, isOpen, onClose }: PlayerStatsModalProps) =>
                 <>
                   <Card>
                     <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-medium">Corsi For %</CardTitle>
+                      <CardTitle className="text-sm font-medium">Time on Ice</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold">{advancedStats.corsiFor}%</div>
-                      <p className="text-xs text-muted-foreground">Shot attempt differential</p>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-medium">Fenwick For %</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold">{advancedStats.fenwickFor}%</div>
-                      <p className="text-xs text-muted-foreground">Unblocked shot attempts</p>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-medium">O-Zone Start %</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold">{advancedStats.oZoneStartPct}%</div>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-medium">TOI/Game</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold">{advancedStats.timeOnIce}</div>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-medium">PP TOI/Game</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold">{advancedStats.ppTimeOnIce}</div>
+                      <div className="text-2xl font-bold">{stats.toi ?? '0:00'}</div>
+                      {stats.toiPercentage && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {stats.toiPercentage.toFixed(1)}% of team TOI
+                        </p>
+                      )}
                     </CardContent>
                   </Card>
                   <Card>
@@ -279,7 +256,39 @@ const PlayerStatsModal = ({ player, isOpen, onClose }: PlayerStatsModalProps) =>
                       <CardTitle className="text-sm font-medium">Hits</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold">{advancedStats.hits}</div>
+                      <div className="text-2xl font-bold">{stats.hits ?? 0}</div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium">Blocked Shots</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">{stats.blockedShots ?? 0}</div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium">Power Play Points</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">{stats.powerPlayPoints ?? 0}</div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium">Short Handed Points</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">{stats.shortHandedPoints ?? 0}</div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium">Penalty Minutes</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">{stats.pim ?? 0}</div>
                     </CardContent>
                   </Card>
                 </>
@@ -287,72 +296,251 @@ const PlayerStatsModal = ({ player, isOpen, onClose }: PlayerStatsModalProps) =>
             </div>
           </TabsContent>
 
-          <TabsContent value="recent" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Last 5 Games</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {recentForm.map((game, index) => (
-                    <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
-                      <div className="font-medium">{game.game}</div>
-                      <div className="flex items-center gap-4 text-sm">
-                        <span>G: {game.goals}</span>
-                        <span>A: {game.assists}</span>
-                        <Badge variant={game.points > 1 ? "default" : game.points === 1 ? "secondary" : "outline"}>
-                          {game.points} PTS
-                        </Badge>
+          {/* Detailed Stats Tab */}
+          <TabsContent value="detailed" className="space-y-4 mt-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <BarChart3 className="h-5 w-5" />
+                    Skater Statistics
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="flex justify-between items-center p-2 bg-muted/50 rounded">
+                      <span className="text-sm text-muted-foreground">Goals</span>
+                      <span className="font-bold">{stats.goals ?? 0}</span>
+                    </div>
+                    <div className="flex justify-between items-center p-2 bg-muted/50 rounded">
+                      <span className="text-sm text-muted-foreground">Assists</span>
+                      <span className="font-bold">{stats.assists ?? 0}</span>
+                    </div>
+                    <div className="flex justify-between items-center p-2 bg-muted/50 rounded">
+                      <span className="text-sm text-muted-foreground">Points</span>
+                      <span className="font-bold">{stats.points ?? (stats.goals ?? 0) + (stats.assists ?? 0)}</span>
+                    </div>
+                    <div className="flex justify-between items-center p-2 bg-muted/50 rounded">
+                      <span className="text-sm text-muted-foreground">+/-</span>
+                      <span className={cn(
+                        "font-bold",
+                        (stats.plusMinus ?? 0) > 0 && "text-green-600",
+                        (stats.plusMinus ?? 0) < 0 && "text-red-600"
+                      )}>
+                        {(stats.plusMinus ?? 0) > 0 ? '+' : ''}{stats.plusMinus ?? 0}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center p-2 bg-muted/50 rounded">
+                      <span className="text-sm text-muted-foreground">Shots</span>
+                      <span className="font-bold">{stats.shots ?? 0}</span>
+                    </div>
+                    <div className="flex justify-between items-center p-2 bg-muted/50 rounded">
+                      <span className="text-sm text-muted-foreground">Hits</span>
+                      <span className="font-bold">{stats.hits ?? 0}</span>
+                    </div>
+                    <div className="flex justify-between items-center p-2 bg-muted/50 rounded">
+                      <span className="text-sm text-muted-foreground">Blocks</span>
+                      <span className="font-bold">{stats.blockedShots ?? 0}</span>
+                    </div>
+                    <div className="flex justify-between items-center p-2 bg-muted/50 rounded">
+                      <span className="text-sm text-muted-foreground">PIM</span>
+                      <span className="font-bold">{stats.pim ?? 0}</span>
+                    </div>
+                    <div className="flex justify-between items-center p-2 bg-muted/50 rounded">
+                      <span className="text-sm text-muted-foreground">PPP</span>
+                      <span className="font-bold">{stats.powerPlayPoints ?? 0}</span>
+                    </div>
+                    <div className="flex justify-between items-center p-2 bg-muted/50 rounded">
+                      <span className="text-sm text-muted-foreground">SHP</span>
+                      <span className="font-bold">{stats.shortHandedPoints ?? 0}</span>
+                    </div>
+                    <div className="flex justify-between items-center p-2 bg-muted/50 rounded">
+                      <span className="text-sm text-muted-foreground">Games</span>
+                      <span className="font-bold">{stats.gamesPlayed ?? 0}</span>
+                    </div>
+                    <div className="flex justify-between items-center p-2 bg-muted/50 rounded">
+                      <span className="text-sm text-muted-foreground">TOI</span>
+                      <span className="font-bold">{stats.toi ?? '0:00'}</span>
+                    </div>
+                  </div>
+                  {stats.toiPercentage && (
+                    <div className="mt-3 pt-3 border-t">
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-sm font-medium">TOI Percentage</span>
+                        <span className="font-bold">{stats.toiPercentage.toFixed(1)}%</span>
+                      </div>
+                      <div className="h-2 bg-muted rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-primary rounded-full transition-all"
+                          style={{ width: `${Math.min(stats.toiPercentage, 100)}%` }}
+                        />
                       </div>
                     </div>
-                  ))}
+                  )}
+                </CardContent>
+              </Card>
+
+              {isGoalie && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Shield className="h-5 w-5" />
+                      Goalie Statistics
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="flex justify-between items-center p-2 bg-muted/50 rounded">
+                        <span className="text-sm text-muted-foreground">Wins</span>
+                        <span className="font-bold">{stats.wins ?? 0}</span>
+                      </div>
+                      <div className="flex justify-between items-center p-2 bg-muted/50 rounded">
+                        <span className="text-sm text-muted-foreground">Losses</span>
+                        <span className="font-bold">{stats.losses ?? 0}</span>
+                      </div>
+                      <div className="flex justify-between items-center p-2 bg-muted/50 rounded">
+                        <span className="text-sm text-muted-foreground">OT Losses</span>
+                        <span className="font-bold">{stats.otl ?? 0}</span>
+                      </div>
+                      <div className="flex justify-between items-center p-2 bg-muted/50 rounded">
+                        <span className="text-sm text-muted-foreground">GAA</span>
+                        <span className="font-bold">{stats.gaa?.toFixed(2) ?? '0.00'}</span>
+                      </div>
+                      <div className="flex justify-between items-center p-2 bg-muted/50 rounded">
+                        <span className="text-sm text-muted-foreground">Save %</span>
+                        <span className="font-bold">
+                          {stats.savePct ? (stats.savePct * 100).toFixed(2) : '0.00'}%
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center p-2 bg-muted/50 rounded">
+                        <span className="text-sm text-muted-foreground">Shutouts</span>
+                        <span className="font-bold">{stats.shutouts ?? 0}</span>
+                      </div>
+                      <div className="flex justify-between items-center p-2 bg-muted/50 rounded">
+                        <span className="text-sm text-muted-foreground">Games</span>
+                        <span className="font-bold">{stats.gamesPlayed ?? 0}</span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          </TabsContent>
+
+          {/* Recent Form Tab */}
+          <TabsContent value="recent" className="space-y-4 mt-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Recent Performance</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-center py-8 text-muted-foreground">
+                  <Activity className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>Recent game data will be displayed here</p>
+                  <p className="text-sm mt-2">Last 5-10 games with goals, assists, points, and +/-</p>
                 </div>
               </CardContent>
             </Card>
           </TabsContent>
 
-          <TabsContent value="profile" className="space-y-4">
+          {/* Profile Tab */}
+          <TabsContent value="profile" className="space-y-4 mt-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Card>
                 <CardHeader>
-                  <CardTitle>Player Info</CardTitle>
+                  <CardTitle className="flex items-center gap-2">
+                    <User className="h-5 w-5" />
+                    Player Information
+                  </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Age:</span>
-                    <span className="font-medium">{player.age}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Height:</span>
-                    <span className="font-medium">{player.height}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Weight:</span>
-                    <span className="font-medium">{player.weight}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Experience:</span>
-                    <span className="font-medium">{player.experience}</span>
+                <CardContent className="space-y-4">
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center p-3 bg-muted/50 rounded">
+                      <div className="flex items-center gap-2">
+                        <Ruler className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-muted-foreground">Height</span>
+                      </div>
+                      <span className="font-semibold">{player.height ?? 'N/A'}</span>
+                    </div>
+                    <div className="flex justify-between items-center p-3 bg-muted/50 rounded">
+                      <div className="flex items-center gap-2">
+                        <Weight className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-muted-foreground">Weight</span>
+                      </div>
+                      <span className="font-semibold">{player.weight ?? 'N/A'}</span>
+                    </div>
+                    <div className="flex justify-between items-center p-3 bg-muted/50 rounded">
+                      <div className="flex items-center gap-2">
+                        <Calendar className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-muted-foreground">Age</span>
+                      </div>
+                      <span className="font-semibold">{player.age ?? 'N/A'}</span>
+                    </div>
+                    <div className="flex justify-between items-center p-3 bg-muted/50 rounded">
+                      <div className="flex items-center gap-2">
+                        <Award className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-muted-foreground">Experience</span>
+                      </div>
+                      <span className="font-semibold">{player.experience ?? 'N/A'}</span>
+                    </div>
+                    <div className="flex justify-between items-center p-3 bg-muted/50 rounded">
+                      <div className="flex items-center gap-2">
+                        <Users className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-muted-foreground">Team</span>
+                      </div>
+                      <span className="font-semibold">{player.team}</span>
+                    </div>
+                    <div className="flex justify-between items-center p-3 bg-muted/50 rounded">
+                      <div className="flex items-center gap-2">
+                        <Target className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-muted-foreground">Position</span>
+                      </div>
+                      <Badge variant="secondary">{player.position}</Badge>
+                    </div>
+                    <div className="flex justify-between items-center p-3 bg-muted/50 rounded">
+                      <div className="flex items-center gap-2">
+                        <Star className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-muted-foreground">Jersey Number</span>
+                      </div>
+                      <span className="font-semibold">#{player.number}</span>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
               
               <Card>
                 <CardHeader>
-                  <CardTitle>Fantasy Impact</CardTitle>
+                  <CardTitle className="flex items-center gap-2">
+                    <Activity className="h-5 w-5" />
+                    Status & Roster
+                  </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Fantasy Rank:</span>
-                    <span className="font-medium">#12 {player.position}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Weekly Projection:</span>
-                    <span className="font-medium text-green-600">14.2 pts</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Rest of Season:</span>
-                    <span className="font-medium">Buy</span>
+                <CardContent className="space-y-4">
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center p-3 bg-muted/50 rounded">
+                      <span className="text-muted-foreground">Roster Status</span>
+                      <Badge variant={player.starter ? "default" : "secondary"}>
+                        {player.starter ? "Starter" : "Bench"}
+                      </Badge>
+                    </div>
+                    {player.status && (
+                      <div className="flex justify-between items-center p-3 bg-muted/50 rounded">
+                        <span className="text-muted-foreground">Injury Status</span>
+                        <Badge variant={statusInfo?.variant || "outline"}>
+                          {statusInfo?.label || player.status}
+                        </Badge>
+                      </div>
+                    )}
+                    {player.teamAbbreviation && (
+                      <div className="flex justify-between items-center p-3 bg-muted/50 rounded">
+                        <span className="text-muted-foreground">Team Abbreviation</span>
+                        <Badge variant="outline">{player.teamAbbreviation}</Badge>
+                      </div>
+                    )}
+                    <div className="flex justify-between items-center p-3 bg-muted/50 rounded">
+                      <span className="text-muted-foreground">Player ID</span>
+                      <span className="font-mono text-sm">{player.id}</span>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
