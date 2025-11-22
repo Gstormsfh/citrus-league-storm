@@ -9,63 +9,63 @@ const gmActions = [
     title: "Stormy AI Assistant",
     description: "Get personalized advice and insights from your AI GM",
     icon: Brain,
-    gradient: "from-[hsl(var(--vibrant-purple))] to-primary",
+    gradient: "from-purple-500 to-pink-500",
     link: "/gm-office/stormy"
   },
   {
     title: "Make a Trade",
     description: "Propose and negotiate trades with league managers",
     icon: ArrowLeftRight,
-    gradient: "from-primary to-[hsl(var(--vibrant-orange))]",
+    gradient: "from-blue-500 to-cyan-500",
     link: "/roster"
   },
   {
     title: "Free Agents",
     description: "Browse and claim available players",
     icon: Users,
-    gradient: "from-[hsl(var(--vibrant-orange))] to-[hsl(var(--citrus-yellow))]",
+    gradient: "from-orange-500 to-amber-500",
     link: "/free-agents"
   },
   {
     title: "Team Analytics",
     description: "Deep dive into your team's performance metrics",
     icon: BarChart3,
-    gradient: "from-[hsl(var(--citrus-green))] to-primary",
+    gradient: "from-green-500 to-emerald-500",
     link: "#analytics"
   },
   {
     title: "Waiver Wire",
     description: "Manage waiver claims and priorities",
     icon: TrendingUp,
-    gradient: "from-primary to-[hsl(var(--vibrant-purple))]",
+    gradient: "from-indigo-500 to-purple-500",
     link: "#waiver"
   },
   {
     title: "Schedule Manager",
     description: "View upcoming matchups and plan your lineup",
     icon: Calendar,
-    gradient: "from-[hsl(var(--vibrant-orange))] to-primary",
+    gradient: "from-rose-500 to-orange-500",
     link: "#schedule"
   },
   {
     title: "Player News",
     description: "Stay updated on injuries and lineup changes",
     icon: Bell,
-    gradient: "from-[hsl(var(--vibrant-purple))] to-[hsl(var(--citrus-green))]",
+    gradient: "from-violet-500 to-fuchsia-500",
     link: "/news"
   },
   {
     title: "League Standings",
     description: "Track rankings and playoff positioning",
     icon: ListChecks,
-    gradient: "from-[hsl(var(--citrus-yellow))] to-[hsl(var(--vibrant-orange))]",
+    gradient: "from-yellow-500 to-orange-500",
     link: "/standings"
   },
   {
     title: "Trade Analyzer",
     description: "Evaluate trade proposals with advanced analytics",
     icon: FileText,
-    gradient: "from-primary to-[hsl(var(--citrus-green))]",
+    gradient: "from-teal-500 to-green-500",
     link: "#trade-analyzer"
   }
 ];
@@ -77,7 +77,7 @@ const GMOffice = () => {
       <main className="pt-24 pb-16">
         <div className="container mx-auto px-4">
           <div className="max-w-3xl mx-auto text-center mb-12">
-            <h1 className="text-4xl md:text-5xl font-bold mb-4" style={{ color: '#f97316' }}>
+            <h1 className="text-4xl md:text-5xl font-bold mb-4 text-foreground">
               GM's Office
             </h1>
             <p className="text-lg text-muted-foreground">
@@ -97,7 +97,7 @@ const GMOffice = () => {
                   <div className={`absolute top-0 left-0 w-full h-32 bg-gradient-to-br ${action.gradient} opacity-10`} />
                   <CardHeader className="relative">
                     <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${action.gradient} flex items-center justify-center mb-4 group-hover:scale-110 group-hover:rotate-3 transition-all duration-300 shadow-lg`}>
-                      <action.icon className="h-8 w-8 text-white" />
+                      <action.icon className="h-8 w-8 text-white" strokeWidth={2.5} />
                     </div>
                     <CardTitle className="text-xl group-hover:text-primary transition-colors">{action.title}</CardTitle>
                     <CardDescription className="text-sm mt-2">
