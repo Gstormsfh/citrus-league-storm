@@ -17,7 +17,7 @@ const gmActions = [
     description: "Propose and negotiate trades with league managers",
     icon: ArrowLeftRight,
     gradient: "from-primary to-secondary",
-    link: "/roster"
+    link: "/trade-analyzer"
   },
   {
     title: "Free Agents",
@@ -46,27 +46,6 @@ const gmActions = [
     icon: Calendar,
     gradient: "from-primary to-secondary",
     link: "/schedule-manager"
-  },
-  {
-    title: "Player News",
-    description: "Stay updated on injuries and lineup changes",
-    icon: Bell,
-    gradient: "from-primary to-secondary",
-    link: "/news"
-  },
-  {
-    title: "League Standings",
-    description: "Track rankings and playoff positioning",
-    icon: ListChecks,
-    gradient: "from-primary to-secondary",
-    link: "/standings"
-  },
-  {
-    title: "Trade Analyzer",
-    description: "Evaluate trade proposals with advanced analytics",
-    icon: FileText,
-    gradient: "from-primary to-secondary",
-    link: "/trade-analyzer"
   }
 ];
 

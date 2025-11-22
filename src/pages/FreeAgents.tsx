@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import { Button } from '@/components/ui/button';
@@ -7,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
+import { Calendar, TrendingUp } from 'lucide-react';
 
 // Mock free agent data
 const freeAgents = [
@@ -89,8 +91,17 @@ const freeAgents = [
 
 const FreeAgents = () => {
   const { toast } = useToast();
+  const [searchParams] = useSearchParams();
   const [searchQuery, setSearchQuery] = useState('');
   const [positionFilter, setPositionFilter] = useState('ALL');
+  const [activeTab, setActiveTab] = useState('available');
+
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    if (tab) {
+      setActiveTab(tab);
+    }
+  }, [searchParams]);
 
   const handleAddPlayer = (player: any) => {
     toast({
@@ -140,9 +151,10 @@ const FreeAgents = () => {
           </div>
         </div>
 
-        <Tabs defaultValue="available" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 max-w-md mb-6">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-4 max-w-2xl mb-6">
             <TabsTrigger value="available">Available</TabsTrigger>
+            <TabsTrigger value="schedule" className="gap-2"><Calendar className="h-4 w-4" /> Schedule</TabsTrigger>
             <TabsTrigger value="waivers">Waiver Wire</TabsTrigger>
             <TabsTrigger value="watch">Watch List</TabsTrigger>
           </TabsList>
@@ -194,6 +206,59 @@ const FreeAgents = () => {
                 </Card>
               ))}
             </div>
+          </TabsContent>
+
+          <TabsContent value="schedule" className="space-y-4">
+             <div className="bg-blue-500/10 border border-blue-500/20 p-4 rounded-lg mb-4 flex items-start gap-3">
+                <Calendar className="h-5 w-5 text-blue-500 mt-1 shrink-0" />
+                <div>
+                  <h3 className="font-semibold text-blue-700 dark:text-blue-400">Schedule Maximizers</h3>
+                  <p className="text-sm text-muted-foreground">These players have favorable schedules this week (4+ games or off-night games).</p>
+                </div>
+             </div>
+
+             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+               {[...filteredPlayers, 
+                 { id: 101, name: "Joey Daccord", position: "G", team: "SEA", opponent: "4 Games", projectedPoints: 5.8, stats: { wins: 12, gaa: 2.3, savePercentage: .920 }, trend: "up", games: 4, rostered: 42 },
+                 { id: 102, name: "Charlie Coyle", position: "C/RW", team: "BOS", opponent: "4 Games", projectedPoints: 6.2, stats: { goals: 18, assists: 22 }, trend: "up", games: 4, rostered: 55 }
+               ].filter(p => (p as any).games === 4 || Math.random() > 0.5).map((player: any) => (
+                 <Card key={player.id} className="overflow-hidden hover:border-blue-500/50 transition-colors border-blue-500/20">
+                  <CardContent className="p-0">
+                    <div className="flex items-center p-4">
+                      <div className="h-12 w-12 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-700 dark:text-blue-400 font-bold text-lg mr-4 relative">
+                        {player.team}
+                        <span className="absolute -top-1 -right-1 bg-green-500 text-white text-[10px] w-5 h-5 flex items-center justify-center rounded-full border-2 border-background">4</span>
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <h3 className="font-bold text-lg">{player.name}</h3>
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                               <span>{player.position}</span>
+                               <span>•</span>
+                               <span className="text-green-600 font-medium flex items-center gap-1"><TrendingUp className="h-3 w-3" /> High Volume Week</span>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="font-bold text-lg text-primary">{player.projectedPoints}</div>
+                            <p className="text-xs text-muted-foreground">Proj Pts</p>
+                          </div>
+                        </div>
+                        
+                        <div className="mt-3 flex gap-2 text-sm overflow-x-auto pb-1">
+                           {['Mon', 'Wed', 'Fri', 'Sun'].map(day => (
+                             <div key={day} className="px-2 py-1 bg-muted rounded text-xs font-medium text-muted-foreground">{day}</div>
+                           ))}
+                        </div>
+                      </div>
+                      <div className="ml-4">
+                        <Button size="sm" onClick={() => handleAddPlayer(player)}>+</Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+               ))}
+             </div>
           </TabsContent>
           
           <TabsContent value="waivers">

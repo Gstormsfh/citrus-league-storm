@@ -23,6 +23,7 @@ import TeamAnalytics from "./pages/TeamAnalytics";
 import WaiverWire from "./pages/WaiverWire";
 import ScheduleManager from "./pages/ScheduleManager";
 import TradeAnalyzer from "./pages/TradeAnalyzer";
+import { StormyChatBubble } from "./components/StormyChatBubble";
 import "./App.css";
 
 // Configure with a higher stale time to prevent unnecessary refetches
@@ -62,6 +63,7 @@ const App = () => (
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
+        <StormyChatBubble />
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>

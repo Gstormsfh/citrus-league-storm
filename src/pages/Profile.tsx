@@ -40,6 +40,9 @@ const Profile = () => {
   const { toast } = useToast();
   const [isEditing, setIsEditing] = useState(false);
   
+  // Active Tab State Management
+  const [activeTab, setActiveTab] = useState('overview');
+  
   // Animation observer setup
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -53,13 +56,17 @@ const Profile = () => {
       { threshold: 0.1 }
     );
 
-    const animatedElements = document.querySelectorAll('.animated-element');
-    animatedElements.forEach(el => observer.observe(el));
+    // Small delay to ensure DOM is updated after tab switch
+    const timeoutId = setTimeout(() => {
+      const animatedElements = document.querySelectorAll('.animated-element');
+      animatedElements.forEach(el => observer.observe(el));
+    }, 100);
 
     return () => {
-      animatedElements.forEach(el => observer.unobserve(el));
+      clearTimeout(timeoutId);
+      observer.disconnect();
     };
-  }, []);
+  }, [activeTab]);
   
   // User & Team Data
   const [formData, setFormData] = useState({
@@ -153,7 +160,7 @@ const Profile = () => {
       <main className="pt-24 pb-16">
         <div className="container mx-auto px-4">
           <div className="max-w-6xl mx-auto">
-            <Tabs defaultValue="overview" className="space-y-8">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-8">
               <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
                 <div className="flex items-center gap-4 animated-element">
                   <div className="relative group">
@@ -359,10 +366,6 @@ const Profile = () => {
                           <div className="flex justify-between text-sm">
                             <span className="text-muted-foreground">Overall Record</span>
                             <span className="font-medium">{userStats.overallRecord}</span>
-                          </div>
-                          <div className="flex justify-between text-sm">
-                            <span className="text-muted-foreground">Avg PPG</span>
-                            <span className="font-medium">{userStats.avgPointsPerGame}</span>
                           </div>
                         </div>
                       </CardContent>

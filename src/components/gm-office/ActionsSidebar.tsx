@@ -1,5 +1,6 @@
 
 import { Button } from '@/components/ui/button';
+import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Users, Briefcase, Settings } from 'lucide-react';
 
@@ -14,10 +15,12 @@ export const ActionsSidebar = () => {
           <Users className="w-4 h-4 mr-2 transition-transform group-hover:scale-110" />
           Manage Team
         </Button>
-        <Button className="w-full bg-gradient-to-r from-primary/90 to-primary hover:from-primary hover:to-primary/90 text-white group transition-all">
-          <Briefcase className="w-4 h-4 mr-2 transition-transform group-hover:scale-110" />
-          Trade Center
-        </Button>
+        <Link to="/trade-analyzer" className="w-full">
+          <Button className="w-full bg-gradient-to-r from-primary/90 to-primary hover:from-primary hover:to-primary/90 text-white group transition-all">
+            <Briefcase className="w-4 h-4 mr-2 transition-transform group-hover:scale-110" />
+            Trade Center
+          </Button>
+        </Link>
         <Button variant="outline" className="w-full group">
           <Settings className="w-4 h-4 mr-2 transition-transform group-hover:scale-110" />
           Team Settings
@@ -26,12 +29,6 @@ export const ActionsSidebar = () => {
         <div className="border-t border-border/40 pt-4 mt-6">
           <h3 className="text-lg font-medium mb-3">Quick Links</h3>
           <nav className="space-y-1">
-            <a href="#" className="flex items-center text-muted-foreground hover:text-primary p-2 rounded-md hover:bg-primary/5 transition-colors">
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-              </svg>
-              League Standings
-            </a>
             <a href="#" className="flex items-center text-muted-foreground hover:text-primary p-2 rounded-md hover:bg-primary/5 transition-colors">
               <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 8v8m-4-5v5M8 8v8m-4 0h18" />

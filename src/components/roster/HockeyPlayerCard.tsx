@@ -156,7 +156,7 @@ const HockeyPlayerCard = ({
       onClick={onClick}
     >
       {/* Compact Header Section */}
-      <div className="relative p-1.5 bg-muted/30 border-b border-border/30 flex items-center gap-1.5 h-[35px]">
+      <div className="relative p-1.5 bg-muted/30 border-b border-border/30 flex items-center gap-1.5 min-h-[35px]">
         {/* Status Badge */}
         {getStatusBadge()}
 
@@ -176,10 +176,17 @@ const HockeyPlayerCard = ({
 
         {/* Player Name and Team */}
         <div className="flex-1 min-w-0 pr-5">
-          <h3 className="font-semibold text-[9px] leading-tight truncate">
+          <h3 
+            className="font-semibold text-[10px] leading-3 line-clamp-2 cursor-pointer hover:underline decoration-primary/50"
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              onClick?.();
+            }}
+          >
             {player.name}
           </h3>
-          <div className="flex items-center text-[8px] text-muted-foreground">
+          <div className="flex items-center text-[8px] text-muted-foreground mt-0.5">
             <span className="font-medium">{teamAbbr}</span>
             <span className="mx-1">•</span>
             <span>#{player.number}</span>

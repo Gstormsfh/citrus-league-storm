@@ -1,158 +1,127 @@
-import { useState, useRef, useEffect } from 'react';
-import Navbar from '../components/Navbar';
-import Footer from '../components/Footer';
+import Navbar from '@/components/Navbar';
+import Footer from '@/components/Footer';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Brain, Send, Loader2 } from 'lucide-react';
-import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
-
-interface Message {
-  role: 'user' | 'assistant';
-  content: string;
-}
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { Brain, Zap, MessageSquare, Clock, Shield, Settings, Crown } from 'lucide-react';
 
 const StormyAssistant = () => {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      role: 'assistant',
-      content: "Hi! I'm Stormy, your AI fantasy hockey assistant. I can help you with lineup decisions, trade analysis, player comparisons, and more. What would you like to know?"
-    }
-  ]);
-  const [input, setInput] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!input.trim() || isLoading) return;
-
-    const userMessage = input.trim();
-    setInput('');
-    
-    // Add user message
-    setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
-    setIsLoading(true);
-
-    try {
-      const { data, error } = await supabase.functions.invoke('stormy-chat', {
-        body: { message: userMessage, conversationHistory: messages }
-      });
-
-      if (error) throw error;
-
-      // Add assistant response
-      setMessages(prev => [...prev, { 
-        role: 'assistant', 
-        content: data.response 
-      }]);
-    } catch (error) {
-      console.error('Error calling Stormy:', error);
-      toast.error('Failed to get response from Stormy. Please try again.');
-      
-      // Remove the user message if the request failed
-      setMessages(prev => prev.slice(0, -1));
-    } finally {
-      setIsLoading(false);
-    }
+  const usageStats = {
+    weeklyRequests: 14,
+    weeklyLimit: 50,
+    resetDate: "Monday at 3:00 AM"
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background to-background/95 flex flex-col">
       <Navbar />
       <main className="flex-1 pt-24 pb-8">
-        <div className="container mx-auto px-4 h-full flex flex-col max-w-4xl">
-          <div className="text-center mb-6">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-[hsl(var(--vibrant-purple))] to-primary mb-4">
-              <Brain className="h-8 w-8 text-white" />
+        <div className="container mx-auto px-4 max-w-4xl">
+          <div className="text-center mb-10">
+            <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-gradient-to-br from-primary to-purple-600 mb-4 shadow-lg shadow-primary/20">
+              <Brain className="h-10 w-10 text-white" />
             </div>
-            <h1 className="text-4xl md:text-5xl font-bold mb-2 bg-gradient-to-r from-[hsl(var(--vibrant-purple))] to-primary inline-block text-transparent bg-clip-text">
-              Stormy AI Assistant
-            </h1>
+            <h1 className="text-4xl font-bold mb-2">Stormy Settings</h1>
             <p className="text-lg text-muted-foreground">
-              Your personal fantasy hockey expert
+              Manage your AI assistant preferences and usage
             </p>
           </div>
 
-          <Card className="flex-1 flex flex-col shadow-xl border-2">
-            <CardHeader className="border-b bg-gradient-to-r from-primary/5 to-[hsl(var(--vibrant-purple))]/5">
-              <CardTitle className="flex items-center gap-2">
-                <Brain className="h-5 w-5 text-primary" />
-                Chat with Stormy
-              </CardTitle>
-            </CardHeader>
-            
-            <CardContent className="flex-1 overflow-y-auto p-6 space-y-4">
-              {messages.map((message, index) => (
-                <div
-                  key={index}
-                  className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                >
-                  <div
-                    className={`max-w-[80%] rounded-2xl px-4 py-3 ${
-                      message.role === 'user'
-                        ? 'bg-primary text-primary-foreground rounded-tr-none'
-                        : 'bg-muted rounded-tl-none'
-                    }`}
-                  >
-                    {message.role === 'assistant' && (
-                      <div className="flex items-center gap-2 mb-2">
-                        <div className="w-6 h-6 rounded-full bg-gradient-to-br from-[hsl(var(--vibrant-purple))] to-primary flex items-center justify-center">
-                          <Brain className="h-3 w-3 text-white" />
-                        </div>
-                        <span className="text-xs font-semibold text-muted-foreground">Stormy</span>
-                      </div>
-                    )}
-                    <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
+          <div className="grid md:grid-cols-2 gap-8">
+            {/* Usage Card */}
+            <Card className="border-primary/10 shadow-lg">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Zap className="h-5 w-5 text-yellow-500" />
+                  Weekly Usage
+                </CardTitle>
+                <CardDescription>Requests remaining this week</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="text-center py-4">
+                  <div className="text-5xl font-bold text-primary mb-2">
+                    {usageStats.weeklyRequests}<span className="text-xl text-muted-foreground font-normal">/{usageStats.weeklyLimit}</span>
                   </div>
+                  <p className="text-sm text-muted-foreground">Requests Used</p>
                 </div>
-              ))}
-              
-              {isLoading && (
-                <div className="flex justify-start">
-                  <div className="bg-muted rounded-2xl rounded-tl-none px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                      <span className="text-sm text-muted-foreground">Stormy is thinking...</span>
-                    </div>
+                
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="font-medium">Usage Level</span>
+                    <span>{Math.round((usageStats.weeklyRequests / usageStats.weeklyLimit) * 100)}%</span>
                   </div>
+                  <Progress value={(usageStats.weeklyRequests / usageStats.weeklyLimit) * 100} className="h-2" />
                 </div>
-              )}
-              
-              <div ref={messagesEndRef} />
-            </CardContent>
 
-            <div className="border-t p-4 bg-muted/30">
-              <form onSubmit={handleSubmit} className="flex gap-2">
-                <Input
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  placeholder="Ask Stormy about your fantasy hockey team..."
-                  disabled={isLoading}
-                  className="flex-1"
-                />
-                <Button 
-                  type="submit" 
-                  disabled={!input.trim() || isLoading}
-                  className="bg-gradient-to-r from-[hsl(var(--vibrant-purple))] to-primary hover:opacity-90"
-                >
-                  <Send className="h-4 w-4" />
+                <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg text-sm">
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <Clock className="h-4 w-4" />
+                    <span>Resets on:</span>
+                  </div>
+                  <span className="font-medium">{usageStats.resetDate}</span>
+                </div>
+
+                <Button className="w-full bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white border-0">
+                  <Crown className="h-4 w-4 mr-2" />
+                  Upgrade to Unlimited
                 </Button>
-              </form>
-              <p className="text-xs text-muted-foreground mt-2 text-center">
-                Powered by AI • Ask about lineups, trades, player stats, and more
-              </p>
-            </div>
-          </Card>
+              </CardContent>
+            </Card>
+
+            {/* Configuration Card */}
+            <Card className="border-primary/10 shadow-lg">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Settings className="h-5 w-5 text-primary" />
+                  Configuration
+                </CardTitle>
+                <CardDescription>Customize Stormy's behavior</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label className="text-base">Proactive Hints</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Show suggestion bubbles on new pages
+                    </p>
+                  </div>
+                  <Switch defaultChecked />
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label className="text-base">Trade Alerts</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Notify when a fair trade is found
+                    </p>
+                  </div>
+                  <Switch defaultChecked />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label className="text-base">Personality Mode</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Enable humorous / trash-talk style
+                    </p>
+                  </div>
+                  <Switch />
+                </div>
+
+                 <div className="pt-4 border-t">
+                   <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
+                     <Shield className="h-4 w-4 text-primary" /> Data & Privacy
+                   </h4>
+                   <p className="text-xs text-muted-foreground leading-relaxed mb-3">
+                     Stormy analyzes your league data to provide insights. Your chat history is stored privately to improve future recommendations.
+                   </p>
+                   <Button variant="outline" size="sm" className="w-full">Clear Chat History</Button>
+                 </div>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </main>
       <Footer />
