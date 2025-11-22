@@ -77,7 +77,7 @@ const GMOffice = () => {
       <main className="pt-24 pb-16">
         <div className="container mx-auto px-4">
           <div className="max-w-3xl mx-auto text-center mb-12">
-            <h1 className="text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-[hsl(var(--vibrant-orange))] via-primary to-[hsl(var(--vibrant-purple))] inline-block text-transparent bg-clip-text">
+            <h1 className="text-4xl md:text-5xl font-bold mb-4 text-foreground">
               GM's Office
             </h1>
             <p className="text-lg text-muted-foreground">
@@ -97,7 +97,7 @@ const GMOffice = () => {
                   <div className={`absolute top-0 left-0 w-full h-32 bg-gradient-to-br ${action.gradient} opacity-10`} />
                   <CardHeader className="relative">
                     <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${action.gradient} flex items-center justify-center mb-4 group-hover:scale-110 group-hover:rotate-3 transition-all duration-300 shadow-lg`}>
-                      <action.icon className="h-8 w-8 text-background" strokeWidth={2.5} />
+                      <action.icon className="h-8 w-8 text-white" strokeWidth={2.5} />
                     </div>
                     <CardTitle className="text-xl group-hover:text-primary transition-colors">{action.title}</CardTitle>
                     <CardDescription className="text-sm mt-2">
