@@ -160,7 +160,7 @@ export const TeamCard = ({ title, starters, bench, gradientClass }: TeamCardProp
                                  {player.gameInfo.time && <span>• {player.gameInfo.time}</span>}
                                </span>
                              ) : (
-                               <span>{player.team}</span>
+                               <span>{player.team} • {player.gamesRemaining} Gms Left</span>
                              )}
                           </div>
                         </div>
