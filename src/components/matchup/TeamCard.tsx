@@ -19,31 +19,31 @@ export const TeamCard = ({ title, starters, bench, gradientClass }: TeamCardProp
   };
 
   return (
-    <Card className="border-border/40 overflow-hidden shadow-sm">
-      <CardHeader className={`${gradientClass} py-3 border-b bg-fantasy-light/30`}>
-        <CardTitle className="text-base font-semibold">{title}</CardTitle>
+    <Card className="card-citrus p-0 overflow-hidden border-none shadow-md">
+      <CardHeader className={`${gradientClass} py-4 border-b bg-white`}>
+        <CardTitle className="text-lg font-bold tracking-tight">{title}</CardTitle>
       </CardHeader>
       <CardContent className="p-0">
         {/* STARTERS SECTION */}
-        <div className="bg-muted/30 px-4 py-2 text-xs font-medium uppercase tracking-wider text-muted-foreground border-b">
+        <div className="bg-muted/20 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground border-b">
           Starting Lineup
         </div>
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent border-b border-border/50">
-              <TableHead className="w-12 text-xs font-medium text-muted-foreground h-8">Pos</TableHead>
-              <TableHead className="text-xs font-medium text-muted-foreground h-8">Player</TableHead>
-              <TableHead className="w-8 text-center text-[10px] font-medium text-muted-foreground h-8 p-0">G</TableHead>
-              <TableHead className="w-8 text-center text-[10px] font-medium text-muted-foreground h-8 p-0">A</TableHead>
-              <TableHead className="w-10 text-center text-[10px] font-medium text-muted-foreground h-8 p-0">SOG</TableHead>
-              <TableHead className="w-10 text-center text-[10px] font-medium text-muted-foreground h-8 p-0">BLK</TableHead>
-              <TableHead className="w-16 text-right text-xs font-medium text-muted-foreground h-8">Pts</TableHead>
-              <TableHead className="w-24 text-right text-xs font-medium text-muted-foreground h-8">Status</TableHead>
+              <TableHead className="w-12 text-xs font-semibold text-muted-foreground h-9">Pos</TableHead>
+              <TableHead className="text-xs font-semibold text-muted-foreground h-9">Player</TableHead>
+              <TableHead className="w-8 text-center text-[10px] font-bold text-muted-foreground h-9 p-0">G</TableHead>
+              <TableHead className="w-8 text-center text-[10px] font-bold text-muted-foreground h-9 p-0">A</TableHead>
+              <TableHead className="w-10 text-center text-[10px] font-bold text-muted-foreground h-9 p-0">SOG</TableHead>
+              <TableHead className="w-10 text-center text-[10px] font-bold text-muted-foreground h-9 p-0">BLK</TableHead>
+              <TableHead className="w-16 text-right text-xs font-semibold text-muted-foreground h-9">Pts</TableHead>
+              <TableHead className="w-24 text-right text-xs font-semibold text-muted-foreground h-9">Status</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {starters.map(player => (
-              <TableRow key={player.id} className={`hover:bg-fantasy-light/20 border-b border-border/40 ${player.isToday ? 'bg-fantasy-light/5' : ''}`}>
+              <TableRow key={player.id} className={`hover:bg-muted/10 border-b border-border/40 ${player.isToday ? 'bg-primary/5' : ''}`}>
                 <TableCell className="w-12 font-medium text-muted-foreground text-xs border-r border-border/20 py-3">{player.position}</TableCell>
                 <TableCell className="py-3">
                   <div className="flex items-center gap-3">
@@ -51,21 +51,21 @@ export const TeamCard = ({ title, starters, bench, gradientClass }: TeamCardProp
                       {player.team}
                     </div>
                     <div className="flex flex-col justify-center">
-                      <div className="font-medium text-sm flex items-center gap-2 leading-none mb-1">
+                      <div className="font-semibold text-sm flex items-center gap-2 leading-none mb-1 text-foreground/90">
                         {player.name}
                         {player.isToday && (
-                          <span className="inline-flex items-center rounded-md bg-fantasy-secondary/10 px-1.5 py-0.5 text-[9px] font-bold text-fantasy-secondary ring-1 ring-inset ring-fantasy-secondary/20">
+                          <span className="inline-flex items-center rounded-md bg-primary/10 px-1.5 py-0.5 text-[9px] font-bold text-primary ring-1 ring-inset ring-primary/20">
                             TODAY
                           </span>
                         )}
                       </div>
-                      <div className="text-[11px] text-muted-foreground leading-none">
+                      <div className="text-[11px] text-muted-foreground leading-none mt-0.5">
                         {player.gameInfo ? (
                            <span className="flex items-center gap-1">
                              <span className="font-medium text-foreground/80">{player.gameInfo.opponent}</span>
                              {player.gameInfo.score && <span>• {player.gameInfo.score}</span>}
                              {player.gameInfo.time && <span>• {player.gameInfo.time}</span>}
-                             {player.gameInfo.period && <span className="text-fantasy-secondary font-medium">• {player.gameInfo.period}</span>}
+                             {player.gameInfo.period && <span className="text-primary font-medium">• {player.gameInfo.period}</span>}
                            </span>
                          ) : (
                            <span>{player.team} • {player.gamesRemaining} Gms Left</span>
@@ -87,26 +87,26 @@ export const TeamCard = ({ title, starters, bench, gradientClass }: TeamCardProp
                   </span>
                 </TableCell>
                 <TableCell className="w-10 text-center p-0">
-                  <span className="text-xs text-muted-foreground">
+                  <span className="text-xs text-muted-foreground/70">
                     {player.stats?.sog || 0}
                   </span>
                 </TableCell>
                 <TableCell className="w-10 text-center p-0">
-                  <span className="text-xs text-muted-foreground">
+                  <span className="text-xs text-muted-foreground/70">
                     {player.stats?.blk || 0}
                   </span>
                 </TableCell>
 
                 <TableCell className="text-right font-bold w-16 border-l border-border/20 bg-muted/5 py-3">
                   <div className="flex flex-col items-end justify-center h-full leading-tight">
-                    <span>{player.points}</span>
+                    <span className="text-sm">{player.points}</span>
                     {player.isToday && (
-                      <span className="text-[10px] text-fantasy-secondary font-medium">+{getDailyPoints(player.stats)}</span>
+                      <span className="text-[10px] text-primary font-medium">+{getDailyPoints(player.stats)}</span>
                     )}
                   </div>
                 </TableCell>
                 <TableCell className="text-right w-24 py-3">
-                  <div className={`text-xs font-medium ${player.status === 'In Game' ? 'text-fantasy-secondary animate-pulse font-bold' : 'text-muted-foreground'}`}>
+                  <div className={`text-xs font-medium ${player.status === 'In Game' ? 'text-primary animate-pulse font-bold' : 'text-muted-foreground'}`}>
                     {player.status}
                   </div>
                 </TableCell>
@@ -118,25 +118,25 @@ export const TeamCard = ({ title, starters, bench, gradientClass }: TeamCardProp
         {/* BENCH SECTION */}
         {bench.length > 0 && (
           <>
-            <div className="bg-muted/30 px-4 py-2 text-xs font-medium uppercase tracking-wider text-muted-foreground border-y mt-4">
+            <div className="bg-muted/20 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground border-y mt-4">
               Bench
             </div>
             <Table>
               <TableHeader>
                 <TableRow className="hover:bg-transparent border-b border-border/50">
-                  <TableHead className="w-12 text-xs font-medium text-muted-foreground h-8">Pos</TableHead>
-                  <TableHead className="text-xs font-medium text-muted-foreground h-8">Player</TableHead>
-                  <TableHead className="w-8 text-center text-[10px] font-medium text-muted-foreground h-8 p-0">G</TableHead>
-                  <TableHead className="w-8 text-center text-[10px] font-medium text-muted-foreground h-8 p-0">A</TableHead>
-                  <TableHead className="w-10 text-center text-[10px] font-medium text-muted-foreground h-8 p-0">SOG</TableHead>
-                  <TableHead className="w-10 text-center text-[10px] font-medium text-muted-foreground h-8 p-0">BLK</TableHead>
-                  <TableHead className="w-16 text-right text-xs font-medium text-muted-foreground h-8">Pts</TableHead>
-                  <TableHead className="w-24 text-right text-xs font-medium text-muted-foreground h-8">Status</TableHead>
+                  <TableHead className="w-12 text-xs font-semibold text-muted-foreground h-9">Pos</TableHead>
+                  <TableHead className="text-xs font-semibold text-muted-foreground h-9">Player</TableHead>
+                  <TableHead className="w-8 text-center text-[10px] font-bold text-muted-foreground h-9 p-0">G</TableHead>
+                  <TableHead className="w-8 text-center text-[10px] font-bold text-muted-foreground h-9 p-0">A</TableHead>
+                  <TableHead className="w-10 text-center text-[10px] font-bold text-muted-foreground h-9 p-0">SOG</TableHead>
+                  <TableHead className="w-10 text-center text-[10px] font-bold text-muted-foreground h-9 p-0">BLK</TableHead>
+                  <TableHead className="w-16 text-right text-xs font-semibold text-muted-foreground h-9">Pts</TableHead>
+                  <TableHead className="w-24 text-right text-xs font-semibold text-muted-foreground h-9">Status</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {bench.map(player => (
-                  <TableRow key={player.id} className={`hover:bg-muted/50 opacity-80 border-b border-border/40 ${player.isToday ? 'bg-fantasy-light/5' : ''}`}>
+                  <TableRow key={player.id} className={`hover:bg-muted/10 opacity-70 hover:opacity-100 transition-opacity border-b border-border/40 ${player.isToday ? 'bg-primary/5' : ''}`}>
                     <TableCell className="w-12 font-medium text-muted-foreground text-xs border-r border-border/20 py-3">BN</TableCell>
                     <TableCell className="py-3">
                       <div className="flex items-center gap-3">
@@ -144,7 +144,7 @@ export const TeamCard = ({ title, starters, bench, gradientClass }: TeamCardProp
                           {player.team}
                         </div>
                         <div className="flex flex-col justify-center">
-                          <div className="font-medium text-sm flex items-center gap-2 leading-none mb-1">
+                          <div className="font-medium text-sm flex items-center gap-2 leading-none mb-1 text-foreground/90">
                             {player.name}
                             {player.isToday && (
                               <span className="inline-flex items-center rounded-md bg-muted px-1.5 py-0.5 text-[9px] font-medium text-muted-foreground ring-1 ring-inset ring-border">
@@ -152,7 +152,7 @@ export const TeamCard = ({ title, starters, bench, gradientClass }: TeamCardProp
                               </span>
                             )}
                           </div>
-                          <div className="text-[11px] text-muted-foreground leading-none">
+                          <div className="text-[11px] text-muted-foreground leading-none mt-0.5">
                             {player.gameInfo ? (
                                <span className="flex items-center gap-1">
                                  <span className="font-medium text-foreground/80">{player.gameInfo.opponent}</span>
@@ -179,19 +179,19 @@ export const TeamCard = ({ title, starters, bench, gradientClass }: TeamCardProp
                       </span>
                     </TableCell>
                     <TableCell className="w-10 text-center p-0">
-                      <span className="text-xs text-muted-foreground">
+                      <span className="text-xs text-muted-foreground/70">
                         {player.stats?.sog || 0}
                       </span>
                     </TableCell>
                     <TableCell className="w-10 text-center p-0">
-                      <span className="text-xs text-muted-foreground">
+                      <span className="text-xs text-muted-foreground/70">
                         {player.stats?.blk || 0}
                       </span>
                     </TableCell>
 
                     <TableCell className="text-right font-medium text-muted-foreground w-16 border-l border-border/20 bg-muted/5 py-3">
                       <div className="flex flex-col items-end justify-center h-full leading-tight">
-                        <span>{player.points}</span>
+                        <span className="text-sm">{player.points}</span>
                         {player.isToday && (
                           <span className="text-[10px] text-muted-foreground">+{getDailyPoints(player.stats)}</span>
                         )}

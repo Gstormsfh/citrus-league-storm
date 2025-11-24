@@ -81,19 +81,23 @@ const Matchup = () => {
   const opponentDailyPoints = [18.9, 20.4, 22.1, 22.5, 19.3, 26.8, 38.7];
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background to-muted/30">
+    <div className="min-h-screen bg-background relative overflow-hidden">
+      {/* Decorative elements to match Home page */}
+      <div className="absolute top-0 right-0 w-96 h-96 bg-[hsl(var(--vibrant-yellow))] rounded-full opacity-10 blur-3xl -z-10"></div>
+      <div className="absolute bottom-0 left-0 w-96 h-96 bg-[hsl(var(--vibrant-green))] rounded-full opacity-10 blur-3xl -z-10"></div>
+
       <Navbar />
       <main className="container mx-auto px-4 pt-28 pb-16">
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
              <div>
-               <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-fantasy-secondary to-emerald-600 bg-clip-text text-transparent">Matchup</h1>
+               <h1 className="text-4xl font-bold mb-2 citrus-gradient-text">Matchup</h1>
                <p className="text-muted-foreground text-lg">Week 12 • Citrus Crushers vs Thunder Titans</p>
              </div>
              <div className="flex gap-2">
-                <Button variant="outline" className="border-fantasy-secondary/20 hover:bg-fantasy-light text-fantasy-secondary">Week 11</Button>
-                <Button className="bg-fantasy-secondary hover:bg-fantasy-secondary/90 text-white">Week 12</Button>
-                <Button variant="outline" className="border-fantasy-secondary/20 hover:bg-fantasy-light text-fantasy-secondary">Week 13</Button>
+                <Button variant="outline" className="rounded-full border-primary/20 hover:bg-primary/5 hover:text-primary">Week 11</Button>
+                <Button className="rounded-full bg-primary hover:bg-primary/90 text-white shadow-md">Week 12</Button>
+                <Button variant="outline" className="rounded-full border-primary/20 hover:bg-primary/5 hover:text-primary">Week 13</Button>
              </div>
           </div>
           
