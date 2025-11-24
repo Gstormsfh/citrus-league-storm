@@ -1,11 +1,10 @@
-
 import { useState, useEffect } from 'react';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 // Mock teams data
 const teams = [
@@ -13,7 +12,7 @@ const teams = [
     id: 1, 
     name: 'Touchdown Titans', 
     owner: 'Alex Johnson',
-    logo: 'https://images.unsplash.com/photo-1606131731446-5568d87113aa?q=80&w=400&auto=format&fit=crop',
+    logo: 'TT',
     record: { wins: 9, losses: 1 },
     points: 1432,
     streak: 'W4'
@@ -22,7 +21,7 @@ const teams = [
     id: 2, 
     name: 'Scoring Sharks', 
     owner: 'Samantha Lee',
-    logo: 'https://images.unsplash.com/photo-1569591159212-b02ea8a9f239?q=80&w=400&auto=format&fit=crop',
+    logo: 'SS',
     record: { wins: 8, losses: 2 },
     points: 1378,
     streak: 'W2'
@@ -31,7 +30,7 @@ const teams = [
     id: 3, 
     name: 'Citrus Crushers', 
     owner: 'You',
-    logo: 'https://images.unsplash.com/photo-1617777938240-9a1d8e3ba07c?q=80&w=400&auto=format&fit=crop',
+    logo: 'CC',
     record: { wins: 7, losses: 3 },
     points: 1247,
     streak: 'W1'
@@ -40,7 +39,7 @@ const teams = [
     id: 4, 
     name: 'Field Generals', 
     owner: 'Carlos Rodriguez',
-    logo: 'https://images.unsplash.com/photo-1620741713132-07086ac93313?q=80&w=400&auto=format&fit=crop',
+    logo: 'FG',
     record: { wins: 6, losses: 4 },
     points: 1189,
     streak: 'L1'
@@ -49,7 +48,7 @@ const teams = [
     id: 5, 
     name: 'Blitz Brigade', 
     owner: 'Taylor Kim',
-    logo: 'https://images.unsplash.com/photo-1566577134770-3d85bb3a9cc4?q=80&w=400&auto=format&fit=crop',
+    logo: 'BB',
     record: { wins: 5, losses: 5 },
     points: 1145,
     streak: 'W3'
@@ -58,7 +57,7 @@ const teams = [
     id: 6, 
     name: 'Goal Getters', 
     owner: 'Jamie Zhang',
-    logo: 'https://images.unsplash.com/photo-1575361204480-aadea25e6e68?q=80&w=400&auto=format&fit=crop',
+    logo: 'GG',
     record: { wins: 4, losses: 6 },
     points: 1102,
     streak: 'L2'
@@ -67,7 +66,7 @@ const teams = [
     id: 7, 
     name: 'Victory Vipers', 
     owner: 'Morgan Williams',
-    logo: 'https://images.unsplash.com/photo-1562519819-016930be069d?q=80&w=400&auto=format&fit=crop',
+    logo: 'VV',
     record: { wins: 3, losses: 7 },
     points: 1067,
     streak: 'L4'
@@ -76,7 +75,7 @@ const teams = [
     id: 8, 
     name: 'Hustle Heroes', 
     owner: 'Jordan Patel',
-    logo: 'https://images.unsplash.com/photo-1577471488278-16eec37ffcc2?q=80&w=400&auto=format&fit=crop',
+    logo: 'HH',
     record: { wins: 2, losses: 8 },
     points: 987,
     streak: 'L1'
@@ -85,7 +84,7 @@ const teams = [
     id: 9, 
     name: 'Gridiron Gladiators', 
     owner: 'Casey Thompson',
-    logo: 'https://images.unsplash.com/photo-1610216705422-caa3fcb6d158?q=80&w=400&auto=format&fit=crop',
+    logo: 'GG',
     record: { wins: 1, losses: 9 },
     points: 896,
     streak: 'L6'
@@ -127,28 +126,32 @@ const Standings = () => {
   });
   
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-background relative overflow-hidden">
+      {/* Decorative elements to match Home page */}
+      <div className="absolute top-0 right-0 w-96 h-96 bg-[hsl(var(--vibrant-yellow))] rounded-full opacity-10 blur-3xl -z-10"></div>
+      <div className="absolute bottom-0 left-0 w-96 h-96 bg-[hsl(var(--vibrant-green))] rounded-full opacity-10 blur-3xl -z-10"></div>
+
       <Navbar />
-      <main className="pt-24 pb-16">
+      <main className="pt-28 pb-16">
         <div className="container mx-auto px-4">
           <div className="max-w-3xl mx-auto text-center mb-10 animated-element">
-            <h1 className="text-4xl md:text-5xl font-bold mb-4 vibrant-gradient-3 bg-clip-text text-transparent">League Standings</h1>
+            <h1 className="text-4xl md:text-5xl font-bold mb-4 citrus-gradient-text">League Standings</h1>
             <p className="text-lg text-muted-foreground">Track your team's position in the league rankings.</p>
           </div>
           
           <div className="flex flex-col md:flex-row items-center justify-between max-w-5xl mx-auto mb-8">
             <div className="mb-4 md:mb-0 animated-element">
-              <h2 className="text-2xl font-bold">CitrusSports League</h2>
+              <h2 className="text-2xl font-bold text-foreground">CitrusSports League</h2>
               <p className="text-muted-foreground">Regular Season Standings</p>
             </div>
             
             <div className="flex items-center space-x-4 animated-element">
-              <div className="w-36">
+              <div className="w-40">
                 <Select defaultValue={season} onValueChange={setSeason}>
-                  <SelectTrigger className="w-36 bg-background select-width-fixed">
+                  <SelectTrigger className="w-full bg-background rounded-full border-primary/20 hover:border-primary/50 transition-colors">
                     <SelectValue placeholder="Select Season" />
                   </SelectTrigger>
-                  <SelectContent className="w-36 bg-background z-[9999]">
+                  <SelectContent className="z-[9999]">
                     <SelectItem value="2023">2023 Season</SelectItem>
                     <SelectItem value="2024">2024 Season</SelectItem>
                     <SelectItem value="2025">2025 Season</SelectItem>
@@ -156,8 +159,8 @@ const Standings = () => {
                 </Select>
               </div>
               
-              <Button variant="outline" size="sm" className="bg-background">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 mr-1">
+              <Button variant="outline" size="sm" className="rounded-full border-primary/20 hover:bg-primary/5 hover:text-primary">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4 mr-2">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
                 </svg>
                 Export
@@ -165,20 +168,20 @@ const Standings = () => {
             </div>
           </div>
           
-          <Card className="max-w-5xl mx-auto overflow-hidden animated-element">
+          <Card className="max-w-5xl mx-auto overflow-hidden animated-element card-citrus p-0 border-none shadow-lg">
             <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-muted/50">
+              <Table>
+                <thead className="bg-muted/30 border-b border-border/50">
                   <tr className="text-left">
-                    <th className="px-6 py-4 font-medium">Rank</th>
-                    <th className="px-6 py-4 font-medium">Team</th>
-                    <th className="px-6 py-4 font-medium">Record</th>
-                    <th className="px-6 py-4 font-medium">Win %</th>
-                    <th className="px-6 py-4 font-medium">Points</th>
-                    <th className="px-6 py-4 font-medium">Streak</th>
+                    <th className="px-6 py-4 font-semibold text-xs uppercase tracking-wider text-muted-foreground">Rank</th>
+                    <th className="px-6 py-4 font-semibold text-xs uppercase tracking-wider text-muted-foreground">Team</th>
+                    <th className="px-6 py-4 font-semibold text-xs uppercase tracking-wider text-muted-foreground text-center">Record</th>
+                    <th className="px-6 py-4 font-semibold text-xs uppercase tracking-wider text-muted-foreground text-center">Win %</th>
+                    <th className="px-6 py-4 font-semibold text-xs uppercase tracking-wider text-muted-foreground text-right">Points</th>
+                    <th className="px-6 py-4 font-semibold text-xs uppercase tracking-wider text-muted-foreground text-center">Streak</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-border">
+                <tbody className="divide-y divide-border/40">
                   {sortedTeams.map((team, index) => {
                     const isUserTeam = team.owner === 'You';
                     const winPercentage = ((team.record.wins / (team.record.wins + team.record.losses)) * 100).toFixed(1);
@@ -186,27 +189,44 @@ const Standings = () => {
                     return (
                       <tr key={team.id} className={`${isUserTeam ? 'bg-primary/5' : 'hover:bg-muted/30'} transition-colors`}>
                         <td className="px-6 py-4 font-medium">
-                          {index + 1}
-                          {index < 4 && (
-                            <span className="ml-1 inline-flex h-5 w-5 items-center justify-center rounded-full bg-green-100 text-xs text-green-600">P</span>
-                          )}
+                          <div className="flex items-center gap-2">
+                            <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${index < 4 ? 'bg-primary text-white' : 'text-muted-foreground bg-muted'}`}>
+                              {index + 1}
+                            </span>
+                            {index < 4 && (
+                              <span className="text-[10px] font-bold text-primary tracking-tight">PO</span>
+                            )}
+                          </div>
                         </td>
                         <td className="px-6 py-4">
-                          <div className="flex items-center">
-                            <div className="h-10 w-10 flex-shrink-0 rounded-full overflow-hidden mr-3">
-                              <img src={team.logo} alt={team.name} className="h-full w-full object-cover" />
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center text-xs font-bold text-muted-foreground border border-white/20 shadow-sm">
+                              {team.logo}
                             </div>
                             <div>
-                              <div className="font-medium">{team.name}</div>
-                              <div className="text-sm text-muted-foreground">{team.owner}</div>
+                              <div className={`font-semibold ${isUserTeam ? 'text-primary' : 'text-foreground'}`}>
+                                {team.name}
+                                {isUserTeam && <span className="ml-2 text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full font-bold">YOU</span>}
+                              </div>
+                              <div className="text-xs text-muted-foreground">{team.owner}</div>
                             </div>
                           </div>
                         </td>
-                        <td className="px-6 py-4 font-medium">{team.record.wins}-{team.record.losses}</td>
-                        <td className="px-6 py-4">{winPercentage}%</td>
-                        <td className="px-6 py-4">{team.points.toLocaleString()}</td>
-                        <td className="px-6 py-4">
-                          <span className={`inline-block px-2 py-1 text-xs font-medium rounded-full ${team.streak.startsWith('W') ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                        <td className="px-6 py-4 text-center font-medium">
+                          {team.record.wins}-{team.record.losses}
+                        </td>
+                        <td className="px-6 py-4 text-center text-muted-foreground">
+                          {winPercentage}%
+                        </td>
+                        <td className="px-6 py-4 text-right font-bold tabular-nums">
+                          {team.points.toLocaleString()}
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          <span className={`inline-flex px-2.5 py-1 text-[10px] font-bold rounded-full border ${
+                            team.streak.startsWith('W') 
+                              ? 'bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800' 
+                              : 'bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800'
+                          }`}>
                             {team.streak}
                           </span>
                         </td>
@@ -214,90 +234,96 @@ const Standings = () => {
                     );
                   })}
                 </tbody>
-              </table>
+              </Table>
             </div>
           </Card>
           
           <div className="max-w-5xl mx-auto mt-8 grid grid-cols-1 md:grid-cols-3 gap-6">
-            <Card className="animated-element">
-              <CardHeader>
-                <CardTitle>Playoff Picture</CardTitle>
+            <Card className="animated-element card-citrus p-0 border-none shadow-md overflow-hidden h-full">
+              <CardHeader className="bg-primary/5 pb-4 border-b border-border/40">
+                <CardTitle className="text-lg font-bold flex items-center gap-2">
+                  <span className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">🏆</span>
+                  Playoff Picture
+                </CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {sortedTeams.slice(0, 4).map((team, i) => (
-                    <div key={team.id} className="flex items-center p-2 rounded-md bg-muted/30">
-                      <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center text-white text-xs mr-2">
-                        {i+1}
-                      </div>
-                      <div className="font-medium">{team.name}</div>
-                      <div className="ml-auto text-sm text-muted-foreground">{team.record.wins}-{team.record.losses}</div>
-                    </div>
-                  ))}
-                  <div className="mt-4 pt-4 border-t border-border">
-                    <div className="text-center text-sm text-muted-foreground">
-                      Top 4 teams qualify for playoffs
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card className="animated-element">
-              <CardHeader>
-                <CardTitle>Points Leaders</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {[...teams].sort((a, b) => b.points - a.points).slice(0, 5).map((team) => (
-                    <div key={team.id} className="flex items-center justify-between p-2 rounded-md bg-muted/30">
-                      <div className="flex items-center">
-                        <div className="h-8 w-8 rounded-full overflow-hidden mr-2">
-                          <img src={team.logo} alt={team.name} className="h-full w-full object-cover" />
-                        </div>
-                        <div className="font-medium">{team.name}</div>
-                      </div>
-                      <div className="font-bold text-[hsl(var(--vibrant-orange))]">{team.points}</div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card className="animated-element">
-              <CardHeader>
-                <CardTitle>Recent Results</CardTitle>
-              </CardHeader>
-              <CardContent>
+              <CardContent className="pt-6">
                 <div className="space-y-3">
-                  <div className="p-3 bg-muted/30 rounded-md">
-                    <div className="text-xs text-muted-foreground mb-1">Week 10</div>
-                    <div className="flex items-center justify-between">
-                      <div className="font-medium">Citrus Crushers</div>
-                      <div className="font-bold text-green-600">W 132-118</div>
+                  {sortedTeams.slice(0, 4).map((team, i) => (
+                    <div key={team.id} className="flex items-center justify-between p-3 rounded-xl bg-muted/20 hover:bg-muted/40 transition-colors border border-transparent hover:border-primary/10">
+                      <div className="flex items-center gap-3">
+                        <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center text-white text-xs font-bold shadow-sm">
+                          {i+1}
+                        </div>
+                        <div className="font-semibold text-sm">{team.name}</div>
+                      </div>
+                      <div className="text-xs font-bold bg-white px-2 py-1 rounded-md shadow-sm border border-border/20">
+                        {team.record.wins}-{team.record.losses}
+                      </div>
                     </div>
-                    <div className="text-sm text-muted-foreground mt-1">vs. Hustle Heroes</div>
-                  </div>
-                  
-                  <div className="p-3 bg-muted/30 rounded-md">
-                    <div className="text-xs text-muted-foreground mb-1">Week 9</div>
-                    <div className="flex items-center justify-between">
-                      <div className="font-medium">Citrus Crushers</div>
-                      <div className="font-bold text-red-600">L 119-126</div>
+                  ))}
+                  <div className="mt-4 pt-4 border-t border-border/40">
+                    <div className="text-center text-xs text-muted-foreground font-medium flex items-center justify-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-primary animate-pulse"></div>
+                      Top 4 teams qualify
                     </div>
-                    <div className="text-sm text-muted-foreground mt-1">vs. Touchdown Titans</div>
-                  </div>
-                  
-                  <div className="p-3 bg-muted/30 rounded-md">
-                    <div className="text-xs text-muted-foreground mb-1">Week 8</div>
-                    <div className="flex items-center justify-between">
-                      <div className="font-medium">Citrus Crushers</div>
-                      <div className="font-bold text-green-600">W 141-107</div>
-                    </div>
-                    <div className="text-sm text-muted-foreground mt-1">vs. Victory Vipers</div>
                   </div>
                 </div>
-                <Button variant="link" className="mt-2 w-full text-[hsl(var(--vibrant-purple))]">View All Results</Button>
+              </CardContent>
+            </Card>
+            
+            <Card className="animated-element card-citrus p-0 border-none shadow-md overflow-hidden h-full">
+              <CardHeader className="bg-[hsl(var(--vibrant-orange))]/5 pb-4 border-b border-border/40">
+                <CardTitle className="text-lg font-bold flex items-center gap-2">
+                  <span className="w-8 h-8 rounded-full bg-[hsl(var(--vibrant-orange))]/10 flex items-center justify-center text-[hsl(var(--vibrant-orange))]">🔥</span>
+                  Points Leaders
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-6">
+                <div className="space-y-3">
+                  {[...teams].sort((a, b) => b.points - a.points).slice(0, 5).map((team, i) => (
+                    <div key={team.id} className="flex items-center justify-between p-3 rounded-xl bg-muted/20 hover:bg-muted/40 transition-colors border border-transparent hover:border-[hsl(var(--vibrant-orange))]/10">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold text-muted-foreground border border-white/40">
+                          {team.logo}
+                        </div>
+                        <div className="font-semibold text-sm">{team.name}</div>
+                      </div>
+                      <div className="font-bold text-[hsl(var(--vibrant-orange))]">{team.points.toLocaleString()}</div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card className="animated-element card-citrus p-0 border-none shadow-md overflow-hidden h-full">
+              <CardHeader className="bg-[hsl(var(--vibrant-purple))]/5 pb-4 border-b border-border/40">
+                <CardTitle className="text-lg font-bold flex items-center gap-2">
+                  <span className="w-8 h-8 rounded-full bg-[hsl(var(--vibrant-purple))]/10 flex items-center justify-center text-[hsl(var(--vibrant-purple))]">📅</span>
+                  Recent Results
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-6">
+                <div className="space-y-4">
+                  <div className="p-3 bg-muted/20 rounded-xl border border-border/40">
+                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold mb-2">Week 10</div>
+                    <div className="flex items-center justify-between">
+                      <div className="font-medium text-sm">Citrus Crushers</div>
+                      <div className="font-bold text-green-600 text-sm bg-green-100 px-2 py-0.5 rounded-md">W 132-118</div>
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-1 text-right">vs. Hustle Heroes</div>
+                  </div>
+                  
+                  <div className="p-3 bg-muted/20 rounded-xl border border-border/40">
+                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold mb-2">Week 9</div>
+                    <div className="flex items-center justify-between">
+                      <div className="font-medium text-sm">Citrus Crushers</div>
+                      <div className="font-bold text-red-600 text-sm bg-red-100 px-2 py-0.5 rounded-md">L 119-126</div>
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-1 text-right">vs. Touchdown Titans</div>
+                  </div>
+                  
+                  <Button variant="ghost" className="w-full text-xs text-muted-foreground hover:text-primary mt-2">View All Results</Button>
+                </div>
               </CardContent>
             </Card>
           </div>
