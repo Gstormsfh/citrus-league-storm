@@ -10,4 +10,17 @@ export type MatchupPlayer = {
   gamesRemaining: number;
   status: MatchupPlayerStatus;
   isStarter: boolean;
+  stats: {
+    goals: number;
+    assists: number;
+    sog: number;
+    blk: number;
+  };
+  isToday?: boolean;
+  gameInfo?: {
+    opponent: string;
+    time?: string;
+    score?: string;
+    period?: string;
+  };
 };
