@@ -23,6 +23,7 @@ import TeamAnalytics from "./pages/TeamAnalytics";
 import WaiverWire from "./pages/WaiverWire";
 import ScheduleManager from "./pages/ScheduleManager";
 import TradeAnalyzer from "./pages/TradeAnalyzer";
+import CreateLeague from "./pages/CreateLeague";
 import { StormyChatBubble } from "./components/StormyChatBubble";
 import "./App.css";
 
@@ -54,7 +55,8 @@ const App = () => (
           <Route path="/gm-office" element={<GMOffice />} />
           <Route path="/gm-office/stormy" element={<StormyAssistant />} />
           <Route path="/news" element={<News />} />
-          <Route path="/draft" element={<DraftRoom />} />
+          <Route path="/draft-room" element={<DraftRoom />} />
+          <Route path="/create-league" element={<CreateLeague />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/team-analytics" element={<TeamAnalytics />} />
           <Route path="/waiver-wire" element={<WaiverWire />} />
