@@ -113,7 +113,7 @@ const Navbar = () => {
                         <p className="text-xs leading-tight text-muted-foreground">League rankings</p>
                         <ChevronRight className="h-3 w-3 mt-2 text-primary" />
                       </Link>
-                      <Link to="/draft" onClick={closeMobileMenu} className="flex h-full w-full select-none flex-col justify-end rounded-md bg-gradient-to-b from-accent/5 to-accent/10 p-4 no-underline outline-none focus:shadow-sm hover:shadow-sm hover:scale-[1.01] transition-all duration-200">
+                      <Link to="/draft-room" onClick={closeMobileMenu} className="flex h-full w-full select-none flex-col justify-end rounded-md bg-gradient-to-b from-accent/5 to-accent/10 p-4 no-underline outline-none focus:shadow-sm hover:shadow-sm hover:scale-[1.01] transition-all duration-200">
                         <div className="mb-1 mt-2 text-base font-medium">Draft Room</div>
                         <p className="text-xs leading-tight text-muted-foreground">Live fantasy draft</p>
                         <ChevronRight className="h-3 w-3 mt-2 text-primary" />

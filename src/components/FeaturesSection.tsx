@@ -84,14 +84,14 @@ const FeaturesSection = () => {
           {features.map((feature, index) => (
             <div 
               key={index} 
-              className="card-citrus animated-element"
+              className="card-citrus animated-element group cursor-pointer hover:border-primary/50 transition-all"
               ref={el => elementRefs.current[index + 1] = el}
               style={{ animationDelay: `${index * 0.1}s` }}
             >
-              <div className="mb-4 rounded-full bg-primary/10 w-12 h-12 flex items-center justify-center">
+              <div className="mb-4 rounded-full bg-primary/10 w-12 h-12 flex items-center justify-center group-hover:scale-110 transition-transform">
                 {feature.icon}
               </div>
-              <h3 className="text-xl font-bold mb-2">{feature.title}</h3>
+              <h3 className="text-xl font-bold mb-2 group-hover:text-primary transition-colors">{feature.title}</h3>
               <p className="text-foreground/70">{feature.description}</p>
             </div>
           ))}

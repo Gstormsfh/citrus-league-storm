@@ -1,6 +1,7 @@
 
 import { Button } from '@/components/ui/button';
 import { Play, ArrowRight } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 const CtaSection = () => {
   return (
@@ -19,12 +20,16 @@ const CtaSection = () => {
           </p>
           
           <div className="flex flex-col sm:flex-row gap-4 justify-center animated-element animate">
-            <Button size="lg" className="bg-white text-primary hover:bg-white/90 rounded-full text-base px-8">
-              Start Your Season <ArrowRight size={18} className="ml-2" />
-            </Button>
-            <Button size="lg" variant="outline" className="bg-transparent text-white border-white hover:bg-white/10 rounded-full text-base px-8">
-              <Play size={18} className="mr-2" /> Watch Demo
-            </Button>
+            <Link to="/gm-office">
+              <Button size="lg" className="bg-white text-primary hover:bg-white/90 rounded-full text-base px-8">
+                Start Your Season <ArrowRight size={18} className="ml-2" />
+              </Button>
+            </Link>
+            <Link to="/stormy-assistant">
+              <Button size="lg" variant="outline" className="bg-transparent text-white border-white hover:bg-white/10 rounded-full text-base px-8">
+                <Play size={18} className="mr-2" /> Watch Demo
+              </Button>
+            </Link>
           </div>
           
           <p className="mt-6 text-sm text-white/70 animated-element animate">
