@@ -15,7 +15,8 @@ import {
   Crown,
   UserPlus,
   Copy,
-  Check
+  Check,
+  Hourglass
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -37,9 +38,10 @@ interface DraftSettings {
 interface DraftLobbyProps {
   teams: Team[];
   onStartDraft: (settings: DraftSettings) => void;
+  isCommissioner: boolean;
 }
 
-export const DraftLobby = ({ teams, onStartDraft }: DraftLobbyProps) => {
+export const DraftLobby = ({ teams, onStartDraft, isCommissioner }: DraftLobbyProps) => {
   const { toast } = useToast();
   const [copied, setCopied] = useState(false);
   const [settings, setSettings] = useState<DraftSettings>({
@@ -82,7 +84,9 @@ export const DraftLobby = ({ teams, onStartDraft }: DraftLobbyProps) => {
           <h1 className="text-3xl font-bold">NHL Fantasy Draft Lobby</h1>
         </div>
         <p className="text-muted-foreground max-w-2xl mx-auto">
-          Configure your draft settings and wait for all managers to join before starting the draft.
+          {isCommissioner 
+            ? "Configure your draft settings and wait for all managers to join before starting the draft."
+            : "Waiting for the league commissioner to start the draft. Review the settings below."}
         </p>
       </div>
 
@@ -94,6 +98,7 @@ export const DraftLobby = ({ teams, onStartDraft }: DraftLobbyProps) => {
               <CardTitle className="flex items-center gap-2">
                 <Settings className="h-5 w-5" />
                 Draft Settings
+                {!isCommissioner && <Badge variant="secondary" className="ml-2">Read Only</Badge>}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -103,6 +108,7 @@ export const DraftLobby = ({ teams, onStartDraft }: DraftLobbyProps) => {
                   <Select 
                     value={settings.rounds.toString()} 
                     onValueChange={(value) => setSettings({...settings, rounds: parseInt(value)})}
+                    disabled={!isCommissioner}
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -120,6 +126,7 @@ export const DraftLobby = ({ teams, onStartDraft }: DraftLobbyProps) => {
                   <Select 
                     value={settings.pickTimeLimit.toString()} 
                     onValueChange={(value) => setSettings({...settings, pickTimeLimit: parseInt(value)})}
+                    disabled={!isCommissioner}
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -138,6 +145,7 @@ export const DraftLobby = ({ teams, onStartDraft }: DraftLobbyProps) => {
                   <Select 
                     value={settings.draftOrder} 
                     onValueChange={(value: 'standard' | 'serpentine') => setSettings({...settings, draftOrder: value})}
+                    disabled={!isCommissioner}
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -154,6 +162,7 @@ export const DraftLobby = ({ teams, onStartDraft }: DraftLobbyProps) => {
                   <Select 
                     value={settings.scoringFormat} 
                     onValueChange={(value: 'standard' | 'points' | 'categories') => setSettings({...settings, scoringFormat: value})}
+                    disabled={!isCommissioner}
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -253,39 +262,62 @@ export const DraftLobby = ({ teams, onStartDraft }: DraftLobbyProps) => {
             </CardContent>
           </Card>
 
-          {/* Start Draft */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Ready to Draft?</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Teams joined:</span>
-                  <span className="font-medium">{teams.length}/12</span>
+          {/* Start Draft or Waiting Status */}
+          {isCommissioner ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>Ready to Draft?</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Teams joined:</span>
+                    <span className="font-medium">{teams.length}/12</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Minimum required:</span>
+                    <span className="font-medium">4</span>
+                  </div>
                 </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Minimum required:</span>
-                  <span className="font-medium">4</span>
-                </div>
-              </div>
-              
-              <Button 
-                onClick={handleStartDraft}
-                className="w-full"
-                disabled={teams.length < 4}
-              >
-                <Play className="h-4 w-4 mr-2" />
-                Start Draft
-              </Button>
-              
-              {teams.length < 4 && (
-                <p className="text-xs text-muted-foreground text-center">
-                  Need at least 4 teams to start
+                
+                <Button 
+                  onClick={handleStartDraft}
+                  className="w-full"
+                  disabled={teams.length < 4}
+                >
+                  <Play className="h-4 w-4 mr-2" />
+                  Start Draft
+                </Button>
+                
+                {teams.length < 4 && (
+                  <p className="text-xs text-muted-foreground text-center">
+                    Need at least 4 teams to start
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          ) : (
+            <Card className="border-primary/20 bg-primary/5">
+              <CardHeader>
+                <CardTitle className="text-primary flex items-center gap-2">
+                  <Hourglass className="h-5 w-5" />
+                  Waiting to Start
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground mb-4">
+                  The commissioner will start the draft once all teams have joined.
                 </p>
-              )}
-            </CardContent>
-          </Card>
+                <div className="flex items-center justify-center">
+                  <div className="animate-pulse flex space-x-2">
+                    <div className="w-2 h-2 bg-primary rounded-full"></div>
+                    <div className="w-2 h-2 bg-primary rounded-full delay-75"></div>
+                    <div className="w-2 h-2 bg-primary rounded-full delay-150"></div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Draft Info */}
           <Card>
