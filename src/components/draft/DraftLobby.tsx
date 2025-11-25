@@ -16,9 +16,11 @@ import {
   UserPlus,
   Copy,
   Check,
-  Hourglass
+  Hourglass,
+  PlusCircle
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { Link } from 'react-router-dom';
 
 interface Team {
   id: string;
@@ -241,6 +243,22 @@ export const DraftLobby = ({ teams, onStartDraft, isCommissioner }: DraftLobbyPr
 
         {/* Sidebar */}
         <div className="space-y-6">
+          {/* Create New League Callout - ADDED */}
+          <div className="bg-gradient-to-br from-primary/10 to-accent/10 p-4 rounded-xl border border-primary/20">
+            <div className="flex items-start gap-3">
+              <div className="bg-primary/20 p-2 rounded-full">
+                <PlusCircle className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <h4 className="font-semibold text-sm mb-1">Not the right league?</h4>
+                <p className="text-xs text-muted-foreground mb-3">Create your own custom league with infinite stat options.</p>
+                <Button size="sm" variant="secondary" className="w-full h-8 text-xs" asChild>
+                  <Link to="/create-league">Create New League</Link>
+                </Button>
+              </div>
+            </div>
+          </div>
+
           {/* Join Draft */}
           <Card>
             <CardHeader>

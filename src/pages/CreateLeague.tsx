@@ -15,7 +15,8 @@ import {
 } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Switch } from "@/components/ui/switch";
-import { Trophy, Users, Settings, ChevronRight, ArrowLeft, CheckCircle } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Trophy, Users, Settings, ChevronRight, ArrowLeft, CheckCircle, Plus, X } from "lucide-react";
 
 const CreateLeague = () => {
   const navigate = useNavigate();
@@ -28,6 +29,39 @@ const CreateLeague = () => {
   const [scoringType, setScoringType] = useState("h2h-points");
   const [draftType, setDraftType] = useState("snake");
   const [isPublic, setIsPublic] = useState(false);
+
+  // Custom Stats State
+  const [customStatName, setCustomStatName] = useState("");
+  const [customStatPoints, setCustomStatPoints] = useState("1");
+  const [activeStats, setActiveStats] = useState([
+    { id: "g", name: "Goals", points: 3, default: true },
+    { id: "a", name: "Assists", points: 2, default: true },
+    { id: "ppp", name: "Power Play Points", points: 1, default: true },
+    { id: "sog", name: "Shots on Goal", points: 0.4, default: true },
+    { id: "blk", name: "Blocks", points: 0.4, default: true },
+    { id: "hit", name: "Hits", points: 0.2, default: true },
+    { id: "w", name: "Wins (Goalie)", points: 4, default: true },
+    { id: "so", name: "Shutouts", points: 2, default: true },
+    { id: "sv", name: "Saves", points: 0.2, default: true },
+    { id: "ga", name: "Goals Against", points: -1, default: true },
+  ]);
+
+  const handleAddCustomStat = () => {
+    if (!customStatName) return;
+    const newStat = {
+      id: `custom-${Date.now()}`,
+      name: customStatName,
+      points: parseFloat(customStatPoints),
+      default: false
+    };
+    setActiveStats([...activeStats, newStat]);
+    setCustomStatName("");
+    setCustomStatPoints("1");
+  };
+
+  const handleRemoveStat = (id: string) => {
+    setActiveStats(activeStats.filter(stat => stat.id !== id));
+  };
 
   const handleCreateLeague = () => {
     setLoading(true);
@@ -66,14 +100,14 @@ const CreateLeague = () => {
                   League Settings
                 </CardTitle>
                 <div className="text-sm font-medium text-muted-foreground">
-                  Step {step} of 2
+                  Step {step} of 3
                 </div>
               </div>
               {/* Progress Bar */}
               <div className="w-full h-2 bg-muted/50 rounded-full mt-4 overflow-hidden">
                 <div 
                   className="h-full bg-primary transition-all duration-500 ease-out"
-                  style={{ width: `${(step / 2) * 100}%` }}
+                  style={{ width: `${(step / 3) * 100}%` }}
                 ></div>
               </div>
             </CardHeader>
@@ -140,8 +174,87 @@ const CreateLeague = () => {
                 </div>
               )}
 
-              {/* STEP 2: DRAFT & PRIVACY */}
+              {/* STEP 2: SCORING & STATS */}
               {step === 2 && (
+                <div className="space-y-8 animate-fade-in">
+                  <div className="text-center mb-4">
+                    <h3 className="text-lg font-semibold">Scoring Settings</h3>
+                    <p className="text-sm text-muted-foreground">Define how your league scores points. Add custom stats for fun leagues!</p>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-4 max-h-[300px] overflow-y-auto p-2 border rounded-md bg-background/50">
+                    {activeStats.map((stat) => (
+                      <div key={stat.id} className="flex items-center justify-between p-3 bg-card rounded-lg shadow-sm border border-border/50">
+                        <div className="flex items-center gap-3">
+                          <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xs">
+                            {stat.points > 0 ? '+' : ''}{stat.points}
+                          </div>
+                          <span className="font-medium">{stat.name}</span>
+                        </div>
+                        {!stat.default && (
+                          <Button variant="ghost" size="icon" onClick={() => handleRemoveStat(stat.id)} className="h-8 w-8 text-muted-foreground hover:text-destructive">
+                            <X className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="bg-muted/30 p-4 rounded-xl space-y-4 border border-border/50">
+                    <h4 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Add Custom Stat</h4>
+                    <div className="flex gap-4">
+                      <div className="flex-1 space-y-2">
+                        <Label htmlFor="custom-stat-name" className="text-xs">Stat Name</Label>
+                        <Input 
+                          id="custom-stat-name" 
+                          placeholder="e.g. Fights, Broken Sticks" 
+                          value={customStatName}
+                          onChange={(e) => setCustomStatName(e.target.value)}
+                          className="bg-background"
+                        />
+                      </div>
+                      <div className="w-24 space-y-2">
+                        <Label htmlFor="custom-stat-points" className="text-xs">Points</Label>
+                        <Input 
+                          id="custom-stat-points" 
+                          type="number" 
+                          step="0.1"
+                          value={customStatPoints}
+                          onChange={(e) => setCustomStatPoints(e.target.value)}
+                          className="bg-background"
+                        />
+                      </div>
+                      <div className="flex items-end pb-0.5">
+                        <Button onClick={handleAddCustomStat} size="icon" className="h-10 w-10" disabled={!customStatName}>
+                          <Plus className="h-5 w-5" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-4 flex justify-between items-center">
+                    <Button 
+                      variant="ghost" 
+                      size="lg" 
+                      onClick={() => setStep(1)}
+                      className="text-muted-foreground hover:text-foreground"
+                    >
+                      <ArrowLeft className="mr-2 w-4 h-4" /> Back
+                    </Button>
+                    
+                    <Button 
+                      size="lg" 
+                      className="rounded-full px-8"
+                      onClick={() => setStep(3)}
+                    >
+                      Next Step <ChevronRight className="ml-2 w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* STEP 3: DRAFT & PRIVACY */}
+              {step === 3 && (
                 <div className="space-y-8 animate-fade-in">
                   
                   <div className="space-y-4">
@@ -186,7 +299,7 @@ const CreateLeague = () => {
                     <Button 
                       variant="ghost" 
                       size="lg" 
-                      onClick={() => setStep(1)}
+                      onClick={() => setStep(2)}
                       className="text-muted-foreground hover:text-foreground"
                     >
                       <ArrowLeft className="mr-2 w-4 h-4" /> Back
@@ -222,4 +335,3 @@ const CreateLeague = () => {
 };
 
 export default CreateLeague;
-
