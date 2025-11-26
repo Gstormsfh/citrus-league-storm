@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -42,6 +43,7 @@ interface DraftLobbyProps {
 }
 
 export const DraftLobby = ({ teams, onStartDraft, isCommissioner }: DraftLobbyProps) => {
+  const navigate = useNavigate();
   const { toast } = useToast();
   const [copied, setCopied] = useState(false);
   const [settings, setSettings] = useState<DraftSettings>({
@@ -324,7 +326,7 @@ export const DraftLobby = ({ teams, onStartDraft, isCommissioner }: DraftLobbyPr
                   <CardTitle className="text-base">Not in this league?</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <Button variant="outline" className="w-full" onClick={() => window.location.href = '/create-league'}>
+                  <Button variant="outline" className="w-full" onClick={() => navigate('/create-league')}>
                     <Trophy className="h-4 w-4 mr-2" />
                     Create New League
                   </Button>

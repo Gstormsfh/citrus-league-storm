@@ -47,10 +47,11 @@ const CreateLeague = () => {
 
   const handleAddCustomStat = () => {
     if (!customStatName) return;
+    const pointsValue = parseFloat(customStatPoints);
     const newStat = {
       id: `custom-${Date.now()}`,
       name: customStatName,
-      points: parseFloat(customStatPoints),
+      points: isNaN(pointsValue) ? 0 : pointsValue,
       default: false
     };
     setActiveStats([...activeStats, newStat]);

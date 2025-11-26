@@ -21,7 +21,7 @@ const HeroSection = () => {
           </p>
           
           <div className="flex flex-wrap gap-4">
-            <Link to="/create-league">
+            <Link to="/gm-office">
               <Button size="lg" className="rounded-full text-base px-8">
                 Get Started <ArrowRight size={18} className="ml-2" />
               </Button>
