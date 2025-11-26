@@ -58,8 +58,8 @@ const Profile = () => {
 
     // Small delay to ensure DOM is updated after tab switch
     const timeoutId = setTimeout(() => {
-      const animatedElements = document.querySelectorAll('.animated-element');
-      animatedElements.forEach(el => observer.observe(el));
+    const animatedElements = document.querySelectorAll('.animated-element');
+    animatedElements.forEach(el => observer.observe(el));
     }, 100);
 
     return () => {

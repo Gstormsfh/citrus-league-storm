@@ -16,11 +16,9 @@ import {
   UserPlus,
   Copy,
   Check,
-  Hourglass,
-  PlusCircle
+  Hourglass
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { Link } from 'react-router-dom';
 
 interface Team {
   id: string;
@@ -243,22 +241,6 @@ export const DraftLobby = ({ teams, onStartDraft, isCommissioner }: DraftLobbyPr
 
         {/* Sidebar */}
         <div className="space-y-6">
-          {/* Create New League Callout - ADDED */}
-          <div className="bg-gradient-to-br from-primary/10 to-accent/10 p-4 rounded-xl border border-primary/20">
-            <div className="flex items-start gap-3">
-              <div className="bg-primary/20 p-2 rounded-full">
-                <PlusCircle className="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <h4 className="font-semibold text-sm mb-1">Not the right league?</h4>
-                <p className="text-xs text-muted-foreground mb-3">Create your own custom league with infinite stat options.</p>
-                <Button size="sm" variant="secondary" className="w-full h-8 text-xs" asChild>
-                  <Link to="/create-league">Create New League</Link>
-                </Button>
-              </div>
-            </div>
-          </div>
-
           {/* Join Draft */}
           <Card>
             <CardHeader>
@@ -315,26 +297,40 @@ export const DraftLobby = ({ teams, onStartDraft, isCommissioner }: DraftLobbyPr
               </CardContent>
             </Card>
           ) : (
-            <Card className="border-primary/20 bg-primary/5">
-              <CardHeader>
-                <CardTitle className="text-primary flex items-center gap-2">
-                  <Hourglass className="h-5 w-5" />
-                  Waiting to Start
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground mb-4">
-                  The commissioner will start the draft once all teams have joined.
-                </p>
-                <div className="flex items-center justify-center">
-                  <div className="animate-pulse flex space-x-2">
-                    <div className="w-2 h-2 bg-primary rounded-full"></div>
-                    <div className="w-2 h-2 bg-primary rounded-full delay-75"></div>
-                    <div className="w-2 h-2 bg-primary rounded-full delay-150"></div>
+            <>
+              <Card className="border-primary/20 bg-primary/5">
+                <CardHeader>
+                  <CardTitle className="text-primary flex items-center gap-2">
+                    <Hourglass className="h-5 w-5" />
+                    Waiting to Start
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    The commissioner will start the draft once all teams have joined.
+                  </p>
+                  <div className="flex items-center justify-center">
+                    <div className="animate-pulse flex space-x-2">
+                      <div className="w-2 h-2 bg-primary rounded-full"></div>
+                      <div className="w-2 h-2 bg-primary rounded-full delay-75"></div>
+                      <div className="w-2 h-2 bg-primary rounded-full delay-150"></div>
+                    </div>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Not in this league?</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Button variant="outline" className="w-full" onClick={() => window.location.href = '/create-league'}>
+                    <Trophy className="h-4 w-4 mr-2" />
+                    Create New League
+                  </Button>
+                </CardContent>
+              </Card>
+            </>
           )}
 
           {/* Draft Info */}
