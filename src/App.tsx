@@ -54,7 +54,9 @@ const App = () => (
           <Route path="/gm-office" element={<GMOffice />} />
           <Route path="/gm-office/stormy" element={<StormyAssistant />} />
           <Route path="/news" element={<News />} />
-          <Route path="/draft" element={<DraftRoom />} />
+          <Route path="/draft-room" element={<DraftRoom />} />
+          <Route path="/draft" element={<DraftRoom />} /> {/* Fallback route */}
+          <Route path="/create-league" element={<CreateLeague />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/team-analytics" element={<TeamAnalytics />} />
           <Route path="/waiver-wire" element={<WaiverWire />} />
