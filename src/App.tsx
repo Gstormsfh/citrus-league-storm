@@ -23,6 +23,7 @@ import TeamAnalytics from "./pages/TeamAnalytics";
 import WaiverWire from "./pages/WaiverWire";
 import ScheduleManager from "./pages/ScheduleManager";
 import TradeAnalyzer from "./pages/TradeAnalyzer";
+import CreateLeague from "./pages/CreateLeague";
 import { StormyChatBubble } from "./components/StormyChatBubble";
 import "./App.css";
 
