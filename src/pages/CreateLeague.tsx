@@ -15,7 +15,9 @@ import {
 } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Switch } from "@/components/ui/switch";
-import { Trophy, Users, Settings, ChevronRight, ArrowLeft, CheckCircle, Plus, X } from "lucide-react";
+import { Trophy, Users, Settings, ChevronRight, ArrowLeft, CheckCircle } from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Badge } from "@/components/ui/badge";
 
 const CreateLeague = () => {
   const navigate = useNavigate();
@@ -29,38 +31,44 @@ const CreateLeague = () => {
   const [draftType, setDraftType] = useState("snake");
   const [isPublic, setIsPublic] = useState(false);
 
-  // Custom Stats State
-  const [customStatName, setCustomStatName] = useState("");
-  const [customStatPoints, setCustomStatPoints] = useState("1");
-  const [activeStats, setActiveStats] = useState([
-    { id: "g", name: "Goals", points: 3, default: true },
-    { id: "a", name: "Assists", points: 2, default: true },
-    { id: "ppp", name: "Power Play Points", points: 1, default: true },
-    { id: "sog", name: "Shots on Goal", points: 0.4, default: true },
-    { id: "blk", name: "Blocks", points: 0.4, default: true },
-    { id: "hit", name: "Hits", points: 0.2, default: true },
-    { id: "w", name: "Wins (Goalie)", points: 4, default: true },
-    { id: "so", name: "Shutouts", points: 2, default: true },
-    { id: "sv", name: "Saves", points: 0.2, default: true },
-    { id: "ga", name: "Goals Against", points: -1, default: true },
+  // Consolidated Stats State (Standard + Fun)
+  const [leagueStats, setLeagueStats] = useState([
+    // Standard Scoring
+    { id: "g", name: "Goals", points: 3, default: true, category: "Offense", enabled: true },
+    { id: "a", name: "Assists", points: 2, default: true, category: "Offense", enabled: true },
+    { id: "ppp", name: "Power Play Points", points: 1, default: true, category: "Offense", enabled: true },
+    { id: "sog", name: "Shots on Goal", points: 0.4, default: true, category: "Offense", enabled: true },
+    { id: "blk", name: "Blocks", points: 0.5, default: true, category: "Defense", enabled: true },
+    { id: "hit", name: "Hits", points: 0.2, default: true, category: "Defense", enabled: true },
+    { id: "w", name: "Wins", points: 4, default: true, category: "Goalie", enabled: true },
+    { id: "so", name: "Shutouts", points: 3, default: true, category: "Goalie", enabled: true },
+    { id: "sv", name: "Saves", points: 0.2, default: true, category: "Goalie", enabled: true },
+    { id: "ga", name: "Goals Against", points: -1, default: true, category: "Goalie", enabled: true },
+    
+    // Fun / Extra Stats
+    { id: "pim", name: "Penalty Minutes", points: 0.5, default: false, category: "Fun", enabled: false },
+    { id: "fights", name: "Fights (Majors)", points: 5, default: false, category: "Fun", enabled: false },
+    { id: "hat", name: "Hat Tricks", points: 10, default: false, category: "Fun", enabled: false },
+    { id: "ghg", name: "Gordie Howe Hat Trick", points: 15, default: false, category: "Fun", enabled: false },
+    { id: "shg", name: "Shorthanded Goals", points: 2, default: false, category: "Offense", enabled: false },
+    { id: "gwg", name: "Game Winning Goals", points: 1, default: false, category: "Offense", enabled: false },
+    { id: "otg", name: "OT Goals", points: 2, default: false, category: "Offense", enabled: false },
+    { id: "def_g", name: "Defender Goals", points: 1, default: false, category: "Defense", enabled: false },
+    { id: "goalie_g", name: "Goalie Goals", points: 50, default: false, category: "Goalie", enabled: false },
+    { id: "bs", name: "Broken Sticks", points: 1, default: false, category: "Fun", enabled: false },
   ]);
 
-  const handleAddCustomStat = () => {
-    if (!customStatName) return;
-    const pointsValue = parseFloat(customStatPoints);
-    const newStat = {
-      id: `custom-${Date.now()}`,
-      name: customStatName,
-      points: isNaN(pointsValue) ? 0 : pointsValue,
-      default: false
-    };
-    setActiveStats([...activeStats, newStat]);
-    setCustomStatName("");
-    setCustomStatPoints("1");
+  const handleStatToggle = (id: string) => {
+    setLeagueStats(prev => prev.map(stat => 
+      stat.id === id ? { ...stat, enabled: !stat.enabled } : stat
+    ));
   };
 
-  const handleRemoveStat = (id: string) => {
-    setActiveStats(activeStats.filter(stat => stat.id !== id));
+  const handleStatPointsChange = (id: string, value: string) => {
+    const numValue = parseFloat(value);
+    setLeagueStats(prev => prev.map(stat => 
+      stat.id === id ? { ...stat, points: isNaN(numValue) ? 0 : numValue } : stat
+    ));
   };
 
   const handleCreateLeague = () => {
@@ -72,6 +80,13 @@ const CreateLeague = () => {
     }, 1500);
   };
 
+  const statsByCategory = {
+    Offense: leagueStats.filter(s => s.category === "Offense"),
+    Defense: leagueStats.filter(s => s.category === "Defense"),
+    Goalie: leagueStats.filter(s => s.category === "Goalie"),
+    Fun: leagueStats.filter(s => s.category === "Fun"),
+  };
+
   return (
     <div className="min-h-screen bg-background relative overflow-hidden">
       {/* Decorative Background */}
@@ -81,7 +96,7 @@ const CreateLeague = () => {
       <Navbar />
 
       <main className="pt-32 pb-20 px-4">
-        <div className="container mx-auto max-w-3xl">
+        <div className="container mx-auto max-w-4xl">
           
           <div className="mb-8 text-center">
             <h1 className="text-4xl md:text-5xl font-bold mb-4 citrus-gradient-text">
@@ -97,17 +112,17 @@ const CreateLeague = () => {
               <div className="flex items-center justify-between">
                 <CardTitle className="text-xl flex items-center gap-2">
                   <Trophy className="w-6 h-6 text-primary" />
-                  League Settings
+                  League Setup
                 </CardTitle>
                 <div className="text-sm font-medium text-muted-foreground">
-                  Step {step} of 3
+                  Step {step} of 2
                 </div>
               </div>
               {/* Progress Bar */}
               <div className="w-full h-2 bg-muted/50 rounded-full mt-4 overflow-hidden">
                 <div 
                   className="h-full bg-primary transition-all duration-500 ease-out"
-                  style={{ width: `${(step / 3) * 100}%` }}
+                  style={{ width: `${(step / 2) * 100}%` }}
                 ></div>
               </div>
             </CardHeader>
@@ -174,61 +189,105 @@ const CreateLeague = () => {
                 </div>
               )}
 
-              {/* STEP 2: SCORING & STATS */}
+              {/* STEP 2: EVERYTHING ELSE (Configuration + Scoring) */}
               {step === 2 && (
                 <div className="space-y-8 animate-fade-in">
-                  <div className="text-center mb-4">
-                    <h3 className="text-lg font-semibold">Scoring Settings</h3>
-                    <p className="text-sm text-muted-foreground">Define how your league scores points. Add custom stats for fun leagues!</p>
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-4 max-h-[300px] overflow-y-auto p-2 border rounded-md bg-background/50">
-                    {activeStats.map((stat) => (
-                      <div key={stat.id} className="flex items-center justify-between p-3 bg-card rounded-lg shadow-sm border border-border/50">
-                        <div className="flex items-center gap-3">
-                          <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xs">
-                            {stat.points > 0 ? '+' : ''}{stat.points}
-                          </div>
-                          <span className="font-medium">{stat.name}</span>
+                  
+                  {/* Draft & Privacy Settings */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <div className="space-y-4">
+                      <Label className="text-base font-semibold">Draft Type</Label>
+                      <RadioGroup value={draftType} onValueChange={setDraftType} className="grid grid-cols-1 gap-3">
+                        <div>
+                          <RadioGroupItem value="snake" id="snake" className="peer sr-only" />
+                          <Label
+                            htmlFor="snake"
+                            className="flex items-center justify-between rounded-xl border-2 border-muted bg-transparent p-3 hover:bg-muted/20 hover:border-primary/50 peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-primary/5 cursor-pointer transition-all"
+                          >
+                            <div className="flex items-center gap-3">
+                              <Settings className="h-5 w-5 text-muted-foreground peer-data-[state=checked]:text-primary" />
+                              <span className="font-semibold">Snake Draft</span>
+                            </div>
+                          </Label>
                         </div>
-                        {!stat.default && (
-                          <Button variant="ghost" size="icon" onClick={() => handleRemoveStat(stat.id)} className="h-8 w-8 text-muted-foreground hover:text-destructive">
-                            <X className="h-4 w-4" />
-                          </Button>
-                        )}
+                        <div>
+                          <RadioGroupItem value="auction" id="auction" className="peer sr-only" />
+                          <Label
+                            htmlFor="auction"
+                            className="flex items-center justify-between rounded-xl border-2 border-muted bg-transparent p-3 hover:bg-muted/20 hover:border-primary/50 peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-primary/5 cursor-pointer transition-all"
+                          >
+                            <div className="flex items-center gap-3">
+                              <Users className="h-5 w-5 text-muted-foreground peer-data-[state=checked]:text-primary" />
+                              <span className="font-semibold">Auction Draft</span>
+                            </div>
+                          </Label>
+                        </div>
+                      </RadioGroup>
+                    </div>
+
+                    <div className="space-y-4">
+                      <Label className="text-base font-semibold">Privacy</Label>
+                      <div className="bg-muted/30 p-4 rounded-xl flex items-center justify-between h-[100px] border border-border/50">
+                        <div className="space-y-0.5">
+                          <Label className="text-base">Public League</Label>
+                          <p className="text-sm text-muted-foreground">
+                            Anyone can join this league
+                          </p>
+                        </div>
+                        <Switch checked={isPublic} onCheckedChange={setIsPublic} />
                       </div>
-                    ))}
+                    </div>
                   </div>
 
-                  <div className="bg-muted/30 p-4 rounded-xl space-y-4 border border-border/50">
-                    <h4 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Add Custom Stat</h4>
-                    <div className="flex gap-4">
-                      <div className="flex-1 space-y-2">
-                        <Label htmlFor="custom-stat-name" className="text-xs">Stat Name</Label>
-                        <Input 
-                          id="custom-stat-name" 
-                          placeholder="e.g. Fights, Broken Sticks" 
-                          value={customStatName}
-                          onChange={(e) => setCustomStatName(e.target.value)}
-                          className="bg-background"
-                        />
-                      </div>
-                      <div className="w-24 space-y-2">
-                        <Label htmlFor="custom-stat-points" className="text-xs">Points</Label>
-                        <Input 
-                          id="custom-stat-points" 
-                          type="number" 
-                          step="0.1"
-                          value={customStatPoints}
-                          onChange={(e) => setCustomStatPoints(e.target.value)}
-                          className="bg-background"
-                        />
-                      </div>
-                      <div className="flex items-end pb-0.5">
-                        <Button onClick={handleAddCustomStat} size="icon" className="h-10 w-10" disabled={!customStatName}>
-                          <Plus className="h-5 w-5" />
-                        </Button>
-                      </div>
+                  <div className="border-t pt-6">
+                    <div className="flex items-center justify-between mb-6">
+                       <div>
+                         <h3 className="text-xl font-bold">Scoring Settings</h3>
+                         <p className="text-muted-foreground text-sm">Toggle stats and adjust point values</p>
+                       </div>
+                       <Badge variant="secondary" className="bg-primary/10 text-primary">
+                         {leagueStats.filter(s => s.enabled).length} Active Stats
+                       </Badge>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {Object.entries(statsByCategory).map(([category, stats]) => (
+                        <div key={category} className="space-y-3">
+                          <h4 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                            {category === 'Fun' && <span className="text-lg">🎉</span>}
+                            {category} Stats
+                          </h4>
+                          <div className="bg-card rounded-xl border shadow-sm overflow-hidden">
+                            {stats.map((stat) => (
+                              <div 
+                                key={stat.id} 
+                                className={`flex items-center justify-between p-3 border-b last:border-0 transition-colors ${stat.enabled ? 'bg-primary/5' : 'opacity-60'}`}
+                              >
+                                <div className="flex items-center gap-3">
+                                  <Switch 
+                                    checked={stat.enabled} 
+                                    onCheckedChange={() => handleStatToggle(stat.id)} 
+                                  />
+                                  <span className={`font-medium ${stat.enabled ? 'text-foreground' : 'text-muted-foreground'}`}>
+                                    {stat.name}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs text-muted-foreground">Pts:</span>
+                                  <Input 
+                                    type="number" 
+                                    className="h-8 w-16 text-right font-mono" 
+                                    value={stat.points}
+                                    onChange={(e) => handleStatPointsChange(stat.id, e.target.value)}
+                                    disabled={!stat.enabled}
+                                    step="0.1"
+                                  />
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
 
@@ -237,69 +296,6 @@ const CreateLeague = () => {
                       variant="ghost" 
                       size="lg" 
                       onClick={() => setStep(1)}
-                      className="text-muted-foreground hover:text-foreground"
-                    >
-                      <ArrowLeft className="mr-2 w-4 h-4" /> Back
-                    </Button>
-                    
-                    <Button 
-                      size="lg" 
-                      className="rounded-full px-8"
-                      onClick={() => setStep(3)}
-                    >
-                      Next Step <ChevronRight className="ml-2 w-4 h-4" />
-                    </Button>
-                  </div>
-                </div>
-              )}
-
-              {/* STEP 3: DRAFT & PRIVACY */}
-              {step === 3 && (
-                <div className="space-y-8 animate-fade-in">
-                  
-                  <div className="space-y-4">
-                    <Label className="text-base">Draft Type</Label>
-                    <RadioGroup value={draftType} onValueChange={setDraftType} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <RadioGroupItem value="snake" id="snake" className="peer sr-only" />
-                        <Label
-                          htmlFor="snake"
-                          className="flex flex-col items-center justify-between rounded-xl border-2 border-muted bg-transparent p-4 hover:bg-muted/20 hover:border-primary/50 peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-primary/5 cursor-pointer transition-all"
-                        >
-                          <Settings className="mb-3 h-6 w-6 text-muted-foreground peer-data-[state=checked]:text-primary" />
-                          <span className="font-semibold">Snake Draft</span>
-                          <span className="text-xs text-muted-foreground text-center mt-1">Standard alternating order (1-12, 12-1)</span>
-                        </Label>
-                      </div>
-                      <div>
-                        <RadioGroupItem value="auction" id="auction" className="peer sr-only" />
-                        <Label
-                          htmlFor="auction"
-                          className="flex flex-col items-center justify-between rounded-xl border-2 border-muted bg-transparent p-4 hover:bg-muted/20 hover:border-primary/50 peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-primary/5 cursor-pointer transition-all"
-                        >
-                          <Users className="mb-3 h-6 w-6 text-muted-foreground peer-data-[state=checked]:text-primary" />
-                          <span className="font-semibold">Auction Draft</span>
-                          <span className="text-xs text-muted-foreground text-center mt-1">Budget-based player bidding</span>
-                        </Label>
-                      </div>
-                    </RadioGroup>
-                  </div>
-
-                  <div className="bg-muted/30 p-4 rounded-xl flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label className="text-base">Public League</Label>
-                      <p className="text-sm text-muted-foreground">
-                        Allow anyone in the community to join this league
-                      </p>
-                    </div>
-                    <Switch checked={isPublic} onCheckedChange={setIsPublic} />
-                  </div>
-
-                  <div className="pt-4 flex justify-between items-center">
-                    <Button 
-                      variant="ghost" 
-                      size="lg" 
-                      onClick={() => setStep(2)}
                       className="text-muted-foreground hover:text-foreground"
                     >
                       <ArrowLeft className="mr-2 w-4 h-4" /> Back
