@@ -89,6 +89,12 @@ const HockeyPlayerCard = ({
       case 'Left Wing': return 'LW';
       case 'Defence': return 'D';
       case 'Goalie': return 'G';
+      // Handle the case where we already have abbreviations from the DB
+      case 'C': return 'C';
+      case 'RW': return 'RW';
+      case 'LW': return 'LW';
+      case 'D': return 'D';
+      case 'G': return 'G';
       default: return position.substring(0, 2).toUpperCase();
     }
   };
