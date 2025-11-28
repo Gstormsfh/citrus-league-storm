@@ -3,91 +3,14 @@ import { useSearchParams } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { Calendar, TrendingUp } from 'lucide-react';
-
-// Mock free agent data
-const freeAgents = [
-  {
-    id: 1,
-    name: "Connor Bedard",
-    position: "C",
-    team: "CHI",
-    opponent: "@ STL",
-    projectedPoints: 3.8,
-    stats: {
-      goals: 22,
-      assists: 39,
-      shots: 214
-    },
-    trend: "up",
-    rostered: 98
-  },
-  {
-    id: 2,
-    name: "Luke Hughes",
-    position: "D",
-    team: "NJ",
-    opponent: "@ WAS",
-    projectedPoints: 2.4,
-    stats: {
-      goals: 9,
-      assists: 38,
-      blocks: 65
-    },
-    trend: "up",
-    rostered: 82
-  },
-  {
-    id: 3,
-    name: "Pyotr Kochetkov",
-    position: "G",
-    team: "CAR",
-    opponent: "vs NYR",
-    projectedPoints: 4.2,
-    stats: {
-      wins: 18,
-      gaa: 2.45,
-      savePercentage: .912
-    },
-    trend: "neutral",
-    rostered: 76
-  },
-  {
-    id: 4,
-    name: "Wyatt Johnston",
-    position: "C/RW",
-    team: "DAL",
-    opponent: "vs NSH",
-    projectedPoints: 2.9,
-    stats: {
-      goals: 24,
-      assists: 28,
-      hits: 45
-    },
-    trend: "down",
-    rostered: 68
-  },
-  {
-    id: 5,
-    name: "Brock Faber",
-    position: "D",
-    team: "MIN",
-    opponent: "@ WPG",
-    projectedPoints: 2.1,
-    stats: {
-      goals: 6,
-      assists: 35,
-      toi: "25:12"
-    },
-    trend: "up",
-    rostered: 72
-  }
-];
+import { PlayerService, Player } from '@/services/PlayerService';
+import { LeagueService } from '@/services/LeagueService';
 
 const FreeAgents = () => {
   const { toast } = useToast();
@@ -95,26 +18,47 @@ const FreeAgents = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [positionFilter, setPositionFilter] = useState('ALL');
   const [activeTab, setActiveTab] = useState('available');
+  const [players, setPlayers] = useState<Player[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const tab = searchParams.get('tab');
     if (tab) {
       setActiveTab(tab);
     }
+    fetchPlayers();
   }, [searchParams]);
 
-  const handleAddPlayer = (player: any) => {
+  const fetchPlayers = async () => {
+    try {
+      setLoading(true);
+      const allPlayers = await PlayerService.getAllPlayers();
+      const freeAgents = await LeagueService.getFreeAgents(allPlayers);
+      setPlayers(freeAgents);
+    } catch (error) {
+      console.error('Error fetching players:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load players. Please try again later.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAddPlayer = (player: Player) => {
     toast({
       title: "Waiver Claim Submitted",
-      description: `Claim for ${player.name} has been submitted successfully.`,
+      description: `Claim for ${player.full_name} has been submitted successfully.`,
       variant: "default"
     });
   };
 
-  const filteredPlayers = freeAgents.filter(player => {
-    const matchesSearch = player.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+  const filteredPlayers = players.filter(player => {
+    const matchesSearch = player.full_name.toLowerCase().includes(searchQuery.toLowerCase()) || 
                           player.team.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesPosition = positionFilter === 'ALL' || player.position.includes(positionFilter);
+    const matchesPosition = positionFilter === 'ALL' || player.position === positionFilter;
     
     return matchesSearch && matchesPosition;
   });
@@ -160,52 +104,63 @@ const FreeAgents = () => {
           </TabsList>
           
           <TabsContent value="available" className="space-y-4">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              {filteredPlayers.map((player) => (
-                <Card key={player.id} className="overflow-hidden hover:border-primary/50 transition-colors">
-                  <CardContent className="p-0">
-                    <div className="flex items-center p-4">
-                      <div className="h-12 w-12 rounded-full bg-secondary/20 flex items-center justify-center text-secondary-foreground font-bold text-lg mr-4">
-                        {player.team}
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <h3 className="font-bold text-lg">{player.name}</h3>
-                            <p className="text-sm text-muted-foreground">{player.position} • {player.team} • {player.opponent}</p>
-                          </div>
-                          <div className="text-right">
-                            <div className="font-bold text-lg text-primary">{player.projectedPoints}</div>
-                            <p className="text-xs text-muted-foreground">Proj Pts</p>
-                          </div>
-                        </div>
-                        
-                        <div className="mt-3 flex gap-4 text-sm">
-                          {player.position === 'G' ? (
-                            <>
-                              <div><span className="text-muted-foreground">W:</span> {player.stats.wins}</div>
-                              <div><span className="text-muted-foreground">GAA:</span> {player.stats.gaa}</div>
-                              <div><span className="text-muted-foreground">SV%:</span> {player.stats.savePercentage}</div>
-                            </>
+            {loading ? (
+              <div className="text-center py-12">
+                <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                <p className="text-muted-foreground">Loading players...</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {filteredPlayers.map((player) => (
+                  <Card key={player.id} className="overflow-hidden hover:border-primary/50 transition-colors">
+                    <CardContent className="p-0">
+                      <div className="flex items-center p-4">
+                        <div className="h-12 w-12 rounded-full bg-secondary/20 flex items-center justify-center overflow-hidden mr-4 border border-border">
+                          {player.headshot_url ? (
+                            <img src={player.headshot_url} alt={player.full_name} className="w-full h-full object-cover" />
                           ) : (
-                            <>
-                              <div><span className="text-muted-foreground">G:</span> {player.stats.goals}</div>
-                              <div><span className="text-muted-foreground">A:</span> {player.stats.assists}</div>
-                              {player.stats.shots && <div><span className="text-muted-foreground">SOG:</span> {player.stats.shots}</div>}
-                              {player.stats.blocks && <div><span className="text-muted-foreground">BLK:</span> {player.stats.blocks}</div>}
-                              {player.stats.hits && <div><span className="text-muted-foreground">HIT:</span> {player.stats.hits}</div>}
-                            </>
+                            <span className="text-secondary-foreground font-bold text-lg">{player.team}</span>
                           )}
                         </div>
+                        <div className="flex-1">
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <h3 className="font-bold text-lg">{player.full_name}</h3>
+                              <p className="text-sm text-muted-foreground">{player.position} • {player.team} • {player.status || 'Active'}</p>
+                            </div>
+                            <div className="text-right">
+                              <div className="font-bold text-lg text-primary">{player.points || 0}</div>
+                              <p className="text-xs text-muted-foreground">Season Pts</p>
+                            </div>
+                          </div>
+                          
+                          <div className="mt-3 flex gap-4 text-sm">
+                            {player.position === 'G' ? (
+                              <>
+                                <div><span className="text-muted-foreground">W:</span> {player.wins || 0}</div>
+                                <div><span className="text-muted-foreground">GAA:</span> {player.goals_against_average || '0.00'}</div>
+                                <div><span className="text-muted-foreground">SV%:</span> {player.save_percentage || '.000'}</div>
+                              </>
+                            ) : (
+                              <>
+                                <div><span className="text-muted-foreground">G:</span> {player.goals || 0}</div>
+                                <div><span className="text-muted-foreground">A:</span> {player.assists || 0}</div>
+                                {player.shots !== null && <div><span className="text-muted-foreground">SOG:</span> {player.shots}</div>}
+                                {player.blocks !== null && <div><span className="text-muted-foreground">BLK:</span> {player.blocks}</div>}
+                                {player.hits !== null && <div><span className="text-muted-foreground">HIT:</span> {player.hits}</div>}
+                              </>
+                            )}
+                          </div>
+                        </div>
+                        <div className="ml-4">
+                          <Button size="sm" onClick={() => handleAddPlayer(player)}>+</Button>
+                        </div>
                       </div>
-                      <div className="ml-4">
-                        <Button size="sm" onClick={() => handleAddPlayer(player)}>+</Button>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
           </TabsContent>
 
           <TabsContent value="schedule" className="space-y-4">

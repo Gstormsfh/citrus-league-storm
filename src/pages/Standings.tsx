@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import { Button } from '@/components/ui/button';
@@ -93,6 +94,7 @@ const teams = [
 
 const Standings = () => {
   const [season, setSeason] = useState("2025");
+  const navigate = useNavigate();
   
   // Animation observer setup
   useEffect(() => {
@@ -187,7 +189,11 @@ const Standings = () => {
                     const winPercentage = ((team.record.wins / (team.record.wins + team.record.losses)) * 100).toFixed(1);
                     
                     return (
-                      <tr key={team.id} className={`${isUserTeam ? 'bg-primary/5' : 'hover:bg-muted/30'} transition-colors`}>
+                      <tr 
+                        key={team.id} 
+                        className={`${isUserTeam ? 'bg-primary/5' : 'hover:bg-muted/30 cursor-pointer'} transition-colors`}
+                        onClick={() => !isUserTeam && navigate(`/team/${team.id}`)}
+                      >
                         <td className="px-6 py-4 font-medium">
                           <div className="flex items-center gap-2">
                             <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${index < 4 ? 'bg-primary text-white' : 'text-muted-foreground bg-muted'}`}>

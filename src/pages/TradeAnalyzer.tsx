@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -39,7 +40,7 @@ interface Player {
 }
 
 interface Team {
-  id: string;
+  id: string | number;
   name: string;
   manager: string;
   record: string;
@@ -60,8 +61,8 @@ const MY_TEAM_ROSTER: Player[] = [
 ];
 
 const OPPONENT_TEAMS: Team[] = [
-  {
-    id: 't2',
+    {
+    id: 1,
     name: 'Touchdown Titans',
     manager: 'Alex Johnson',
     record: '9-1-0',
@@ -76,7 +77,7 @@ const OPPONENT_TEAMS: Team[] = [
     ]
   },
   {
-    id: 't3',
+    id: 2,
     name: 'Scoring Sharks',
     manager: 'Samantha Lee',
     record: '8-2-0',
@@ -90,7 +91,16 @@ const OPPONENT_TEAMS: Team[] = [
     ]
   },
   {
-    id: 't4',
+    id: 3,
+    name: 'Citrus Crushers', // Should exclude from trade partners in UI but keeping ID consistent
+    manager: 'You',
+    record: '7-3-0',
+    avatar: 'CC',
+    logo: '',
+    roster: []
+  },
+  {
+    id: 4,
     name: 'Blitz Brigade',
     manager: 'Taylor Kim',
     record: '5-5-0',
@@ -102,18 +112,27 @@ const OPPONENT_TEAMS: Team[] = [
       { id: 17, name: 'J.T. Miller', position: 'C', team: 'VAN', value: 90, stats: { goals: 37, assists: 66, points: 103, avgPoints: 3.7 }, trend: 'up' },
       { id: 18, name: 'Thatcher Demko', position: 'G', team: 'VAN', value: 86, stats: { goals: 0, assists: 1, points: 1, avgPoints: 4.5 }, trend: 'neutral' },
     ]
-  }
+  },
 ];
 
 const TradeAnalyzer = () => {
-  const [selectedTeamId, setSelectedTeamId] = useState<string>("");
+  const [searchParams] = useSearchParams();
+  const [selectedTeamId, setSelectedTeamId] = useState<string | number>("");
+  
+  useEffect(() => {
+    const partnerId = searchParams.get('partner');
+    if (partnerId) {
+      setSelectedTeamId(Number(partnerId));
+    }
+  }, [searchParams]);
+
   const [mySelectedPlayers, setMySelectedPlayers] = useState<number[]>([]);
   const [theirSelectedPlayers, setTheirSelectedPlayers] = useState<number[]>([]);
   const [searchMyTeam, setSearchMyTeam] = useState("");
   const [searchTheirTeam, setSearchTheirTeam] = useState("");
 
   const selectedPartnerTeam = useMemo(() => 
-    OPPONENT_TEAMS.find(t => t.id === selectedTeamId), 
+    OPPONENT_TEAMS.find(t => Number(t.id) === Number(selectedTeamId) || t.id === selectedTeamId), 
     [selectedTeamId]
   );
 

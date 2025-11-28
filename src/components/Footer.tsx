@@ -2,6 +2,7 @@
 import { Facebook, Twitter, Instagram, Youtube, Mail } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Link } from 'react-router-dom';
 
 const Footer = () => {
   return (
@@ -37,33 +38,33 @@ const Footer = () => {
           <div>
             <h4 className="font-bold text-lg mb-4">Product</h4>
             <ul className="space-y-3">
-              <li><a href="#" className="text-foreground/70 hover:text-primary transition-colors">Features</a></li>
-              <li><a href="#" className="text-foreground/70 hover:text-primary transition-colors">Leagues</a></li>
-              <li><a href="#" className="text-foreground/70 hover:text-primary transition-colors">Players</a></li>
-              <li><a href="#" className="text-foreground/70 hover:text-primary transition-colors">Stormy AI</a></li>
-              <li><a href="#" className="text-foreground/70 hover:text-primary transition-colors">Pricing</a></li>
+              <li><Link to="/features" className="text-foreground/70 hover:text-primary transition-colors">Features</Link></li>
+              <li><Link to="/standings" className="text-foreground/70 hover:text-primary transition-colors">Leagues</Link></li>
+              <li><Link to="/free-agents" className="text-foreground/70 hover:text-primary transition-colors">Players</Link></li>
+              <li><Link to="/gm-office/stormy" className="text-foreground/70 hover:text-primary transition-colors">Stormy AI</Link></li>
+              <li><Link to="/pricing" className="text-foreground/70 hover:text-primary transition-colors">Pricing</Link></li>
             </ul>
           </div>
           
           <div>
             <h4 className="font-bold text-lg mb-4">Resources</h4>
             <ul className="space-y-3">
-              <li><a href="#" className="text-foreground/70 hover:text-primary transition-colors">Blog</a></li>
-              <li><a href="#" className="text-foreground/70 hover:text-primary transition-colors">Podcasts</a></li>
-              <li><a href="#" className="text-foreground/70 hover:text-primary transition-colors">Strategy Guides</a></li>
-              <li><a href="#" className="text-foreground/70 hover:text-primary transition-colors">Player News</a></li>
-              <li><a href="#" className="text-foreground/70 hover:text-primary transition-colors">Support</a></li>
+              <li><Link to="/blog" className="text-foreground/70 hover:text-primary transition-colors">Blog</Link></li>
+              <li><Link to="/podcasts" className="text-foreground/70 hover:text-primary transition-colors">Podcasts</Link></li>
+              <li><Link to="/guides" className="text-foreground/70 hover:text-primary transition-colors">Strategy Guides</Link></li>
+              <li><Link to="/news" className="text-foreground/70 hover:text-primary transition-colors">Player News</Link></li>
+              <li><Link to="/contact" className="text-foreground/70 hover:text-primary transition-colors">Support</Link></li>
             </ul>
           </div>
           
           <div>
             <h4 className="font-bold text-lg mb-4">Company</h4>
             <ul className="space-y-3">
-              <li><a href="#" className="text-foreground/70 hover:text-primary transition-colors">About Us</a></li>
-              <li><a href="#" className="text-foreground/70 hover:text-primary transition-colors">Careers</a></li>
-              <li><a href="#" className="text-foreground/70 hover:text-primary transition-colors">Contact</a></li>
-              <li><a href="#" className="text-foreground/70 hover:text-primary transition-colors">Privacy Policy</a></li>
-              <li><a href="#" className="text-foreground/70 hover:text-primary transition-colors">Terms of Service</a></li>
+              <li><Link to="/about" className="text-foreground/70 hover:text-primary transition-colors">About Us</Link></li>
+              <li><Link to="/careers" className="text-foreground/70 hover:text-primary transition-colors">Careers</Link></li>
+              <li><Link to="/contact" className="text-foreground/70 hover:text-primary transition-colors">Contact</Link></li>
+              <li><Link to="/privacy" className="text-foreground/70 hover:text-primary transition-colors">Privacy Policy</Link></li>
+              <li><Link to="/terms" className="text-foreground/70 hover:text-primary transition-colors">Terms of Service</Link></li>
             </ul>
           </div>
         </div>

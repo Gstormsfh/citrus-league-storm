@@ -1,475 +1,47 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, closestCenter } from '@dnd-kit/core';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { TrendingUp, TrendingDown, Wand2, Trophy, Activity, ArrowUpRight, Users } from 'lucide-react';
+import { TrendingUp, TrendingDown, Wand2, Trophy, Activity, ArrowUpRight, Users, Loader2 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import PlayerStatsModal from '@/components/PlayerStatsModal';
-import { StartersGrid, BenchGrid, IRSlot, HockeyPlayer } from '@/components/roster';
+import { StartersGrid, BenchGrid, IRSlot } from '@/components/roster';
+import { HockeyPlayer } from '@/components/roster/HockeyPlayerCard';
 import { useToast } from '@/hooks/use-toast';
 import HockeyPlayerCard from '@/components/roster/HockeyPlayerCard';
+import { PlayerService } from '@/services/PlayerService';
+import { LeagueService } from '@/services/LeagueService';
 
 // Helper function to transform position to fantasy slot
 const getFantasyPosition = (position: string): 'C' | 'LW' | 'RW' | 'D' | 'G' | 'UTIL' => {
-  if (position === 'Centre') return 'C';
-  if (position === 'Left Wing') return 'LW';
-  if (position === 'Right Wing') return 'RW';
-  if (position === 'Defence') return 'D';
-  if (position === 'Goalie') return 'G';
+  if (position === 'Centre' || position === 'C') return 'C';
+  if (position === 'Left Wing' || position === 'LW') return 'LW';
+  if (position === 'Right Wing' || position === 'RW') return 'RW';
+  if (position === 'Defence' || position === 'D') return 'D';
+  if (position === 'Goalie' || position === 'G') return 'G';
   return 'UTIL';
 };
 
 // Helper function to get team abbreviation
 const getTeamAbbreviation = (team: string): string => {
   const abbreviations: Record<string, string> = {
-    'Anaheim Ducks': 'ANA',
-    'Arizona Coyotes': 'ARI',
-    'Boston Bruins': 'BOS',
-    'Buffalo Sabres': 'BUF',
-    'Calgary Flames': 'CGY',
-    'Carolina Hurricanes': 'CAR',
-    'Chicago Blackhawks': 'CHI',
-    'Colorado Avalanche': 'COL',
-    'Columbus Blue Jackets': 'CBJ',
-    'Dallas Stars': 'DAL',
-    'Detroit Red Wings': 'DET',
-    'Edmonton Oilers': 'EDM',
-    'Florida Panthers': 'FLA',
-    'Los Angeles Kings': 'LAK',
-    'Minnesota Wild': 'MIN',
-    'Montreal Canadiens': 'MTL',
-    'Nashville Predators': 'NSH',
-    'New Jersey Devils': 'NJD',
-    'New York Islanders': 'NYI',
-    'New York Rangers': 'NYR',
-    'Ottawa Senators': 'OTT',
-    'Philadelphia Flyers': 'PHI',
-    'Pittsburgh Penguins': 'PIT',
-    'San Jose Sharks': 'SJS',
-    'Seattle Kraken': 'SEA',
-    'St. Louis Blues': 'STL',
-    'Tampa Bay Lightning': 'TBL',
-    'Toronto Maple Leafs': 'TOR',
-    'Utah Hockey Club': 'UTA',
-    'Vancouver Canucks': 'VAN',
-    'Vegas Golden Knights': 'VGK',
-    'Washington Capitals': 'WSH',
-    'Winnipeg Jets': 'WPG',
+    'Anaheim Ducks': 'ANA', 'Arizona Coyotes': 'ARI', 'Boston Bruins': 'BOS', 'Buffalo Sabres': 'BUF',
+    'Calgary Flames': 'CGY', 'Carolina Hurricanes': 'CAR', 'Chicago Blackhawks': 'CHI', 'Colorado Avalanche': 'COL',
+    'Columbus Blue Jackets': 'CBJ', 'Dallas Stars': 'DAL', 'Detroit Red Wings': 'DET', 'Edmonton Oilers': 'EDM',
+    'Florida Panthers': 'FLA', 'Los Angeles Kings': 'LAK', 'Minnesota Wild': 'MIN', 'Montreal Canadiens': 'MTL',
+    'Nashville Predators': 'NSH', 'New Jersey Devils': 'NJD', 'New York Islanders': 'NYI', 'New York Rangers': 'NYR',
+    'Ottawa Senators': 'OTT', 'Philadelphia Flyers': 'PHI', 'Pittsburgh Penguins': 'PIT', 'San Jose Sharks': 'SJS',
+    'Seattle Kraken': 'SEA', 'St. Louis Blues': 'STL', 'Tampa Bay Lightning': 'TBL', 'Toronto Maple Leafs': 'TOR',
+    'Utah Hockey Club': 'UTA', 'Vancouver Canucks': 'VAN', 'Vegas Golden Knights': 'VGK', 'Washington Capitals': 'WSH',
+    'Winnipeg Jets': 'WPG'
   };
+  // If team is already an abbreviation (3 letters), return it. Otherwise lookup or truncate.
+  if (team.length === 3) return team;
   return abbreviations[team] || team.split(' ').slice(-1)[0].substring(0, 3).toUpperCase();
 };
-
-// Sample player data - hockey themed
-const initialPlayers = [
-  {
-    id: 1,
-    name: 'Connor McDavid',
-    position: 'Centre',
-    number: 97,
-    starter: true,
-    stats: { goals: 44, assists: 89, points: 133, plusMinus: 28, pim: 36, shots: 352, gamesPlayed: 82, toi: '21:34', toiPercentage: 35.2, blockedShots: 12, hits: 45, powerPlayPoints: 28, shortHandedPoints: 2 },
-    team: 'Edmonton Oilers',
-    height: '6\'1"',
-    weight: '193 lbs',
-    age: 27,
-    experience: '9 years',
-    image: 'https://images.unsplash.com/photo-1562088287-bde35a1ea917?q=80&w=200&auto=format&fit=crop',
-    nextGame: { opponent: 'vs CGY', isToday: true },
-    projectedPoints: 4.5
-  },
-  {
-    id: 2,
-    name: 'Leon Draisaitl',
-    position: 'Centre',
-    number: 29,
-    starter: true,
-    stats: { goals: 41, assists: 64, points: 105, plusMinus: 7, pim: 42, shots: 245, gamesPlayed: 81, toi: '20:15', toiPercentage: 33.8, blockedShots: 8, hits: 52, powerPlayPoints: 24, shortHandedPoints: 1 },
-    team: 'Edmonton Oilers',
-    height: '6\'2"',
-    weight: '208 lbs',
-    age: 28,
-    experience: '9 years',
-    image: 'https://images.unsplash.com/photo-1580064003896-8eba6fc5435f?q=80&w=200&auto=format&fit=crop',
-    nextGame: { opponent: 'vs CGY', isToday: true },
-    projectedPoints: 3.8
-  },
-  {
-    id: 3,
-    name: 'Nathan MacKinnon',
-    position: 'Centre',
-    number: 29,
-    starter: false,
-    stats: { goals: 51, assists: 89, points: 140, plusMinus: 32, pim: 28, shots: 370, gamesPlayed: 82, toi: '22:10', toiPercentage: 36.9, blockedShots: 15, hits: 38, powerPlayPoints: 32, shortHandedPoints: 0 },
-    team: 'Colorado Avalanche',
-    height: '6\'0"',
-    weight: '200 lbs',
-    age: 28,
-    experience: '10 years',
-    image: 'https://images.unsplash.com/photo-1574883052806-413e0927a4d7?q=80&w=200&auto=format&fit=crop',
-    nextGame: { opponent: '@ DAL', isToday: false },
-    projectedPoints: 0.0
-  },
-  {
-    id: 4,
-    name: 'David Pastrnak',
-    position: 'Right Wing',
-    number: 88,
-    starter: true,
-    stats: { goals: 47, assists: 63, points: 110, plusMinus: 26, pim: 34, shots: 312, gamesPlayed: 82, toi: '19:45', toiPercentage: 32.9, blockedShots: 10, hits: 42, powerPlayPoints: 26, shortHandedPoints: 0 },
-    team: 'Boston Bruins',
-    height: '6\'0"',
-    weight: '195 lbs',
-    age: 28,
-    experience: '10 years',
-    image: 'https://images.unsplash.com/photo-1562088287-e698e7c8e6da?q=80&w=200&auto=format&fit=crop',
-    nextGame: { opponent: 'vs TOR', isToday: true },
-    projectedPoints: 3.2
-  },
-  {
-    id: 5,
-    name: 'Mikko Rantanen',
-    position: 'Right Wing',
-    number: 96,
-    starter: true,
-    stats: { goals: 40, assists: 64, points: 104, plusMinus: 24, pim: 48, shots: 265, gamesPlayed: 80, toi: '20:30', toiPercentage: 34.2, blockedShots: 9, hits: 48, powerPlayPoints: 22, shortHandedPoints: 1 },
-    team: 'Colorado Avalanche',
-    height: '6\'4"',
-    weight: '215 lbs',
-    age: 27,
-    experience: '8 years',
-    image: 'https://images.unsplash.com/photo-1580652870699-ae85c08a1ace?q=80&w=200&auto=format&fit=crop',
-    nextGame: { opponent: '@ DAL', isToday: false },
-    projectedPoints: 0.0
-  },
-  {
-    id: 6,
-    name: 'Mitchell Marner',
-    position: 'Right Wing',
-    number: 16,
-    starter: false,
-    stats: { goals: 26, assists: 59, points: 85, plusMinus: 16, pim: 22, shots: 198, gamesPlayed: 78, toi: '19:20', toiPercentage: 32.3, blockedShots: 7, hits: 35, powerPlayPoints: 18, shortHandedPoints: 3 },
-    team: 'Toronto Maple Leafs',
-    height: '6\'0"',
-    weight: '175 lbs',
-    age: 27,
-    experience: '8 years',
-    image: 'https://images.unsplash.com/photo-1565035010268-a3816f98589a?q=80&w=200&auto=format&fit=crop',
-    nextGame: { opponent: '@ BOS', isToday: true },
-    projectedPoints: 2.9
-  },
-  {
-    id: 7,
-    name: 'Kirill Kaprizov',
-    position: 'Left Wing',
-    number: 97,
-    starter: true,
-    stats: { goals: 39, assists: 57, points: 96, plusMinus: 22, pim: 30, shots: 243, gamesPlayed: 79, toi: '20:00', toiPercentage: 33.3, blockedShots: 11, hits: 40, powerPlayPoints: 20, shortHandedPoints: 0 },
-    team: 'Minnesota Wild',
-    height: '5\'10"',
-    weight: '201 lbs',
-    age: 27,
-    experience: '4 years',
-    image: 'https://images.unsplash.com/photo-1580852300654-203e8516c578?q=80&w=200&auto=format&fit=crop',
-    nextGame: { opponent: 'vs WPG', isToday: true },
-    projectedPoints: 3.5
-  },
-  {
-    id: 8,
-    name: 'Matthew Tkachuk',
-    position: 'Left Wing',
-    number: 19,
-    starter: true,
-    stats: { goals: 26, assists: 61, points: 87, plusMinus: -2, pim: 110, shots: 234, gamesPlayed: 82, toi: '19:15', toiPercentage: 32.1, blockedShots: 14, hits: 95, powerPlayPoints: 19, shortHandedPoints: 1 },
-    team: 'Florida Panthers',
-    height: '6\'2"',
-    weight: '202 lbs',
-    age: 26,
-    experience: '8 years',
-    image: 'https://images.unsplash.com/photo-1565992441121-4367c2967103?q=80&w=200&auto=format&fit=crop',
-    nextGame: { opponent: 'vs TBL', isToday: true },
-    projectedPoints: 3.1
-  },
-  {
-    id: 9,
-    name: 'Jason Robertson',
-    position: 'Left Wing',
-    number: 21,
-    starter: false,
-    stats: { goals: 29, assists: 50, points: 79, plusMinus: 15, pim: 24, shots: 214, gamesPlayed: 75, toi: '18:45', toiPercentage: 31.3, blockedShots: 6, hits: 28, powerPlayPoints: 15, shortHandedPoints: 0 },
-    team: 'Dallas Stars',
-    height: '6\'3"',
-    weight: '200 lbs',
-    age: 25,
-    experience: '4 years',
-    image: 'https://images.unsplash.com/photo-1566577739112-5180d4bf9390?q=80&w=200&auto=format&fit=crop',
-    nextGame: { opponent: 'vs COL', isToday: false },
-    projectedPoints: 0.0
-  },
-  {
-    id: 10,
-    name: 'Cale Makar',
-    position: 'Defence',
-    number: 8,
-    starter: true,
-    stats: { goals: 21, assists: 62, points: 83, plusMinus: 29, pim: 26, shots: 246, gamesPlayed: 77, toi: '24:30', toiPercentage: 40.8, blockedShots: 98, hits: 42, powerPlayPoints: 18, shortHandedPoints: 0 },
-    team: 'Colorado Avalanche',
-    height: '5\'11"',
-    weight: '187 lbs',
-    age: 25,
-    experience: '5 years',
-    image: 'https://images.unsplash.com/photo-1566492031773-4f4e44671857?q=80&w=200&auto=format&fit=crop',
-    nextGame: { opponent: '@ DAL', isToday: false },
-    projectedPoints: 0.0
-  },
-  {
-    id: 11,
-    name: 'Roman Josi',
-    position: 'Defence',
-    number: 59,
-    starter: true,
-    stats: { goals: 18, assists: 67, points: 85, plusMinus: -5, pim: 38, shots: 270, gamesPlayed: 82, toi: '25:15', toiPercentage: 42.1, blockedShots: 112, hits: 55, powerPlayPoints: 20, shortHandedPoints: 0 },
-    team: 'Nashville Predators',
-    height: '6\'1"',
-    weight: '201 lbs',
-    age: 33,
-    experience: '13 years',
-    image: 'https://images.unsplash.com/photo-1562087926-662f6680a456?q=80&w=200&auto=format&fit=crop',
-    nextGame: { opponent: 'vs VAN', isToday: true },
-    projectedPoints: 3.0
-  },
-  {
-    id: 12,
-    name: 'Victor Hedman',
-    position: 'Defence',
-    number: 77,
-    starter: false,
-    stats: { goals: 13, assists: 62, points: 75, plusMinus: 14, pim: 52, shots: 195, gamesPlayed: 78, toi: '23:45', toiPercentage: 39.6, blockedShots: 105, hits: 48, powerPlayPoints: 16, shortHandedPoints: 0 },
-    team: 'Tampa Bay Lightning',
-    height: '6\'6"',
-    weight: '241 lbs',
-    age: 33,
-    experience: '15 years',
-    image: 'https://images.unsplash.com/photo-1582642030918-905439388d02?q=80&w=200&auto=format&fit=crop',
-    nextGame: { opponent: '@ FLA', isToday: true },
-    projectedPoints: 2.8
-  },
-  {
-    id: 13,
-    name: 'Andrei Vasilevskiy',
-    position: 'Goalie',
-    number: 88,
-    starter: true,
-    stats: { wins: 30, losses: 15, otl: 5, gaa: 2.50, savePct: 0.915, shutouts: 4 },
-    team: 'Tampa Bay Lightning',
-    height: '6\'3"',
-    weight: '225 lbs',
-    age: 29,
-    experience: '10 years',
-    image: 'https://images.unsplash.com/photo-1560849807-bae5314c9e98?q=80&w=200&auto=format&fit=crop',
-    nextGame: { opponent: '@ FLA', isToday: true },
-    projectedPoints: 6.2
-  },
-  {
-    id: 14,
-    name: 'Igor Shesterkin',
-    position: 'Goalie',
-    number: 31,
-    starter: false,
-    stats: { wins: 36, losses: 17, otl: 2, gaa: 2.58, savePct: 0.913, shutouts: 3 },
-    team: 'New York Rangers',
-    height: '6\'2"',
-    weight: '182 lbs',
-    age: 28,
-    experience: '4 years',
-    image: 'https://images.unsplash.com/photo-1561731172-9d906d7b13ad?q=80&w=200&auto=format&fit=crop',
-    nextGame: { opponent: 'vs WSH', isToday: true },
-    projectedPoints: 5.8
-  },
-  // Additional bench players
-  {
-    id: 15,
-    name: 'Auston Matthews',
-    position: 'Centre',
-    number: 34,
-    starter: false,
-    stats: { goals: 69, assists: 38, points: 107, plusMinus: 31, pim: 20, shots: 368, gamesPlayed: 81, toi: '20:45', toiPercentage: 34.6, blockedShots: 18, hits: 58, powerPlayPoints: 35, shortHandedPoints: 0 },
-    team: 'Toronto Maple Leafs',
-    height: '6\'3"',
-    weight: '208 lbs',
-    age: 27,
-    experience: '8 years',
-    image: 'https://images.unsplash.com/photo-1562088287-bde35a1ea917?q=80&w=200&auto=format&fit=crop',
-    nextGame: { opponent: '@ BOS', isToday: true },
-    projectedPoints: 4.8
-  },
-  {
-    id: 16,
-    name: 'Artemi Panarin',
-    position: 'Left Wing',
-    number: 10,
-    starter: false,
-    stats: { goals: 49, assists: 71, points: 120, plusMinus: 18, pim: 18, shots: 279, gamesPlayed: 82, toi: '20:20', toiPercentage: 33.9, blockedShots: 9, hits: 32, powerPlayPoints: 31, shortHandedPoints: 0 },
-    team: 'New York Rangers',
-    height: '5\'11"',
-    weight: '170 lbs',
-    age: 32,
-    experience: '9 years',
-    image: 'https://images.unsplash.com/photo-1580852300654-203e8516c578?q=80&w=200&auto=format&fit=crop',
-    nextGame: { opponent: 'vs WSH', isToday: true },
-    projectedPoints: 3.6
-  },
-  {
-    id: 17,
-    name: 'Erik Karlsson',
-    position: 'Defence',
-    number: 65,
-    starter: false,
-    stats: { goals: 25, assists: 76, points: 101, plusMinus: -26, pim: 22, shots: 223, gamesPlayed: 82, toi: '25:45', toiPercentage: 42.9, blockedShots: 89, hits: 41, powerPlayPoints: 24, shortHandedPoints: 0 },
-    team: 'Pittsburgh Penguins',
-    height: '6\'0"',
-    weight: '190 lbs',
-    age: 34,
-    experience: '15 years',
-    image: 'https://images.unsplash.com/photo-1566492031773-4f4e44671857?q=80&w=200&auto=format&fit=crop',
-    nextGame: { opponent: 'vs PHI', isToday: true },
-    projectedPoints: 2.5
-  },
-  {
-    id: 18,
-    name: 'Quinn Hughes',
-    position: 'Defence',
-    number: 43,
-    starter: false,
-    stats: { goals: 17, assists: 75, points: 92, plusMinus: 33, pim: 18, shots: 201, gamesPlayed: 82, toi: '24:15', toiPercentage: 40.4, blockedShots: 67, hits: 28, powerPlayPoints: 22, shortHandedPoints: 0 },
-    team: 'Vancouver Canucks',
-    height: '5\'10"',
-    weight: '180 lbs',
-    age: 24,
-    experience: '5 years',
-    image: 'https://images.unsplash.com/photo-1562087926-662f6680a456?q=80&w=200&auto=format&fit=crop',
-    nextGame: { opponent: '@ NSH', isToday: true },
-    projectedPoints: 2.7
-  },
-  {
-    id: 19,
-    name: 'Sidney Crosby',
-    position: 'Centre',
-    number: 87,
-    starter: false,
-    stats: { goals: 42, assists: 50, points: 92, plusMinus: 19, pim: 36, shots: 268, gamesPlayed: 82, toi: '20:30', toiPercentage: 34.2, blockedShots: 24, hits: 67, powerPlayPoints: 28, shortHandedPoints: 2 },
-    team: 'Pittsburgh Penguins',
-    height: '5\'11"',
-    weight: '200 lbs',
-    age: 36,
-    experience: '19 years',
-    image: 'https://images.unsplash.com/photo-1574883052806-413e0927a4d7?q=80&w=200&auto=format&fit=crop',
-    nextGame: { opponent: 'vs PHI', isToday: true },
-    projectedPoints: 3.3
-  },
-  {
-    id: 20,
-    name: 'Alex Ovechkin',
-    position: 'Left Wing',
-    number: 8,
-    starter: false,
-    stats: { goals: 31, assists: 34, points: 65, plusMinus: -19, pim: 20, shots: 293, gamesPlayed: 79, toi: '19:45', toiPercentage: 32.9, blockedShots: 19, hits: 78, powerPlayPoints: 18, shortHandedPoints: 0 },
-    team: 'Washington Capitals',
-    height: '6\'3"',
-    weight: '235 lbs',
-    age: 39,
-    experience: '19 years',
-    image: 'https://images.unsplash.com/photo-1580852300654-203e8516c578?q=80&w=200&auto=format&fit=crop',
-    nextGame: { opponent: '@ NYR', isToday: true },
-    projectedPoints: 2.4
-  },
-  {
-    id: 21,
-    name: 'Connor Hellebuyck',
-    position: 'Goalie',
-    number: 37,
-    starter: false,
-    stats: { wins: 37, losses: 19, otl: 4, gaa: 2.39, savePct: 0.921, shutouts: 5 },
-    team: 'Winnipeg Jets',
-    height: '6\'4"',
-    weight: '207 lbs',
-    age: 31,
-    experience: '9 years',
-    image: 'https://images.unsplash.com/photo-1560849807-bae5314c9e98?q=80&w=200&auto=format&fit=crop',
-    nextGame: { opponent: '@ MIN', isToday: true },
-    projectedPoints: 5.5
-  },
-  // IR players
-  {
-    id: 22,
-    name: 'Mark Stone',
-    position: 'Right Wing',
-    number: 61,
-    starter: false,
-    stats: { goals: 16, assists: 37, points: 53, plusMinus: 12, pim: 10, shots: 145, gamesPlayed: 56, toi: '18:30', toiPercentage: 30.8, blockedShots: 8, hits: 42, powerPlayPoints: 12, shortHandedPoints: 0 },
-    team: 'Vegas Golden Knights',
-    height: '6\'4"',
-    weight: '219 lbs',
-    age: 32,
-    experience: '11 years',
-    image: 'https://images.unsplash.com/photo-1562088287-e698e7c8e6da?q=80&w=200&auto=format&fit=crop',
-    status: 'IR' as const,
-    nextGame: { opponent: 'vs SJS', isToday: false },
-    projectedPoints: 0.0
-  },
-  {
-    id: 23,
-    name: 'Jack Eichel',
-    position: 'Centre',
-    number: 9,
-    starter: false,
-    stats: { goals: 26, assists: 33, points: 59, plusMinus: 8, pim: 12, shots: 198, gamesPlayed: 63, toi: '19:15', toiPercentage: 32.1, blockedShots: 11, hits: 35, powerPlayPoints: 15, shortHandedPoints: 0 },
-    team: 'Vegas Golden Knights',
-    height: '6\'2"',
-    weight: '206 lbs',
-    age: 28,
-    experience: '9 years',
-    image: 'https://images.unsplash.com/photo-1574883052806-413e0927a4d7?q=80&w=200&auto=format&fit=crop',
-    status: 'IR' as const,
-    nextGame: { opponent: 'vs SJS', isToday: false },
-    projectedPoints: 0.0
-  },
-  {
-    id: 24,
-    name: 'Timo Meier',
-    position: 'Right Wing',
-    number: 28,
-    starter: false,
-    stats: { goals: 28, assists: 25, points: 53, plusMinus: -5, pim: 30, shots: 212, gamesPlayed: 78, toi: '18:00', toiPercentage: 30.0, blockedShots: 12, hits: 88, powerPlayPoints: 14, shortHandedPoints: 0 },
-    team: 'New Jersey Devils',
-    height: '6\'1"',
-    weight: '220 lbs',
-    age: 27,
-    experience: '8 years',
-    image: 'https://images.unsplash.com/photo-1580652870699-ae85c08a1ace?q=80&w=200&auto=format&fit=crop',
-    status: 'IR' as const,
-    nextGame: { opponent: 'vs DET', isToday: true },
-    projectedPoints: 0.0
-  },
-  {
-    id: 25,
-    name: 'Clayton Keller',
-    position: 'Right Wing',
-    number: 9,
-    starter: false,
-    stats: { goals: 33, assists: 43, points: 76, plusMinus: -2, pim: 32, shots: 220, gamesPlayed: 78, toi: '19:15', toiPercentage: 32.1, blockedShots: 28, hits: 25, powerPlayPoints: 24, shortHandedPoints: 0 },
-    team: 'Utah Hockey Club',
-    height: '5\'10"',
-    weight: '178 lbs',
-    age: 25,
-    experience: '7 years',
-    image: 'https://images.unsplash.com/photo-1580652870699-ae85c08a1ace?q=80&w=200&auto=format&fit=crop',
-    nextGame: { opponent: 'vs ARI', isToday: false },
-    projectedPoints: 0.0
-  },
-];
 
 // Sample team stats for analytics section
 const teamStats = {
@@ -504,7 +76,7 @@ interface RosterState {
   starters: HockeyPlayer[];
   bench: HockeyPlayer[];
   ir: HockeyPlayer[];
-  slotAssignments: Record<number, string>;
+  slotAssignments: Record<string, string>; // Changed key to string to support UUIDs
 }
 
 const Roster = () => {
@@ -512,11 +84,20 @@ const Roster = () => {
   const [selectedPlayer, setSelectedPlayer] = useState<HockeyPlayer | null>(null);
   const [isPlayerDialogOpen, setIsPlayerDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("roster");
-  const [activeId, setActiveId] = useState<number | null>(null);
+  const [activeId, setActiveId] = useState<string | number | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  // Helper to calculate initial assignments based on player position and load order
+  // Initial empty roster state
+  const [roster, setRoster] = useState<RosterState>({
+    starters: [],
+    bench: [],
+    ir: [],
+    slotAssignments: {}
+  });
+
+  // Calculate slots helper
   const calculateInitialSlotAssignments = (starters: HockeyPlayer[]) => {
-    const assignments: Record<number, string> = {};
+    const assignments: Record<string, string> = {};
     const playersByPos: Record<string, HockeyPlayer[]> = {
       'C': [], 'LW': [], 'RW': [], 'D': [], 'G': [], 'UTIL': []
     };
@@ -544,8 +125,8 @@ const Roster = () => {
     });
     
     // Assign remaining non-goalie starters to UTIL if not already assigned
-    const assignedIds = new Set(Object.keys(assignments).map(Number));
-    const unassigned = starters.filter(p => !assignedIds.has(p.id));
+    const assignedIds = new Set(Object.keys(assignments));
+    const unassigned = starters.filter(p => !assignedIds.has(String(p.id)));
     const utilPlayer = unassigned.find(p => getFantasyPosition(p.position) !== 'G');
     if (utilPlayer) {
         assignments[utilPlayer.id] = 'slot-UTIL';
@@ -554,45 +135,86 @@ const Roster = () => {
     return assignments;
   };
 
-  // Initialize roster state from initial players
-  const [roster, setRoster] = useState<RosterState>(() => {
-    const transformedPlayers: HockeyPlayer[] = initialPlayers.map((p) => ({
-      id: p.id,
-      name: p.name,
-      position: p.position,
-      number: p.number,
-      starter: p.starter,
-      stats: p.stats,
-      team: p.team,
-      teamAbbreviation: getTeamAbbreviation(p.team),
-      status: (p as any).status || null, // Preserve IR/out status (IR, SUSP, GTD, WVR, or null)
-      height: p.height,
-      weight: p.weight,
-      age: p.age,
-      experience: p.experience,
-      image: p.image,
-      nextGame: (p as any).nextGame,
-      projectedPoints: (p as any).projectedPoints,
-    }));
+  // Fetch and adapt players
+  useEffect(() => {
+    const loadRoster = async () => {
+      setLoading(true);
+      try {
+        // Get consistent roster for "My Team" (ID: 3)
+        const allPlayers = await PlayerService.getAllPlayers();
+        const dbPlayers = await LeagueService.getMyTeam(allPlayers);
+        
+        // Transform DB players to HockeyPlayer format
+        const transformedPlayers: HockeyPlayer[] = dbPlayers.map((p) => ({
+          id: p.id,
+          name: p.full_name,
+          position: p.position,
+          number: parseInt(p.jersey_number || '0'),
+          starter: false, // Will determine below
+          stats: {
+            goals: p.goals || 0,
+            assists: p.assists || 0,
+            points: p.points || 0,
+            plusMinus: p.plus_minus || 0,
+            shots: p.shots || 0,
+            hits: p.hits || 0,
+            blockedShots: p.blocks || 0,
+            wins: p.wins || 0,
+            losses: p.losses || 0,
+            otl: p.ot_losses || 0,
+            gaa: p.goals_against_average || 0,
+            savePct: p.save_percentage || 0,
+            shutouts: 0 // Not in DB yet
+          },
+          team: p.team,
+          teamAbbreviation: p.team, // DB has 'EDM' etc
+          status: p.status === 'injured' ? 'IR' : (p.status === 'active' ? null : 'WVR'),
+          image: p.headshot_url || undefined,
+          // Mock game data since we don't have schedule API yet
+          nextGame: { opponent: 'vs OPP', isToday: Math.random() > 0.5 },
+          projectedPoints: (p.points || 0) / 20 // Rough projection
+        }));
 
-    const starters: HockeyPlayer[] = [];
-    const bench: HockeyPlayer[] = [];
-    const ir: HockeyPlayer[] = [];
+        // Organize into slots (Simulation of a drafted team)
+        const starters: HockeyPlayer[] = [];
+        const bench: HockeyPlayer[] = [];
+        const ir: HockeyPlayer[] = [];
 
-    transformedPlayers.forEach((player) => {
-      if (player.status === 'IR' || player.status === 'SUSP') {
-        ir.push(player);
-      } else if (player.starter) {
-        starters.push(player);
-      } else {
-        bench.push(player);
+        // Simple draft logic to fill slots
+        const slotsNeeded = { 'C': 2, 'LW': 2, 'RW': 2, 'D': 4, 'G': 2, 'UTIL': 1 };
+        const slotsFilled = { 'C': 0, 'LW': 0, 'RW': 0, 'D': 0, 'G': 0, 'UTIL': 0 };
+
+        transformedPlayers.forEach(p => {
+          if (p.status === 'IR' || p.status === 'SUSP') {
+            ir.push(p);
+            return;
+          }
+
+          const pos = getFantasyPosition(p.position);
+          
+          if (pos !== 'UTIL' && slotsFilled[pos] < slotsNeeded[pos]) {
+            starters.push({ ...p, starter: true });
+            slotsFilled[pos]++;
+          } else if (pos !== 'G' && slotsFilled['UTIL'] < slotsNeeded['UTIL']) {
+            starters.push({ ...p, starter: true });
+            slotsFilled['UTIL']++;
+          } else {
+            bench.push(p);
+          }
+        });
+
+        const slotAssignments = calculateInitialSlotAssignments(starters);
+        setRoster({ starters, bench, ir, slotAssignments });
+      } catch (e) {
+        console.error("Failed to load roster", e);
+        toast({ title: "Error", description: "Could not load roster.", variant: "destructive" });
+      } finally {
+        setLoading(false);
       }
-    });
+    };
 
-    const slotAssignments = calculateInitialSlotAssignments(starters);
-
-    return { starters, bench, ir, slotAssignments };
-  });
+    loadRoster();
+  }, [toast]);
 
   const handleAutoLineup = () => {
     setRoster((prev) => {
@@ -627,10 +249,10 @@ const Roster = () => {
       });
 
       // 5. Assign Slots
-      const newAssignments: Record<number, string> = {};
+      const newAssignments: Record<string, string> = {};
       const newStarters: HockeyPlayer[] = [];
       const newBench: HockeyPlayer[] = [];
-      const assignedIds = new Set<number>();
+      const assignedIds = new Set<string | number>();
 
       // Helper to assign players to a list of slot IDs
       const assignToSlots = (players: HockeyPlayer[], slotPrefix: string, count: number) => {
@@ -694,7 +316,7 @@ const Roster = () => {
     setIsPlayerDialogOpen(true);
   };
 
-  // Position validation: Check if player can be placed in target slot
+  // Position validation
   const isPositionValid = (player: HockeyPlayer, targetSlot: string): boolean => {
     const playerFantasyPos = getFantasyPosition(player.position);
     
@@ -733,7 +355,7 @@ const Roster = () => {
   };
 
   const handleDragStart = (event: DragStartEvent) => {
-    setActiveId(event.active.id as number);
+    setActiveId(event.active.id as string | number);
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
@@ -742,7 +364,7 @@ const Roster = () => {
 
     if (!over) return;
 
-    const playerId = active.id as number;
+    const playerId = active.id as string | number;
     const targetId = over.id as string; 
 
     const allPlayers = [...roster.starters, ...roster.bench, ...roster.ir];
@@ -751,7 +373,7 @@ const Roster = () => {
     if (!player) return;
 
     // Identify if dropping onto a player or an empty slot
-    const droppedOnPlayer = allPlayers.find(p => p.id === targetId); // targetId might be a player ID
+    const droppedOnPlayer = allPlayers.find(p => p.id === targetId); 
     
     let finalTargetSlotId = targetId;
 
@@ -780,7 +402,7 @@ const Roster = () => {
         const newAssignments = { ...prev.slotAssignments };
 
         // Remove player from old location
-        const removeFromCurrent = (pId: number) => {
+        const removeFromCurrent = (pId: string | number) => {
             const sIdx = newStarters.findIndex(p => p.id === pId);
             if (sIdx >= 0) { 
                 newStarters.splice(sIdx, 1); 
@@ -804,10 +426,14 @@ const Roster = () => {
         const sourceInfo = removeFromCurrent(player.id);
         
         // 2. Check if target slot is occupied
-        let occupantId: number | undefined;
+        let occupantId: string | number | undefined;
         if (finalTargetSlotId.startsWith('slot-')) {
-            const foundId = Object.keys(newAssignments).find(id => newAssignments[Number(id)] === finalTargetSlotId);
-            if (foundId) occupantId = Number(foundId);
+            const foundId = Object.keys(newAssignments).find(id => newAssignments[id] === finalTargetSlotId);
+            if (foundId) {
+              // Try to cast back to number if possible to match original ID type, though string is safe for keys
+              // Since ID can be string or number, simple retrieval is safest
+              occupantId = foundId; 
+            }
         }
 
         // 3. If occupied, remove the occupant (Swap)
@@ -819,36 +445,44 @@ const Roster = () => {
         // 4. Place Active Player into Target Slot
         const p = { ...player };
         if (finalTargetSlotId === 'bench-grid') {
-            p.starter = false; p.status = null; newBench.push(p);
+            p.starter = false; p.status = (p.status === 'IR' || p.status === 'SUSP') ? p.status : null; newBench.push(p);
         } else if (finalTargetSlotId === 'ir-slot') {
             p.starter = false; if(p.status !== 'IR' && p.status !== 'SUSP') p.status='IR'; newIR.push(p);
         } else {
-            p.starter = true; p.status = null; newStarters.push(p);
+            p.starter = true; p.status = (p.status === 'IR' || p.status === 'SUSP') ? p.status : null; newStarters.push(p);
             newAssignments[p.id] = finalTargetSlotId; 
         }
 
         // 5. If we swapped, put the occupant where the active player came from
         if (occupantId && occupantSourceInfo) {
-            const occupant = allPlayers.find(x => x.id === occupantId)!;
+            // Find the original object reference from closure or re-find in 'allPlayers' isn't quite right because we need the object.
+            // But we removed it from newStarters/Bench/IR. We can find it in 'allPlayers' which is unchanged.
+            const occupant = allPlayers.find(x => String(x.id) === String(occupantId))!;
             const p2 = { ...occupant };
             
-            const originalSlot = prev.slotAssignments[player.id];
+            // Determine where to put the swapped player
             let swapBackTarget = 'bench-grid';
             
+            // Logic: try to put them back where source came from
             if (sourceInfo?.loc === 'bench') swapBackTarget = 'bench-grid';
             else if (sourceInfo?.loc === 'ir') swapBackTarget = 'ir-slot';
-            else if (sourceInfo?.loc === 'starter' && originalSlot) swapBackTarget = originalSlot;
+            else if (sourceInfo?.loc === 'starter') {
+               // We don't have the original slot assignment easily available since we deleted it from newAssignments
+               // But we can look at 'prev.slotAssignments'
+               const originalSlot = prev.slotAssignments[player.id];
+               if (originalSlot) swapBackTarget = originalSlot;
+            }
 
             if (!isPositionValid(p2, swapBackTarget)) {
                 swapBackTarget = 'bench-grid';
             }
 
             if (swapBackTarget === 'bench-grid') {
-                p2.starter = false; p2.status = null; newBench.push(p2);
+                p2.starter = false; newBench.push(p2);
             } else if (swapBackTarget === 'ir-slot') {
                 p2.starter = false; if(p2.status!=='IR') p2.status='IR'; newIR.push(p2);
             } else {
-                p2.starter = true; p2.status = null; newStarters.push(p2);
+                p2.starter = true; newStarters.push(p2);
                 newAssignments[p2.id] = swapBackTarget;
             }
         }
@@ -927,40 +561,47 @@ const Roster = () => {
               </TabsList>
 
               <TabsContent value="roster" className="m-0 p-6">
-                <DndContext
-                  collisionDetection={closestCenter}
-                  onDragStart={handleDragStart}
-                  onDragEnd={handleDragEnd}
-                >
-                  <div className="space-y-8">
-                    <StartersGrid 
-                      players={roster.starters}
-                      slotAssignments={roster.slotAssignments}
-                      onPlayerClick={handlePlayerClick}
-                    />
-                    
-                    <BenchGrid 
-                      players={roster.bench}
-                      onPlayerClick={handlePlayerClick}
-                    />
-                    
-                    <IRSlot 
-                      players={roster.ir}
-                      onPlayerClick={handlePlayerClick}
-                    />
+                {loading ? (
+                  <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
+                    <Loader2 className="w-10 h-10 animate-spin mb-4 text-primary" />
+                    <p>Loading your roster...</p>
                   </div>
+                ) : (
+                  <DndContext
+                    collisionDetection={closestCenter}
+                    onDragStart={handleDragStart}
+                    onDragEnd={handleDragEnd}
+                  >
+                    <div className="space-y-8">
+                      <StartersGrid 
+                        players={roster.starters}
+                        slotAssignments={roster.slotAssignments}
+                        onPlayerClick={handlePlayerClick}
+                      />
+                      
+                      <BenchGrid 
+                        players={roster.bench}
+                        onPlayerClick={handlePlayerClick}
+                      />
+                      
+                      <IRSlot 
+                        players={roster.ir}
+                        onPlayerClick={handlePlayerClick}
+                      />
+                    </div>
 
-                  <DragOverlay>
-                    {activePlayer ? (
-                      <div className="opacity-90 rotate-3">
-                        <HockeyPlayerCard 
-                          player={activePlayer}
-                          draggable={false}
-                        />
-                      </div>
-                    ) : null}
-                  </DragOverlay>
-                </DndContext>
+                    <DragOverlay>
+                      {activePlayer ? (
+                        <div className="opacity-90 rotate-3">
+                          <HockeyPlayerCard 
+                            player={activePlayer}
+                            draggable={false}
+                          />
+                        </div>
+                      ) : null}
+                    </DragOverlay>
+                  </DndContext>
+                )}
               </TabsContent>
 
               <TabsContent value="stats" className="m-0 p-6">

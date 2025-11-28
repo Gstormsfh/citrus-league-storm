@@ -37,7 +37,7 @@ const createIndividualSlots = (position: 'D' | 'G' | 'C' | 'LW' | 'RW', count: n
 
 interface StartersGridProps {
   players: HockeyPlayer[];
-  slotAssignments?: Record<number, string>; // Map of Player ID -> Slot ID
+  slotAssignments?: Record<string | number, string>; // Map of Player ID -> Slot ID
   onPlayerClick?: (player: HockeyPlayer) => void;
   className?: string;
 }
@@ -45,9 +45,13 @@ interface StartersGridProps {
 const StartersGrid = ({ players, slotAssignments = {}, onPlayerClick, className }: StartersGridProps) => {
   
   const getPlayerInSlot = (slotId: string) => {
-    const playerId = Object.keys(slotAssignments).find(key => slotAssignments[Number(key)] === slotId);
+    // Look for key in slotAssignments where value is slotId
+    // Cast key to string for comparison since Object.keys returns strings
+    const playerId = Object.keys(slotAssignments).find(key => slotAssignments[key as any] === slotId);
     if (!playerId) return undefined;
-    return players.find(p => p.id === Number(playerId));
+    
+    // Loose comparison to catch both string/number IDs
+    return players.find(p => String(p.id) === String(playerId));
   };
 
   const renderSlot = (slot: PositionSlot) => {

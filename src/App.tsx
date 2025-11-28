@@ -23,7 +23,14 @@ import TeamAnalytics from "./pages/TeamAnalytics";
 import WaiverWire from "./pages/WaiverWire";
 import ScheduleManager from "./pages/ScheduleManager";
 import TradeAnalyzer from "./pages/TradeAnalyzer";
+import OtherTeam from "./pages/OtherTeam";
 import CreateLeague from "./pages/CreateLeague";
+import Features from "./pages/Features";
+import Pricing from "./pages/Pricing";
+import About from "./pages/About";
+import Careers from "./pages/Careers";
+import Privacy from "./pages/Privacy";
+import Terms from "./pages/Terms";
 import { StormyChatBubble } from "./components/StormyChatBubble";
 import "./App.css";
 
@@ -63,6 +70,13 @@ const App = () => (
           <Route path="/waiver-wire" element={<WaiverWire />} />
           <Route path="/schedule-manager" element={<ScheduleManager />} />
           <Route path="/trade-analyzer" element={<TradeAnalyzer />} />
+          <Route path="/team/:teamId" element={<OtherTeam />} />
+          <Route path="/features" element={<Features />} />
+          <Route path="/pricing" element={<Pricing />} />
+          <Route path="/about" element={<About />} />
+          <Route path="/careers" element={<Careers />} />
+          <Route path="/privacy" element={<Privacy />} />
+          <Route path="/terms" element={<Terms />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

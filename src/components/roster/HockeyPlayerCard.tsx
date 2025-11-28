@@ -7,9 +7,9 @@ import { AlertCircle, Shield, CalendarDays } from "lucide-react";
 import { useState } from "react";
 
 export interface HockeyPlayer {
-  id: number;
+  id: number | string;
   name: string;
-  position: string; // 'Centre', 'Right Wing', 'Left Wing', 'Defence', 'Goalie'
+  position: string; // 'Centre', 'Right Wing', 'Left Wing', 'Defence', 'Goalie', 'C', 'RW', 'LW', 'D', 'G'
   number: number;
   starter: boolean;
   stats: {

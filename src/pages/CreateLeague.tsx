@@ -15,13 +15,12 @@ import {
 } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Switch } from "@/components/ui/switch";
-import { Trophy, Users, Settings, ChevronRight, ArrowLeft, CheckCircle } from "lucide-react";
+import { Trophy, Users, Settings, CheckCircle } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 
 const CreateLeague = () => {
   const navigate = useNavigate();
-  const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
 
   // Form State
@@ -114,24 +113,14 @@ const CreateLeague = () => {
                   <Trophy className="w-6 h-6 text-primary" />
                   League Setup
                 </CardTitle>
-                <div className="text-sm font-medium text-muted-foreground">
-                  Step {step} of 2
-                </div>
-              </div>
-              {/* Progress Bar */}
-              <div className="w-full h-2 bg-muted/50 rounded-full mt-4 overflow-hidden">
-                <div 
-                  className="h-full bg-primary transition-all duration-500 ease-out"
-                  style={{ width: `${(step / 2) * 100}%` }}
-                ></div>
               </div>
             </CardHeader>
 
             <CardContent className="p-8">
               
-              {/* STEP 1: BASIC SETTINGS */}
-              {step === 1 && (
-                <div className="space-y-6 animate-fade-in">
+              <div className="space-y-8 animate-fade-in">
+                {/* BASIC SETTINGS */}
+                <div className="space-y-6">
                   <div className="space-y-3">
                     <Label htmlFor="league-name" className="text-base">League Name</Label>
                     <Input 
@@ -175,150 +164,124 @@ const CreateLeague = () => {
                       </Select>
                     </div>
                   </div>
-
-                  <div className="pt-4 flex justify-end">
-                    <Button 
-                      size="lg" 
-                      className="rounded-full px-8"
-                      onClick={() => setStep(2)}
-                      disabled={!leagueName}
-                    >
-                      Next Step <ChevronRight className="ml-2 w-4 h-4" />
-                    </Button>
-                  </div>
                 </div>
-              )}
 
-              {/* STEP 2: EVERYTHING ELSE (Configuration + Scoring) */}
-              {step === 2 && (
-                <div className="space-y-8 animate-fade-in">
-                  
-                  {/* Draft & Privacy Settings */}
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                    <div className="space-y-4">
-                      <Label className="text-base font-semibold">Draft Type</Label>
-                      <RadioGroup value={draftType} onValueChange={setDraftType} className="grid grid-cols-1 gap-3">
-                        <div>
-                          <RadioGroupItem value="snake" id="snake" className="peer sr-only" />
-                          <Label
-                            htmlFor="snake"
-                            className="flex items-center justify-between rounded-xl border-2 border-muted bg-transparent p-3 hover:bg-muted/20 hover:border-primary/50 peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-primary/5 cursor-pointer transition-all"
-                          >
-                            <div className="flex items-center gap-3">
-                              <Settings className="h-5 w-5 text-muted-foreground peer-data-[state=checked]:text-primary" />
-                              <span className="font-semibold">Snake Draft</span>
-                            </div>
-                          </Label>
-                        </div>
-                        <div>
-                          <RadioGroupItem value="auction" id="auction" className="peer sr-only" />
-                          <Label
-                            htmlFor="auction"
-                            className="flex items-center justify-between rounded-xl border-2 border-muted bg-transparent p-3 hover:bg-muted/20 hover:border-primary/50 peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-primary/5 cursor-pointer transition-all"
-                          >
-                            <div className="flex items-center gap-3">
-                              <Users className="h-5 w-5 text-muted-foreground peer-data-[state=checked]:text-primary" />
-                              <span className="font-semibold">Auction Draft</span>
-                            </div>
-                          </Label>
-                        </div>
-                      </RadioGroup>
-                    </div>
-
-                    <div className="space-y-4">
-                      <Label className="text-base font-semibold">Privacy</Label>
-                      <div className="bg-muted/30 p-4 rounded-xl flex items-center justify-between h-[100px] border border-border/50">
-                        <div className="space-y-0.5">
-                          <Label className="text-base">Public League</Label>
-                          <p className="text-sm text-muted-foreground">
-                            Anyone can join this league
-                          </p>
-                        </div>
-                        <Switch checked={isPublic} onCheckedChange={setIsPublic} />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="border-t pt-6">
-                    <div className="flex items-center justify-between mb-6">
-                       <div>
-                         <h3 className="text-xl font-bold">Scoring Settings</h3>
-                         <p className="text-muted-foreground text-sm">Toggle stats and adjust point values</p>
-                       </div>
-                       <Badge variant="secondary" className="bg-primary/10 text-primary">
-                         {leagueStats.filter(s => s.enabled).length} Active Stats
-                       </Badge>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      {Object.entries(statsByCategory).map(([category, stats]) => (
-                        <div key={category} className="space-y-3">
-                          <h4 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                            {category === 'Fun' && <span className="text-lg">🎉</span>}
-                            {category} Stats
-                          </h4>
-                          <div className="bg-card rounded-xl border shadow-sm overflow-hidden">
-                            {stats.map((stat) => (
-                              <div 
-                                key={stat.id} 
-                                className={`flex items-center justify-between p-3 border-b last:border-0 transition-colors ${stat.enabled ? 'bg-primary/5' : 'opacity-60'}`}
-                              >
-                                <div className="flex items-center gap-3">
-                                  <Switch 
-                                    checked={stat.enabled} 
-                                    onCheckedChange={() => handleStatToggle(stat.id)} 
-                                  />
-                                  <span className={`font-medium ${stat.enabled ? 'text-foreground' : 'text-muted-foreground'}`}>
-                                    {stat.name}
-                                  </span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <span className="text-xs text-muted-foreground">Pts:</span>
-                                  <Input 
-                                    type="number" 
-                                    className="h-8 w-16 text-right font-mono" 
-                                    value={stat.points}
-                                    onChange={(e) => handleStatPointsChange(stat.id, e.target.value)}
-                                    disabled={!stat.enabled}
-                                    step="0.1"
-                                  />
-                                </div>
-                              </div>
-                            ))}
+                {/* Draft & Privacy Settings */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 pt-2">
+                  <div className="space-y-4">
+                    <Label className="text-base font-semibold">Draft Type</Label>
+                    <RadioGroup value={draftType} onValueChange={setDraftType} className="grid grid-cols-1 gap-3">
+                      <div>
+                        <RadioGroupItem value="snake" id="snake" className="peer sr-only" />
+                        <Label
+                          htmlFor="snake"
+                          className="flex items-center justify-between rounded-xl border-2 border-muted bg-transparent p-3 hover:bg-muted/20 hover:border-primary/50 peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-primary/5 cursor-pointer transition-all"
+                        >
+                          <div className="flex items-center gap-3">
+                            <Settings className="h-5 w-5 text-muted-foreground peer-data-[state=checked]:text-primary" />
+                            <span className="font-semibold">Snake Draft</span>
                           </div>
-                        </div>
-                      ))}
-                    </div>
+                        </Label>
+                      </div>
+                      <div>
+                        <RadioGroupItem value="auction" id="auction" className="peer sr-only" />
+                        <Label
+                          htmlFor="auction"
+                          className="flex items-center justify-between rounded-xl border-2 border-muted bg-transparent p-3 hover:bg-muted/20 hover:border-primary/50 peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-primary/5 cursor-pointer transition-all"
+                        >
+                          <div className="flex items-center gap-3">
+                            <Users className="h-5 w-5 text-muted-foreground peer-data-[state=checked]:text-primary" />
+                            <span className="font-semibold">Auction Draft</span>
+                          </div>
+                        </Label>
+                      </div>
+                    </RadioGroup>
                   </div>
 
-                  <div className="pt-4 flex justify-between items-center">
-                    <Button 
-                      variant="ghost" 
-                      size="lg" 
-                      onClick={() => setStep(1)}
-                      className="text-muted-foreground hover:text-foreground"
-                    >
-                      <ArrowLeft className="mr-2 w-4 h-4" /> Back
-                    </Button>
-                    
-                    <Button 
-                      size="lg" 
-                      className="rounded-full px-8 min-w-[160px]"
-                      onClick={handleCreateLeague}
-                      disabled={loading}
-                    >
-                      {loading ? (
-                        <div className="flex items-center">
-                          <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2"></div>
-                          Creating...
-                        </div>
-                      ) : (
-                        <>Create League <CheckCircle className="ml-2 w-4 h-4" /></>
-                      )}
-                    </Button>
+                  <div className="space-y-4">
+                    <Label className="text-base font-semibold">Privacy</Label>
+                    <div className="bg-muted/30 p-4 rounded-xl flex items-center justify-between h-[100px] border border-border/50">
+                      <div className="space-y-0.5">
+                        <Label className="text-base">Public League</Label>
+                        <p className="text-sm text-muted-foreground">
+                          Anyone can join this league
+                        </p>
+                      </div>
+                      <Switch checked={isPublic} onCheckedChange={setIsPublic} />
+                    </div>
                   </div>
                 </div>
-              )}
+
+                <div className="border-t pt-6">
+                  <div className="flex items-center justify-between mb-6">
+                     <div>
+                       <h3 className="text-xl font-bold">Scoring Settings</h3>
+                       <p className="text-muted-foreground text-sm">Toggle stats and adjust point values</p>
+                     </div>
+                     <Badge variant="secondary" className="bg-primary/10 text-primary">
+                       {leagueStats.filter(s => s.enabled).length} Active Stats
+                     </Badge>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {Object.entries(statsByCategory).map(([category, stats]) => (
+                      <div key={category} className="space-y-3">
+                        <h4 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                          {category === 'Fun' && <span className="text-lg">🎉</span>}
+                          {category} Stats
+                        </h4>
+                        <div className="bg-card rounded-xl border shadow-sm overflow-hidden">
+                          {stats.map((stat) => (
+                            <div 
+                              key={stat.id} 
+                              className={`flex items-center justify-between p-3 border-b last:border-0 transition-colors ${stat.enabled ? 'bg-primary/5' : 'opacity-60'}`}
+                            >
+                              <div className="flex items-center gap-3">
+                                <Switch 
+                                  checked={stat.enabled} 
+                                  onCheckedChange={() => handleStatToggle(stat.id)} 
+                                />
+                                <span className={`font-medium ${stat.enabled ? 'text-foreground' : 'text-muted-foreground'}`}>
+                                  {stat.name}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-muted-foreground">Pts:</span>
+                                <Input 
+                                  type="number" 
+                                  className="h-8 w-16 text-right font-mono" 
+                                  value={stat.points}
+                                  onChange={(e) => handleStatPointsChange(stat.id, e.target.value)}
+                                  disabled={!stat.enabled}
+                                  step="0.1"
+                                />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="pt-4 flex justify-end items-center">
+                  <Button 
+                    size="lg" 
+                    className="rounded-full px-8 min-w-[200px]"
+                    onClick={handleCreateLeague}
+                    disabled={loading || !leagueName}
+                  >
+                    {loading ? (
+                      <div className="flex items-center">
+                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2"></div>
+                        Creating...
+                      </div>
+                    ) : (
+                      <>Create League <CheckCircle className="ml-2 w-4 h-4" /></>
+                    )}
+                  </Button>
+                </div>
+              </div>
 
             </CardContent>
           </Card>
