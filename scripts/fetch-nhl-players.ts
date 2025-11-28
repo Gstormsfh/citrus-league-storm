@@ -90,10 +90,20 @@ async function main() {
       const currentStats = details.featuredStats?.regularSeason?.subSeason || {};
       const careerStats = details.careerTotals?.regularSeason || {};
 
-      // Prepare DB object
+      // Map generic positions to specific ones using shoots/catches for wingers
+      let position = details.position;
+      if (position === 'L') position = 'LW';
+      if (position === 'R') position = 'RW';
+      if (position === 'G') {
+        // Goalies are just 'G' but let's make sure we aren't filtering them out downstream or something.
+        // The issue might be that previous code didn't handle 'G' correctly or defaults?
+        // Actually, the roster endpoint returns categories: 'forwards', 'defensemen', 'goalies'.
+        // We are iterating all of them.
+      }
+      
       const playerData = {
         full_name: `${details.firstName?.default} ${details.lastName?.default}`,
-        position: details.position,
+        position: position,
         team: details.currentTeamAbbrev || team, // Fallback to loop team
         jersey_number: details.sweaterNumber?.toString(),
         status: details.isActive ? 'active' : 'na',
