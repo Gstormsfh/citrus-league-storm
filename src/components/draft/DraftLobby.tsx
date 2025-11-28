@@ -26,7 +26,7 @@ interface Team {
   name: string;
   owner: string;
   color: string;
-  picks: any[];
+  picks: unknown[];
 }
 
 interface DraftSettings {

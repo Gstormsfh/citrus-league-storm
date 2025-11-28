@@ -73,7 +73,7 @@ export const PlayerPool = ({
   const [viewMode, setViewMode] = useState<'all' | 'tiers'>('all');
 
   const filteredAndSortedPlayers = useMemo(() => {
-    let filtered = mockPlayers.filter(player => {
+    const filtered = mockPlayers.filter(player => {
       const matchesSearch = player.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                            player.team.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesPosition = selectedPosition === 'All' || player.position === selectedPosition;

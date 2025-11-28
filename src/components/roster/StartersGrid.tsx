@@ -47,7 +47,7 @@ const StartersGrid = ({ players, slotAssignments = {}, onPlayerClick, className 
   const getPlayerInSlot = (slotId: string) => {
     // Look for key in slotAssignments where value is slotId
     // Cast key to string for comparison since Object.keys returns strings
-    const playerId = Object.keys(slotAssignments).find(key => slotAssignments[key as any] === slotId);
+    const playerId = Object.keys(slotAssignments).find(key => slotAssignments[key] === slotId);
     if (!playerId) return undefined;
     
     // Loose comparison to catch both string/number IDs

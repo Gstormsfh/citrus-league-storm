@@ -11,7 +11,7 @@ export type Player = {
   position: string;
   number: number;
   starter: boolean;
-  stats: any;
+  stats: Record<string, string | number>;
   team: string;
   height: string;
   weight: string;

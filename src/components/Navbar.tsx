@@ -139,14 +139,14 @@ const Navbar = () => {
                         <p className="text-xs leading-tight text-muted-foreground">Latest fantasy updates</p>
                         <ChevronRight className="h-3 w-3 mt-2 text-primary" />
                       </Link>
-                      <Link to="/blog" onClick={closeMobileMenu} className="flex h-full w-full select-none flex-col justify-end rounded-md bg-gradient-to-b from-primary/5 to-primary/10 p-4 no-underline outline-none focus:shadow-sm hover:shadow-sm hover:scale-[1.01] transition-all duration-200">
-                        <div className="mb-1 mt-2 text-base font-medium">Blog</div>
-                        <p className="text-xs leading-tight text-muted-foreground">Fantasy sports insights</p>
+                      <Link to="/create-league" onClick={closeMobileMenu} className="flex h-full w-full select-none flex-col justify-end rounded-md bg-gradient-to-b from-primary/5 to-primary/10 p-4 no-underline outline-none focus:shadow-sm hover:shadow-sm hover:scale-[1.01] transition-all duration-200">
+                        <div className="mb-1 mt-2 text-base font-medium">Create League</div>
+                        <p className="text-xs leading-tight text-muted-foreground">Start a new league</p>
                         <ChevronRight className="h-3 w-3 mt-2 text-primary" />
                       </Link>
-                      <Link to="/podcasts" onClick={closeMobileMenu} className="flex h-full w-full select-none flex-col justify-end rounded-md bg-gradient-to-b from-secondary/5 to-secondary/10 p-4 no-underline outline-none focus:shadow-sm hover:shadow-sm hover:scale-[1.01] transition-all duration-200">
-                        <div className="mb-1 mt-2 text-base font-medium">Podcasts</div>
-                        <p className="text-xs leading-tight text-muted-foreground">Expert analysis</p>
+                      <Link to="/blog" onClick={closeMobileMenu} className="flex h-full w-full select-none flex-col justify-end rounded-md bg-gradient-to-b from-secondary/5 to-secondary/10 p-4 no-underline outline-none focus:shadow-sm hover:shadow-sm hover:scale-[1.01] transition-all duration-200">
+                        <div className="mb-1 mt-2 text-base font-medium">Blog & Podcasts</div>
+                        <p className="text-xs leading-tight text-muted-foreground">Insights & Analysis</p>
                         <ChevronRight className="h-3 w-3 mt-2 text-primary" />
                       </Link>
                       <Link to="/guides" onClick={closeMobileMenu} className="flex h-full w-full select-none flex-col justify-end rounded-md bg-gradient-to-b from-accent/5 to-accent/10 p-4 no-underline outline-none focus:shadow-sm hover:shadow-sm hover:scale-[1.01] transition-all duration-200">

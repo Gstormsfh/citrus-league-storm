@@ -12,10 +12,10 @@ interface TeamCardProps {
 export const TeamCard = ({ title, starters, bench, gradientClass }: TeamCardProps) => {
   
   // Helper to calculate daily points
-  const getDailyPoints = (stats: any) => {
+  const getDailyPoints = (stats: { goals?: number; assists?: number; sog?: number; blk?: number }) => {
     if (!stats) return 0;
     // Simplified calculation for demo: G=3, A=2, SOG=0.4, BLK=0.4
-    return (stats.goals * 3 + stats.assists * 2 + stats.sog * 0.4 + stats.blk * 0.4).toFixed(1);
+    return ((stats.goals || 0) * 3 + (stats.assists || 0) * 2 + (stats.sog || 0) * 0.4 + (stats.blk || 0) * 0.4).toFixed(1);
   };
 
   return (
