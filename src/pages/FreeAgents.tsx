@@ -3,14 +3,15 @@ import { useSearchParams } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { Calendar, TrendingUp } from 'lucide-react';
+import { Calendar, TrendingUp, Filter, List, Grid } from 'lucide-react';
 import { PlayerService, Player } from '@/services/PlayerService';
 import { LeagueService } from '@/services/LeagueService';
+import { Badge } from '@/components/ui/badge';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 const FreeAgents = () => {
   const { toast } = useToast();
@@ -18,6 +19,7 @@ const FreeAgents = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [positionFilter, setPositionFilter] = useState('ALL');
   const [activeTab, setActiveTab] = useState('available');
+  const [viewMode, setViewMode] = useState<'summary' | 'all'>('summary');
   const [players, setPlayers] = useState<Player[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -55,13 +57,30 @@ const FreeAgents = () => {
     });
   };
 
-  const filteredPlayers = players.filter(player => {
-    const matchesSearch = player.full_name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          player.team.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesPosition = positionFilter === 'ALL' || player.position === positionFilter;
-    
-    return matchesSearch && matchesPosition;
-  });
+  // Filter players based on search and position
+  const getFilteredPlayers = (sourcePlayers: Player[]) => {
+    return sourcePlayers.filter(player => {
+      const matchesSearch = player.full_name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                            player.team.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesPosition = positionFilter === 'ALL' || 
+        (positionFilter === 'W' ? (player.position === 'LW' || player.position === 'RW') : player.position === positionFilter);
+      
+      return matchesSearch && matchesPosition;
+    });
+  };
+
+  const filteredPlayers = getFilteredPlayers(players);
+
+  // Derived lists for Summary View
+  const topTrending = [...filteredPlayers]
+    .sort((a, b) => (b.points || 0) - (a.points || 0)) // Mock trending with points for now
+    .slice(0, 5);
+
+  const topProjected = [...filteredPlayers]
+    .sort((a, b) => ((b.points || 0) / 20) - ((a.points || 0) / 20)) // Mock projection
+    .slice(0, 5);
+
+  const positions = ['ALL', 'C', 'LW', 'RW', 'W', 'D', 'G'];
 
   return (
     <div className="min-h-screen bg-background">
@@ -79,19 +98,6 @@ const FreeAgents = () => {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
-            <Select value={positionFilter} onValueChange={setPositionFilter}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Position" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">All Positions</SelectItem>
-                <SelectItem value="C">Center</SelectItem>
-                <SelectItem value="LW">Left Wing</SelectItem>
-                <SelectItem value="RW">Right Wing</SelectItem>
-                <SelectItem value="D">Defense</SelectItem>
-                <SelectItem value="G">Goalie</SelectItem>
-              </SelectContent>
-            </Select>
           </div>
         </div>
 
@@ -103,63 +109,180 @@ const FreeAgents = () => {
             <TabsTrigger value="watch">Watch List</TabsTrigger>
           </TabsList>
           
-          <TabsContent value="available" className="space-y-4">
+          <TabsContent value="available" className="space-y-6">
+            {/* Quick Position Filters */}
+            <div className="flex flex-wrap gap-2">
+              {positions.map((pos) => (
+                <Badge
+                  key={pos}
+                  variant={positionFilter === pos ? "default" : "outline"}
+                  className="cursor-pointer hover:bg-primary/90 px-4 py-1 text-sm transition-all"
+                  onClick={() => setPositionFilter(pos)}
+                >
+                  {pos === 'W' ? 'Wingers' : (pos === 'ALL' ? 'All Positions' : pos)}
+                </Badge>
+              ))}
+            </div>
+
             {loading ? (
               <div className="text-center py-12">
                 <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
                 <p className="text-muted-foreground">Loading players...</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {filteredPlayers.map((player) => (
-                  <Card key={player.id} className="overflow-hidden hover:border-primary/50 transition-colors">
-                    <CardContent className="p-0">
-                      <div className="flex items-center p-4">
-                        <div className="h-12 w-12 rounded-full bg-secondary/20 flex items-center justify-center overflow-hidden mr-4 border border-border">
-                          {player.headshot_url ? (
-                            <img src={player.headshot_url} alt={player.full_name} className="w-full h-full object-cover" />
-                          ) : (
-                            <span className="text-secondary-foreground font-bold text-lg">{player.team}</span>
-                          )}
-                        </div>
-                        <div className="flex-1">
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <h3 className="font-bold text-lg">{player.full_name}</h3>
-                              <p className="text-sm text-muted-foreground">{player.position} • {player.team} • {player.status || 'Active'}</p>
+              <>
+                {viewMode === 'summary' && !searchQuery ? (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {/* Top Trending Table */}
+                    <Card>
+                      <CardHeader className="flex flex-row items-center justify-between pb-2">
+                        <CardTitle className="text-lg font-bold flex items-center gap-2">
+                          <TrendingUp className="h-5 w-5 text-green-500" />
+                          Top Trending
+                        </CardTitle>
+                        <Button variant="ghost" size="sm" onClick={() => setViewMode('all')}>See All</Button>
+                      </CardHeader>
+                      <CardContent className="p-0">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Player</TableHead>
+                              <TableHead className="text-right">Pos</TableHead>
+                              <TableHead className="text-right">Pts</TableHead>
+                              <TableHead className="w-[50px]"></TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {topTrending.map(player => (
+                              <TableRow key={player.id}>
+                                <TableCell className="font-medium">
+                                  <div className="flex flex-col">
+                                    <span>{player.full_name}</span>
+                                    <span className="text-xs text-muted-foreground">{player.team}</span>
+                                  </div>
+                                </TableCell>
+                                <TableCell className="text-right">{player.position}</TableCell>
+                                <TableCell className="text-right font-bold text-green-600">
+                                  {player.points || 0}
+                                </TableCell>
+                                <TableCell>
+                                  <Button size="icon" variant="ghost" className="h-8 w-8 text-primary" onClick={() => handleAddPlayer(player)}>
+                                    +
+                                  </Button>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </CardContent>
+                    </Card>
+
+                    {/* Top Projected Table */}
+                    <Card>
+                      <CardHeader className="flex flex-row items-center justify-between pb-2">
+                        <CardTitle className="text-lg font-bold flex items-center gap-2">
+                          <Calendar className="h-5 w-5 text-blue-500" />
+                          Top Projected (Week)
+                        </CardTitle>
+                        <Button variant="ghost" size="sm" onClick={() => setViewMode('all')}>See All</Button>
+                      </CardHeader>
+                      <CardContent className="p-0">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Player</TableHead>
+                              <TableHead className="text-right">Pos</TableHead>
+                              <TableHead className="text-right">Proj</TableHead>
+                              <TableHead className="w-[50px]"></TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {topProjected.map(player => (
+                              <TableRow key={player.id}>
+                                <TableCell className="font-medium">
+                                  <div className="flex flex-col">
+                                    <span>{player.full_name}</span>
+                                    <span className="text-xs text-muted-foreground">{player.team}</span>
+                                  </div>
+                                </TableCell>
+                                <TableCell className="text-right">{player.position}</TableCell>
+                                <TableCell className="text-right font-bold text-blue-600">
+                                  {((player.points || 0) / 10).toFixed(1)}
+                                </TableCell>
+                                <TableCell>
+                                  <Button size="icon" variant="ghost" className="h-8 w-8 text-primary" onClick={() => handleAddPlayer(player)}>
+                                    +
+                                  </Button>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </CardContent>
+                    </Card>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <h3 className="font-semibold text-lg">All Available Players</h3>
+                      {viewMode === 'all' && !searchQuery && (
+                        <Button variant="outline" size="sm" onClick={() => setViewMode('summary')}>Back to Summary</Button>
+                      )}
+                    </div>
+                    
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                      {filteredPlayers.map((player) => (
+                        <Card key={player.id} className="overflow-hidden hover:border-primary/50 transition-colors">
+                          <CardContent className="p-0">
+                            <div className="flex items-center p-4">
+                              <div className="h-12 w-12 rounded-full bg-secondary/20 flex items-center justify-center overflow-hidden mr-4 border border-border">
+                                {player.headshot_url ? (
+                                  <img src={player.headshot_url} alt={player.full_name} className="w-full h-full object-cover" />
+                                ) : (
+                                  <span className="text-secondary-foreground font-bold text-lg">{player.team}</span>
+                                )}
+                              </div>
+                              <div className="flex-1">
+                                <div className="flex justify-between items-start">
+                                  <div>
+                                    <h3 className="font-bold text-lg">{player.full_name}</h3>
+                                    <p className="text-sm text-muted-foreground">{player.position} • {player.team} • {player.status || 'Active'}</p>
+                                  </div>
+                                  <div className="text-right">
+                                    <div className="font-bold text-lg text-primary">{player.points || 0}</div>
+                                    <p className="text-xs text-muted-foreground">Season Pts</p>
+                                  </div>
+                                </div>
+                                
+                                <div className="mt-3 flex gap-4 text-sm">
+                                  {player.position === 'G' ? (
+                                    <>
+                                      <div><span className="text-muted-foreground">W:</span> {player.wins || 0}</div>
+                                      <div><span className="text-muted-foreground">GAA:</span> {player.goals_against_average || '0.00'}</div>
+                                      <div><span className="text-muted-foreground">SV%:</span> {player.save_percentage || '.000'}</div>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <div><span className="text-muted-foreground">G:</span> {player.goals || 0}</div>
+                                      <div><span className="text-muted-foreground">A:</span> {player.assists || 0}</div>
+                                      {player.shots !== null && <div><span className="text-muted-foreground">SOG:</span> {player.shots}</div>}
+                                      {player.blocks !== null && <div><span className="text-muted-foreground">BLK:</span> {player.blocks}</div>}
+                                      {player.hits !== null && <div><span className="text-muted-foreground">HIT:</span> {player.hits}</div>}
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="ml-4">
+                                <Button size="sm" onClick={() => handleAddPlayer(player)}>+</Button>
+                              </div>
                             </div>
-                            <div className="text-right">
-                              <div className="font-bold text-lg text-primary">{player.points || 0}</div>
-                              <p className="text-xs text-muted-foreground">Season Pts</p>
-                            </div>
-                          </div>
-                          
-                          <div className="mt-3 flex gap-4 text-sm">
-                            {player.position === 'G' ? (
-                              <>
-                                <div><span className="text-muted-foreground">W:</span> {player.wins || 0}</div>
-                                <div><span className="text-muted-foreground">GAA:</span> {player.goals_against_average || '0.00'}</div>
-                                <div><span className="text-muted-foreground">SV%:</span> {player.save_percentage || '.000'}</div>
-                              </>
-                            ) : (
-                              <>
-                                <div><span className="text-muted-foreground">G:</span> {player.goals || 0}</div>
-                                <div><span className="text-muted-foreground">A:</span> {player.assists || 0}</div>
-                                {player.shots !== null && <div><span className="text-muted-foreground">SOG:</span> {player.shots}</div>}
-                                {player.blocks !== null && <div><span className="text-muted-foreground">BLK:</span> {player.blocks}</div>}
-                                {player.hits !== null && <div><span className="text-muted-foreground">HIT:</span> {player.hits}</div>}
-                              </>
-                            )}
-                          </div>
-                        </div>
-                        <div className="ml-4">
-                          <Button size="sm" onClick={() => handleAddPlayer(player)}>+</Button>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </TabsContent>
 
@@ -174,9 +297,9 @@ const FreeAgents = () => {
 
              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                {[...filteredPlayers, 
-                 { id: 101, name: "Joey Daccord", position: "G", team: "SEA", opponent: "4 Games", projectedPoints: 5.8, stats: { wins: 12, gaa: 2.3, savePercentage: .920 }, trend: "up", games: 4, rostered: 42 },
-                 { id: 102, name: "Charlie Coyle", position: "C/RW", team: "BOS", opponent: "4 Games", projectedPoints: 6.2, stats: { goals: 18, assists: 22 }, trend: "up", games: 4, rostered: 55 }
-               ].filter(p => (p as any).games === 4 || Math.random() > 0.5).map((player: any) => (
+                 { id: 101, full_name: "Joey Daccord", position: "G", team: "SEA", opponent: "4 Games", projectedPoints: 5.8, wins: 12, goals_against_average: 2.3, save_percentage: .920, trend: "up", games: 4, rostered: 42 },
+                 { id: 102, full_name: "Charlie Coyle", position: "C", team: "BOS", opponent: "4 Games", projectedPoints: 6.2, goals: 18, assists: 22, trend: "up", games: 4, rostered: 55 }
+               ].filter(p => (p as any).games === 4 || Math.random() > 0.8).slice(0, 6).map((player: any) => (
                  <Card key={player.id} className="overflow-hidden hover:border-blue-500/50 transition-colors border-blue-500/20">
                   <CardContent className="p-0">
                     <div className="flex items-center p-4">
@@ -187,7 +310,7 @@ const FreeAgents = () => {
                       <div className="flex-1">
                         <div className="flex justify-between items-start">
                           <div>
-                            <h3 className="font-bold text-lg">{player.name}</h3>
+                            <h3 className="font-bold text-lg">{player.full_name}</h3>
                             <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                <span>{player.position}</span>
                                <span>•</span>
@@ -195,7 +318,7 @@ const FreeAgents = () => {
                             </div>
                           </div>
                           <div className="text-right">
-                            <div className="font-bold text-lg text-primary">{player.projectedPoints}</div>
+                            <div className="font-bold text-lg text-primary">{player.projectedPoints || ((player.points || 0) / 15).toFixed(1)}</div>
                             <p className="text-xs text-muted-foreground">Proj Pts</p>
                           </div>
                         </div>
