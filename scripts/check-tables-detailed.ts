@@ -18,6 +18,8 @@ async function listTables() {
     'goalies_2025_staging',
     'skaters_2024_staging',
     'skaters_2025_staging',
+    'staging_2025_skaters',
+    'staging_2025_goalies',
     'Goalies 2024 Season',
     'Goalies 2025 Season',
     'Skaters 2024 Season',

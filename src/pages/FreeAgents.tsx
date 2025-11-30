@@ -111,6 +111,7 @@ const FreeAgents = () => {
     number: parseInt(p.jersey_number || '0'),
     starter: false,
     stats: {
+      gamesPlayed: p.games_played || 0,
       goals: p.goals || 0,
       assists: p.assists || 0,
       points: p.points || 0,
@@ -118,6 +119,9 @@ const FreeAgents = () => {
       shots: p.shots || 0,
       hits: p.hits || 0,
       blockedShots: p.blocks || 0,
+      xGoals: p.xGoals || 0,
+      corsi: p.corsi || 0,
+      fenwick: p.fenwick || 0,
       wins: p.wins || 0,
       losses: p.losses || 0,
       otl: p.ot_losses || 0,

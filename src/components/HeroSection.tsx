@@ -66,15 +66,50 @@ const HeroSection = () => {
               
               <div className="grid grid-cols-2 gap-4">
                 <div className="bg-white/80 backdrop-blur-sm rounded-lg p-4">
-                  <h4 className="font-bold text-sm mb-1">League Activity</h4>
-                  <div className="h-20 bg-citrus-green-light/40 rounded-md"></div>
+                  <h4 className="font-bold text-sm mb-2 flex items-center justify-between">
+                    League Activity
+                    <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                  </h4>
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-xs border-b border-black/5 pb-1">
+                        <div className="w-1 h-8 bg-foreground/20 rounded-full"></div>
+                        <div>
+                            <span className="font-semibold">Team Orange</span>
+                            <p className="text-foreground/70 leading-tight">Added <span className="font-medium">M. Michkov</span></p>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs">
+                         <div className="w-1 h-8 bg-foreground/20 rounded-full"></div>
+                         <div>
+                            <span className="font-semibold">Puck Peelers</span>
+                            <p className="text-foreground/70 leading-tight">Traded for <span className="font-medium">K. Kaprizov</span></p>
+                         </div>
+                    </div>
+                  </div>
                 </div>
-                <div className="bg-white/80 backdrop-blur-sm rounded-lg p-4">
-                  <h4 className="font-bold text-sm mb-1">Weekly Matchup</h4>
+                <div className="bg-white/80 backdrop-blur-sm rounded-lg p-4 flex flex-col justify-between">
+                  <h4 className="font-bold text-sm mb-1 flex items-center gap-2">
+                    Weekly Matchup
+                    <span className="text-[10px] bg-foreground/10 text-foreground/80 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">Live</span>
+                  </h4>
+                  <div className="flex flex-col gap-3 mt-1">
+                    <div className="flex justify-between items-center">
+                        <div className="flex items-center gap-2">
+                            <div className="w-6 h-6 rounded-full bg-foreground/5 flex items-center justify-center text-xs font-bold text-foreground/70">CC</div>
+                            <span className="text-xs font-bold">Citrus Crush</span>
+                        </div>
+                        <span className="font-bold text-sm">128.7</span>
+                    </div>
+                    <div className="w-full bg-muted/30 h-1.5 rounded-full overflow-hidden">
+                         <div className="bg-foreground/40 w-[55%] h-full rounded-full"></div>
+                    </div>
                   <div className="flex justify-between items-center">
-                    <span className="font-bold">128.7</span>
-                    <span className="text-xs text-foreground/60">vs</span>
-                    <span className="font-bold">115.3</span>
+                        <div className="flex items-center gap-2">
+                             <div className="w-6 h-6 rounded-full bg-foreground/5 flex items-center justify-center text-xs font-bold text-foreground/70">PP</div>
+                             <span className="text-xs font-bold">Puck Peelers</span>
+                        </div>
+                        <span className="font-bold text-sm">115.3</span>
+                    </div>
                   </div>
                 </div>
               </div>

@@ -12,13 +12,18 @@ import { PlayerService } from '@/services/PlayerService';
 import { LeagueService } from '@/services/LeagueService';
 import PlayerStatsModal from '@/components/PlayerStatsModal';
 
+import { ErrorBoundary } from "@/components/ErrorBoundary";
+
 // Helper for fantasy position (reused)
 const getFantasyPosition = (position: string): 'C' | 'LW' | 'RW' | 'D' | 'G' | 'UTIL' => {
-  if (position === 'Centre' || position === 'C') return 'C';
-  if (position === 'Left Wing' || position === 'LW') return 'LW';
-  if (position === 'Right Wing' || position === 'RW') return 'RW';
-  if (position === 'Defence' || position === 'D') return 'D';
-  if (position === 'Goalie' || position === 'G') return 'G';
+  const pos = position?.toUpperCase() || '';
+  
+  if (['C', 'CENTRE', 'CENTER'].includes(pos)) return 'C';
+  if (['LW', 'LEFT WING', 'LEFTWING', 'L'].includes(pos)) return 'LW';
+  if (['RW', 'RIGHT WING', 'RIGHTWING', 'R'].includes(pos)) return 'RW';
+  if (['D', 'DEFENCE', 'DEFENSE'].includes(pos)) return 'D';
+  if (['G', 'GOALIE'].includes(pos)) return 'G';
+  
   return 'UTIL';
 };
 
@@ -61,6 +66,7 @@ const OtherTeam = () => {
           number: parseInt(p.jersey_number || '0'),
           starter: false,
           stats: {
+            gamesPlayed: p.games_played || 0,
             goals: p.goals || 0,
             assists: p.assists || 0,
             points: p.points || 0,
@@ -68,6 +74,9 @@ const OtherTeam = () => {
             shots: p.shots || 0,
             hits: p.hits || 0,
             blockedShots: p.blocks || 0,
+            xGoals: p.xGoals || 0,
+            corsi: p.corsi || 0,
+            fenwick: p.fenwick || 0,
             wins: p.wins || 0,
             losses: p.losses || 0,
             otl: p.ot_losses || 0,
@@ -103,21 +112,24 @@ const OtherTeam = () => {
             ...savedLineup.ir
           ]);
           
-          const starters = savedLineup.starters
+          // Helper to deduplicate IDs
+          const uniqueIds = (ids: string[]) => Array.from(new Set(ids));
+
+          const starters = uniqueIds(savedLineup.starters)
             .map(id => {
               const player = playerMap.get(id);
               if (!player) return null;
               return { ...player, starter: true };
             })
-            .filter((p): p is HockeyPlayer => p !== null);
+            .filter((p): p is HockeyPlayer => !!p);
           
-          const bench = savedLineup.bench
+          const bench = uniqueIds(savedLineup.bench)
             .map(id => playerMap.get(id))
-            .filter((p): p is HockeyPlayer => p !== null);
+            .filter((p): p is HockeyPlayer => !!p);
           
-          const ir = savedLineup.ir
+          const ir = uniqueIds(savedLineup.ir)
             .map(id => playerMap.get(id))
-            .filter((p): p is HockeyPlayer => p !== null);
+            .filter((p): p is HockeyPlayer => !!p);
           
           // Add any new players (not in saved lineup) to bench
           transformedPlayers.forEach(player => {
@@ -215,6 +227,7 @@ const OtherTeam = () => {
   }
 
   return (
+    <ErrorBoundary>
     <div className="min-h-screen bg-background">
       <Navbar />
       <main className="pt-24 pb-16 container mx-auto px-4">
@@ -305,6 +318,7 @@ const OtherTeam = () => {
       </main>
       <Footer />
     </div>
+    </ErrorBoundary>
   );
 };
 

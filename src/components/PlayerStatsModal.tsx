@@ -15,7 +15,7 @@ interface PlayerStatsModalProps {
 const PlayerStatsModal = ({ player, isOpen, onClose }: PlayerStatsModalProps) => {
   if (!player) return null;
 
-  const isGoalie = player.position === 'Goalie';
+  const isGoalie = player.position === 'Goalie' || player.position === 'G';
   const stats = player.stats || {};
 
   // Get status badge info
@@ -160,21 +160,6 @@ const PlayerStatsModal = ({ player, isOpen, onClose }: PlayerStatsModalProps) =>
                   </Card>
                   <Card>
                     <CardHeader className="flex flex-row items-center space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">+/-</CardTitle>
-                      <TrendingUp className="h-4 w-4 ml-auto text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                      <div className={cn(
-                        "text-2xl font-bold",
-                        (stats.plusMinus ?? 0) > 0 && "text-green-600",
-                        (stats.plusMinus ?? 0) < 0 && "text-red-600"
-                      )}>
-                        {(stats.plusMinus ?? 0) > 0 ? '+' : ''}{stats.plusMinus ?? 0}
-                      </div>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardHeader className="flex flex-row items-center space-y-0 pb-2">
                       <CardTitle className="text-sm font-medium">Shots on Goal</CardTitle>
                       <Crosshair className="h-4 w-4 ml-auto text-muted-foreground" />
                     </CardHeader>
@@ -194,6 +179,15 @@ const PlayerStatsModal = ({ player, isOpen, onClose }: PlayerStatsModalProps) =>
                     </CardHeader>
                     <CardContent>
                       <div className="text-2xl font-bold">{stats.gamesPlayed ?? 0}</div>
+                    </CardContent>
+                  </Card>
+                   <Card>
+                    <CardHeader className="flex flex-row items-center space-y-0 pb-2">
+                      <CardTitle className="text-sm font-medium">Hits</CardTitle>
+                      <Weight className="h-4 w-4 ml-auto text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">{stats.hits ?? 0}</div>
                     </CardContent>
                   </Card>
                 </>
@@ -227,35 +221,24 @@ const PlayerStatsModal = ({ player, isOpen, onClose }: PlayerStatsModalProps) =>
                   </Card>
                   <Card>
                     <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-medium">High Danger Save %</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold">.824</div>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardHeader className="pb-2">
                       <CardTitle className="text-sm font-medium">Goals Saved Above Expected</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold text-green-600">+12.4</div>
+                      <div className={cn("text-2xl font-bold", 
+                        (stats.goalsSavedAboveExpected || 0) > 0 ? "text-green-600" : (stats.goalsSavedAboveExpected || 0) < 0 ? "text-red-600" : ""
+                      )}>
+                        {(stats.goalsSavedAboveExpected || 0) > 0 ? '+' : ''}{(stats.goalsSavedAboveExpected || 0).toFixed(2)}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">GSAx (Expected - Actual)</p>
                     </CardContent>
                   </Card>
                   <Card>
                     <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-medium">Quality Starts %</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold">64%</div>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-medium">Record</CardTitle>
+                      <CardTitle className="text-sm font-medium">High Danger Save %</CardTitle>
                     </CardHeader>
                     <CardContent>
                       <div className="text-2xl font-bold">
-                        {stats.wins ?? 0}-{stats.losses ?? 0}-{stats.otl ?? 0}
+                        {stats.highDangerSavePct ? (stats.highDangerSavePct * 100).toFixed(1) : '0.0'}%
                       </div>
                     </CardContent>
                   </Card>
@@ -264,21 +247,17 @@ const PlayerStatsModal = ({ player, isOpen, onClose }: PlayerStatsModalProps) =>
                 <>
                   <Card>
                     <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-medium">Power Play TOI %</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold">68.5%</div>
-                      <p className="text-xs text-muted-foreground mt-1">Top Unit</p>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardHeader className="pb-2">
                       <CardTitle className="text-sm font-medium">Expected Goals (xG)</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold">{((stats.goals || 0) * 0.92).toFixed(1)}</div>
+                      <div className="text-2xl font-bold">{stats.xGoals?.toFixed(1) ?? '0.0'}</div>
                       <p className="text-xs text-muted-foreground mt-1">
-                         Diff: <span className="text-green-600">+{((stats.goals || 0) - ((stats.goals || 0) * 0.92)).toFixed(1)}</span>
+                         Diff: <span className={cn(
+                           ((stats.goals || 0) - (stats.xGoals || 0)) > 0 ? "text-green-600" : "text-red-600"
+                         )}>
+                           {((stats.goals || 0) - (stats.xGoals || 0)) > 0 ? '+' : ''}
+                           {((stats.goals || 0) - (stats.xGoals || 0)).toFixed(1)}
+                         </span>
                       </p>
                     </CardContent>
                   </Card>
@@ -287,7 +266,9 @@ const PlayerStatsModal = ({ player, isOpen, onClose }: PlayerStatsModalProps) =>
                       <CardTitle className="text-sm font-medium">Corsi For %</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold">54.2%</div>
+                      <div className="text-2xl font-bold">
+                        {stats.corsi ? (stats.corsi * 100).toFixed(1) : '0.0'}%
+                      </div>
                       <p className="text-xs text-muted-foreground mt-1">Possession Dominance</p>
                     </CardContent>
                   </Card>
@@ -296,30 +277,39 @@ const PlayerStatsModal = ({ player, isOpen, onClose }: PlayerStatsModalProps) =>
                       <CardTitle className="text-sm font-medium">Fenwick For %</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold">53.8%</div>
+                      <div className="text-2xl font-bold">
+                         {stats.fenwick ? (stats.fenwick * 100).toFixed(1) : '0.0'}%
+                      </div>
                     </CardContent>
                   </Card>
-                  <Card>
+                   <Card>
                     <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-medium">PDO</CardTitle>
+                      <CardTitle className="text-sm font-medium">Hits</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold">1.015</div>
-                      <p className="text-xs text-muted-foreground mt-1">Slightly Lucky</p>
+                      <div className="text-2xl font-bold">{stats.hits ?? 0}</div>
                     </CardContent>
                   </Card>
-                  <Card>
+                   <Card>
                     <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-medium">Zone Starts (Off)</CardTitle>
+                      <CardTitle className="text-sm font-medium">Blocked Shots</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold">62%</div>
-                      <p className="text-xs text-muted-foreground mt-1">Offensive Deployment</p>
+                      <div className="text-2xl font-bold">{stats.blockedShots ?? 0}</div>
+                    </CardContent>
+                  </Card>
+                   <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium">Power Play Points</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">{stats.powerPlayPoints ?? 0}</div>
                     </CardContent>
                   </Card>
                 </>
               )}
             </div>
+
 
             {/* Detailed Stats Table (Merged) */}
             <div className="mt-6">

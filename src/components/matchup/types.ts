@@ -15,6 +15,7 @@ export type MatchupPlayer = {
     assists: number;
     sog: number;
     blk: number;
+    gamesPlayed?: number;
   };
   isToday?: boolean;
   gameInfo?: {

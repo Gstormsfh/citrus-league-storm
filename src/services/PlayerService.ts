@@ -11,6 +11,7 @@ export interface Player {
   status: string | null;
   headshot_url: string | null;
   last_updated: string | null;
+  games_played: number;
   
   // Stats (from 'all' situation)
   goals: number;
@@ -21,6 +22,11 @@ export interface Player {
   hits: number;
   blocks: number;
   
+  // Advanced stats (new)
+  xGoals: number;
+  corsi: number;
+  fenwick: number;
+  
   // Goalie specific
   wins: number | null;
   losses: number | null;
@@ -28,6 +34,8 @@ export interface Player {
   saves: number | null;
   goals_against_average: number | null;
   save_percentage: number | null;
+  highDangerSavePct: number;
+  goalsSavedAboveExpected: number;
 }
 
 export const PlayerService = {
@@ -69,6 +77,7 @@ export const PlayerService = {
             status: 'active', // Default to active since they have stats
             headshot_url: `https://assets.nhle.com/mugs/nhl/20242025/${s.team}/${s.playerId}.png`, // Construct dynamic URL
             last_updated: new Date().toISOString(),
+            games_played: typeof s.games_played === 'string' ? parseInt(s.games_played) : (s.games_played || 0),
             
             goals: typeof s.I_F_goals === 'string' ? parseFloat(s.I_F_goals) : (s.I_F_goals || 0),
             assists: totalAssists,
@@ -77,6 +86,11 @@ export const PlayerService = {
             shots: typeof s.I_F_shotsOnGoal === 'string' ? parseFloat(s.I_F_shotsOnGoal) : (s.I_F_shotsOnGoal || 0),
             hits: typeof s.I_F_hits === 'string' ? parseFloat(s.I_F_hits) : (s.I_F_hits || 0),
             blocks: typeof s.shotsBlockedByPlayer === 'string' ? parseFloat(s.shotsBlockedByPlayer) : (s.shotsBlockedByPlayer || 0),
+            xGoals: typeof s.I_F_xGoals === 'string' ? parseFloat(s.I_F_xGoals) : (s.I_F_xGoals || 0),
+            corsi: typeof s.onIce_corsiPercentage === 'string' ? parseFloat(s.onIce_corsiPercentage) : (s.onIce_corsiPercentage || 0),
+            fenwick: typeof s.onIce_fenwickPercentage === 'string' ? parseFloat(s.onIce_fenwickPercentage) : (s.onIce_fenwickPercentage || 0),
+            highDangerSavePct: 0,
+            goalsSavedAboveExpected: 0,
             
             wins: null,
             losses: null,
@@ -99,6 +113,7 @@ export const PlayerService = {
             status: 'active',
             headshot_url: `https://assets.nhle.com/mugs/nhl/20242025/${g.team}/${g.playerId}.png`,
             last_updated: new Date().toISOString(),
+            games_played: typeof g.games_played === 'string' ? parseInt(g.games_played) : (g.games_played || 0),
             
             goals: 0,
             assists: 0,
@@ -107,14 +122,28 @@ export const PlayerService = {
             shots: 0,
             hits: 0,
             blocks: 0,
+            xGoals: 0,
+            corsi: 0,
+            fenwick: 0,
+            highDangerSavePct: parseFloat(g.highDangerShots) > 0
+                ? (parseFloat(g.highDangerShots) - parseFloat(g.highDangerGoals)) / parseFloat(g.highDangerShots)
+                : 0,
+            goalsSavedAboveExpected: (parseFloat(g.xGoals) - parseFloat(g.goals)) || 0,
             
             // Goalie Stats (Check casing/existence in DB if needed, mapping commonly used keys)
-            wins: typeof g.wins === 'string' ? parseFloat(g.wins) : (g.wins || 0), // Check if 'wins' exists in staging
-            losses: typeof g.losses === 'string' ? parseFloat(g.losses) : (g.losses || 0),
-            ot_losses: typeof g.otLosses === 'string' ? parseFloat(g.otLosses) : (g.otLosses || 0),
-            saves: typeof g.saves === 'string' ? parseFloat(g.saves) : (g.saves || 0),
-            goals_against_average: typeof g.goalsAgainstAverage === 'string' ? parseFloat(g.goalsAgainstAverage) : (g.goalsAgainstAverage || 0),
-            save_percentage: typeof g.savePercentage === 'string' ? parseFloat(g.savePercentage) : (g.savePercentage || 0),
+            // Calculate derived stats from MoneyPuck data
+            // wins: typeof g.wins === 'string' ? parseFloat(g.wins) : (g.wins || 0), // Check if 'wins' exists in staging
+            wins: 0, // Not available in MoneyPuck staging
+            losses: 0, // Not available in MoneyPuck staging
+            ot_losses: 0, // Not available in MoneyPuck staging
+            
+            saves: (parseFloat(g.ongoal) - parseFloat(g.goals)) || 0,
+            goals_against_average: parseFloat(g.icetime) > 0 
+                ? (parseFloat(g.goals) * 3600) / parseFloat(g.icetime) 
+                : 0,
+            save_percentage: parseFloat(g.ongoal) > 0 
+                ? (parseFloat(g.ongoal) - parseFloat(g.goals)) / parseFloat(g.ongoal) 
+                : 0,
           };
       });
 

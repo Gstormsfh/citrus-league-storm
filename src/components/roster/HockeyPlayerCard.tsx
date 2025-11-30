@@ -28,6 +28,9 @@ export interface HockeyPlayer {
     gamesPlayed?: number;
     toi?: string; // Time on ice, e.g., "21:34"
     toiPercentage?: number; // Percentage of team's total TOI
+    xGoals?: number;
+    corsi?: number;
+    fenwick?: number;
     // Goalie stats
     wins?: number;
     losses?: number;
@@ -35,11 +38,13 @@ export interface HockeyPlayer {
     gaa?: number;
     savePct?: number;
     shutouts?: number;
+    highDangerSavePct?: number;
+    goalsSavedAboveExpected?: number;
     
     // Advanced / CitrusPuck stats can be mapped here or accessed via citrusPuckData
-    xGoals?: number;
-    corsi?: number;
-    fenwick?: number;
+    // xGoals?: number; // Moved up
+    // corsi?: number; // Moved up
+    // fenwick?: number; // Moved up
   };
   team: string;
   teamAbbreviation?: string; // e.g., "EDM", "COL"
@@ -170,20 +175,21 @@ const HockeyPlayerCardContent = ({
     }
 
     if (!data) {
-        // If we are in a specific analytics view and have no data, show 0s instead of fallback stats
-        if (['currentWeek', 'restOfSeason', 'lastSeason', 'seasonToDate'].includes(view)) {
+        // If we are in a specific analytics view (projections/last season) and have no data, show 0s
+        if (['currentWeek', 'restOfSeason', 'lastSeason'].includes(view)) {
              return {
                 goals: 0,
                 assists: 0,
                 points: 0,
                 plusMinus: 0,
                 shots: 0,
+                gamesPlayed: 0,
                 wins: 0,
                 gaa: 0,
                 savePct: 0
             };
         }
-        // Fallback to existing stats only for default/unknown views
+        // Fallback to existing stats for seasonToDate or default
         return player.stats;
     }
 
@@ -198,6 +204,30 @@ const HockeyPlayerCardContent = ({
     const goals = typeof data.I_F_goals === 'string' ? parseFloat(data.I_F_goals) : (data.I_F_goals || 0);
     const points = typeof data.I_F_points === 'string' ? parseFloat(data.I_F_points) : (data.I_F_points || 0);
     const shots = typeof data.I_F_shotsOnGoal === 'string' ? parseFloat(data.I_F_shotsOnGoal) : (data.I_F_shotsOnGoal || 0);
+    const gamesPlayed = typeof data.games_played === 'string' ? parseInt(data.games_played) : (data.games_played || 0);
+    const hits = typeof data.I_F_hits === 'string' ? parseFloat(data.I_F_hits) : (data.I_F_hits || 0);
+    const blockedShots = typeof data.shotsBlockedByPlayer === 'string' ? parseFloat(data.shotsBlockedByPlayer) : (data.shotsBlockedByPlayer || 0);
+    const xGoals = typeof data.I_F_xGoals === 'string' ? parseFloat(data.I_F_xGoals) : (data.I_F_xGoals || 0);
+    const corsi = typeof data.onIce_corsiPercentage === 'string' ? parseFloat(data.onIce_corsiPercentage) : (data.onIce_corsiPercentage || 0);
+    const fenwick = typeof data.onIce_fenwickPercentage === 'string' ? parseFloat(data.onIce_fenwickPercentage) : (data.onIce_fenwickPercentage || 0);
+    
+    // Goalie stats (derived if present in advanced data, otherwise fallback)
+    const wins = 0; 
+    const gaa = data.icetime && parseFloat(String(data.icetime)) > 0 && data.goals 
+       ? (parseFloat(String(data.goals)) * 3600) / parseFloat(String(data.icetime)) 
+       : 0;
+    const savePct = data.ongoal && parseFloat(String(data.ongoal)) > 0
+       ? (parseFloat(String(data.ongoal)) - parseFloat(String(data.goals || 0))) / parseFloat(String(data.ongoal))
+       : 0;
+    
+    // Derived Advanced Goalie Stats
+    const highDangerSavePct = data.I_F_highDangerShots && parseFloat(String(data.I_F_highDangerShots)) > 0
+       ? (parseFloat(String(data.I_F_highDangerShots)) - parseFloat(String(data.I_F_highDangerGoals || 0))) / parseFloat(String(data.I_F_highDangerShots))
+       : 0;
+
+    const goalsSavedAboveExpected = data.I_F_xGoals && data.I_F_goals
+       ? parseFloat(String(data.I_F_xGoals)) - parseFloat(String(data.I_F_goals))
+       : 0;
 
     return {
         goals: Math.round(goals),
@@ -205,9 +235,17 @@ const HockeyPlayerCardContent = ({
         points: Math.round(points),
         plusMinus: 0, 
         shots: Math.round(shots),
-        wins: 0, 
-        gaa: 0,
-        savePct: 0
+        gamesPlayed: gamesPlayed,
+        hits: Math.round(hits),
+        blockedShots: Math.round(blockedShots),
+        xGoals: xGoals,
+        corsi: corsi,
+        fenwick: fenwick,
+        wins: wins, 
+        gaa: gaa,
+        savePct: savePct,
+        highDangerSavePct: highDangerSavePct,
+        goalsSavedAboveExpected: goalsSavedAboveExpected
     };
   };
 
@@ -315,22 +353,16 @@ const HockeyPlayerCardContent = ({
         ) : (
           <div className="grid grid-cols-4 gap-0.5 text-center w-full">
             <div>
+              <div className="text-[7px] text-muted-foreground uppercase leading-none mb-0.5">GP</div>
+              <div className="font-bold text-[9px]">{displayStats.gamesPlayed || 0}</div>
+            </div>
+            <div>
               <div className="text-[7px] text-muted-foreground uppercase leading-none mb-0.5">G</div>
               <div className="font-bold text-[9px]">{displayStats.goals || 0}</div>
             </div>
             <div>
               <div className="text-[7px] text-muted-foreground uppercase leading-none mb-0.5">A</div>
               <div className="font-bold text-[9px]">{displayStats.assists || 0}</div>
-            </div>
-            <div>
-              <div className="text-[7px] text-muted-foreground uppercase leading-none mb-0.5">+/-</div>
-              <div className={cn(
-                "font-bold text-[9px]",
-                (displayStats.plusMinus || 0) > 0 && "text-emerald-600",
-                (displayStats.plusMinus || 0) < 0 && "text-red-600"
-              )}>
-                {(displayStats.plusMinus || 0) > 0 ? '+' : ''}{displayStats.plusMinus || 0}
-              </div>
             </div>
             <div>
               <div className="text-[7px] text-muted-foreground uppercase leading-none mb-0.5">SOG</div>
