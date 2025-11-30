@@ -13,13 +13,15 @@ interface BenchGridProps {
 
 // Helper to normalize position to standard abbreviations
 const normalizePosition = (position: string): string => {
-  const pos = position.toLowerCase();
-  if (pos.includes('centre') || pos === 'c') return 'C';
-  if (pos.includes('left wing') || pos === 'lw') return 'LW';
-  if (pos.includes('right wing') || pos === 'rw') return 'RW';
-  if (pos.includes('defence') || pos.includes('defense') || pos === 'd') return 'D';
-  if (pos.includes('goalie') || pos === 'g') return 'G';
-  return position.toUpperCase().substring(0, 2);
+  const pos = position?.toUpperCase() || '';
+  
+  if (['C', 'CENTRE', 'CENTER'].includes(pos)) return 'C';
+  if (['LW', 'LEFT WING', 'LEFTWING', 'L'].includes(pos)) return 'LW';
+  if (['RW', 'RIGHT WING', 'RIGHTWING', 'R'].includes(pos)) return 'RW';
+  if (['D', 'DEFENCE', 'DEFENSE'].includes(pos)) return 'D';
+  if (['G', 'GOALIE'].includes(pos)) return 'G';
+  
+  return pos.substring(0, 2);
 };
 
 // Get position border color (matching StartersGrid)

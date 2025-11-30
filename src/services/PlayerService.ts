@@ -51,11 +51,14 @@ export const PlayerService = {
       if (goalieError) throw goalieError;
 
       // 3. Map Skaters to Player Interface
-      const mappedSkaters: Player[] = (skaters || []).map((s: any) => {
+      const mappedSkaters = (skaters || []).map((s: any) => {
           // Calculate Assists correctly (parse strings)
           const pri = typeof s.I_F_primaryAssists === 'string' ? parseFloat(s.I_F_primaryAssists) : (s.I_F_primaryAssists || 0);
           const sec = typeof s.I_F_secondaryAssists === 'string' ? parseFloat(s.I_F_secondaryAssists) : (s.I_F_secondaryAssists || 0);
           const totalAssists = pri + sec;
+
+          // Safety check for ID
+          if (!s.playerId) return null;
 
           return {
             id: s.playerId.toString(), // Use NHL ID as the unique ID
@@ -85,7 +88,8 @@ export const PlayerService = {
       });
 
       // 4. Map Goalies to Player Interface
-      const mappedGoalies: Player[] = (goalies || []).map((g: any) => {
+      const mappedGoalies = (goalies || []).map((g: any) => {
+          if (!g.playerId) return null;
           return {
             id: g.playerId.toString(),
             full_name: g.name,
@@ -114,8 +118,24 @@ export const PlayerService = {
           };
       });
 
-      // 5. Combine and Return
-      return [...mappedSkaters, ...mappedGoalies].sort((a, b) => b.points - a.points);
+      // 5. Combine and Deduplicate
+      // Filter out nulls from mapping
+      const validSkaters = mappedSkaters.filter((p): p is Player => p !== null);
+      const validGoalies = mappedGoalies.filter((p): p is Player => p !== null);
+      
+      const allPlayers = [...validSkaters, ...validGoalies];
+      
+      const uniquePlayers = new Map<string, Player>();
+      allPlayers.forEach(p => {
+        if (!uniquePlayers.has(p.id)) {
+          uniquePlayers.set(p.id, p);
+        } else {
+            // Optional: If duplicate exists, keep the one with more games/points?
+            // For now, first one wins.
+        }
+      });
+
+      return Array.from(uniquePlayers.values()).sort((a, b) => b.points - a.points);
 
     } catch (error) {
       console.error('Error fetching players from staging tables:', error);

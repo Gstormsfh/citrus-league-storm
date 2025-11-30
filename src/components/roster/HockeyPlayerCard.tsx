@@ -77,7 +77,9 @@ interface HockeyPlayerCardProps {
   isInSlot?: boolean; // Whether the card is in a starter slot
 }
 
-const HockeyPlayerCard = ({ 
+import { ErrorBoundary } from "@/components/ErrorBoundary";
+
+const HockeyPlayerCardContent = ({ 
   player, 
   onClick, 
   draggable = true, 
@@ -104,19 +106,13 @@ const HockeyPlayerCard = ({
   } : undefined;
 
   const getPositionAbbreviation = (position: string): string => {
-    switch (position) {
-      case 'Centre': return 'C';
-      case 'Right Wing': return 'RW';
-      case 'Left Wing': return 'LW';
-      case 'Defence': return 'D';
-      case 'Goalie': return 'G';
-      case 'C': return 'C';
-      case 'RW': return 'RW';
-      case 'LW': return 'LW';
-      case 'D': return 'D';
-      case 'G': return 'G';
-      default: return position.substring(0, 2).toUpperCase();
-    }
+    const pos = position?.toUpperCase() || '';
+    if (['C', 'CENTRE', 'CENTER'].includes(pos)) return 'C';
+    if (['LW', 'LEFT WING', 'LEFTWING', 'L'].includes(pos)) return 'LW';
+    if (['RW', 'RIGHT WING', 'RIGHTWING', 'R'].includes(pos)) return 'RW';
+    if (['D', 'DEFENCE', 'DEFENSE'].includes(pos)) return 'D';
+    if (['G', 'GOALIE'].includes(pos)) return 'G';
+    return pos.substring(0, 2);
   };
 
   const getTeamAbbreviation = (): string => {
@@ -229,6 +225,7 @@ const HockeyPlayerCard = ({
   const dragProps = draggable ? {
     ...attributes,
     ...listeners,
+    isDragging // Ensure isDragging is passed or handled if used elsewhere
   } : {};
 
   return (
@@ -382,5 +379,11 @@ const HockeyPlayerCard = ({
     </Card>
   );
 };
+
+const HockeyPlayerCard = (props: HockeyPlayerCardProps) => (
+  <ErrorBoundary>
+    <HockeyPlayerCardContent {...props} />
+  </ErrorBoundary>
+);
 
 export default HockeyPlayerCard;

@@ -15,6 +15,9 @@ export const CitrusPuckService = {
           supabase.from(this.getTableName(season, 'goalie')).select('*').eq('situation', 'all')
       ]);
 
+      if (skaters.error) console.error(`Error fetching skaters for ${season}:`, skaters.error);
+      if (goalies.error) console.error(`Error fetching goalies for ${season}:`, goalies.error);
+
       const map = new Map<number, AggregatedPlayerData>();
 
       const processData = (data: any[], type: 'skater' | 'goalie') => {
@@ -146,6 +149,9 @@ export const CitrusPuckService = {
    * Project current week stats
    */
   projectCurrentWeek(data: AggregatedPlayerData): CitrusPuckPlayerData {
+    if (!data || !data.allSituation) {
+      return {} as CitrusPuckPlayerData;
+    }
     const all = data.allSituation;
     const gamesPlayed = all.games_played || 1; // Avoid divide by zero
     const gamesPerWeek = 3.5; // Average games per week
@@ -163,6 +169,9 @@ export const CitrusPuckService = {
     data2024: AggregatedPlayerData | null,
     data2025: AggregatedPlayerData
   ): CitrusPuckPlayerData {
+    if (!data2025 || !data2025.allSituation) {
+      return {} as CitrusPuckPlayerData;
+    }
     const all2025 = data2025.allSituation;
     const gamesPlayed = all2025.games_played || 0;
     const gamesInSeason = 82;
@@ -170,13 +179,7 @@ export const CitrusPuckService = {
     
     // If no 2024 data, or if 2025 games played is 0 (injured/not started),
     // we need a baseline. 
-    // If gamesPlayed is 0, scaleFactor is 0 -> returns 0 stats.
-    // If user wants "full season projection" for an injured player (e.g. Barkov has 0 games),
-    // we might want to project based on 2024 stats if available?
-    // The logic above handles `!data2025` by using `data2024`. 
-    // But here `data2025` exists (it's passed in), but might have 0 games.
-    
-    if (gamesPlayed === 0 && data2024) {
+    if (gamesPlayed === 0 && data2024 && data2024.allSituation) {
         // Player hasn't played this year, project based on last year's pace for remaining games
         const all2024 = data2024.allSituation;
         const gp2024 = all2024.games_played || 1;

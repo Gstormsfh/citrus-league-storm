@@ -24,11 +24,14 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 // Helper function to transform position to fantasy slot
 const getFantasyPosition = (position: string): 'C' | 'LW' | 'RW' | 'D' | 'G' | 'UTIL' => {
-  if (position === 'Centre' || position === 'C') return 'C';
-  if (position === 'Left Wing' || position === 'LW') return 'LW';
-  if (position === 'Right Wing' || position === 'RW') return 'RW';
-  if (position === 'Defence' || position === 'D') return 'D';
-  if (position === 'Goalie' || position === 'G') return 'G';
+  const pos = position?.toUpperCase() || '';
+  
+  if (['C', 'CENTRE', 'CENTER'].includes(pos)) return 'C';
+  if (['LW', 'LEFT WING', 'LEFTWING', 'L'].includes(pos)) return 'LW';
+  if (['RW', 'RIGHT WING', 'RIGHTWING', 'R'].includes(pos)) return 'RW';
+  if (['D', 'DEFENCE', 'DEFENSE'].includes(pos)) return 'D';
+  if (['G', 'GOALIE'].includes(pos)) return 'G';
+  
   return 'UTIL';
 };
 
@@ -84,32 +87,46 @@ const getTeamAbbreviation = (team: string): string => {
       
       // Let's refine getting the "Real" position for stats aggregation
       let realPos = 'UTIL';
-      if (['C', 'Centre'].includes(p.position)) realPos = 'C';
-      else if (['LW', 'Left Wing'].includes(p.position)) realPos = 'LW';
-      else if (['RW', 'Right Wing'].includes(p.position)) realPos = 'RW';
-      else if (['D', 'Defence'].includes(p.position)) realPos = 'D';
-      else if (['G', 'Goalie'].includes(p.position)) realPos = 'G';
+      const posUpper = p.position?.toUpperCase() || '';
+      
+      if (['C', 'CENTRE', 'CENTER'].includes(posUpper)) realPos = 'C';
+      else if (['LW', 'LEFT WING', 'L', 'LEFTWING'].includes(posUpper)) realPos = 'LW';
+      else if (['RW', 'RIGHT WING', 'R', 'RIGHTWING'].includes(posUpper)) realPos = 'RW';
+      else if (['D', 'DEFENCE', 'DEFENSE'].includes(posUpper)) realPos = 'D';
+      else if (['G', 'GOALIE'].includes(posUpper)) realPos = 'G';
       
       if (realPos === 'G') {
-        stats.G.wins += p.stats.wins || 0;
-        stats.G.losses += p.stats.losses || 0;
-        // Mock saves if not present (approx 25 per game * games played?)
-        // We don't have saves in the interface stats used earlier, let's just stick to wins
+        stats.G.wins += p.stats?.wins || 0;
+        stats.G.losses += p.stats?.losses || 0;
         stats.G.count++;
       } else if (stats[realPos as keyof typeof stats]) {
         const target = stats[realPos as keyof typeof stats] as any;
-        target.goals += p.stats.goals || 0;
-        target.assists += p.stats.assists || 0;
-        target.shots += p.stats.shots || 0;
-        target.hits += p.stats.hits || 0;
-        target.blocks += p.stats.blockedShots || 0;
-        target.ppp += p.stats.powerPlayPoints || 0;
-        target.shp += p.stats.shortHandedPoints || 0;
+        if (p.stats) {
+            target.goals += p.stats.goals || 0;
+            target.assists += p.stats.assists || 0;
+            target.shots += p.stats.shots || 0;
+            target.hits += p.stats.hits || 0;
+            target.blocks += p.stats.blockedShots || 0;
+            target.ppp += p.stats.powerPlayPoints || 0;
+            target.shp += p.stats.shortHandedPoints || 0;
+        }
       }
     });
 
     return stats;
   };
+
+import { ErrorBoundary } from "@/components/ErrorBoundary";
+
+// ... existing imports ...
+
+// Helper to safely calculate chart value
+const safeValue = (val: number) => {
+    if (typeof val !== 'number' || isNaN(val) || !isFinite(val)) return 0;
+    return Math.max(0, Math.min(100, val));
+};
+
+// ... inside Roster component ...
 
   const calculateRadarData = (stats: any, position: string) => {
     // Baselines customized by position group (Per Player Season Avg * Num Slots)
@@ -123,21 +140,19 @@ const getTeamAbbreviation = (team: string): string => {
 
     const base = singlePlayerBaseline[position as keyof typeof singlePlayerBaseline] || singlePlayerBaseline.C;
     
-    // We are looking at totals, so we should maybe normalize? 
-    // Or just show raw accumulation vs a "Target" for that position group (e.g. 2 Centers)
-    // Let's assume we are evaluating the "Group" strength.
-    // If user has 3 centers (2 C slots + 1 Util), they should exceed the baseline for 2 slots.
+    // Safety check for stats object
+    const s = stats || { goals: 0, assists: 0, shots: 0, hits: 0, blocks: 0, ppp: 0 };
     
     // Dynamic baseline based on roughly 2 players worth of stats for that position
-    const factor = 2.5; // Baseline for "Strong" position group
+    const factor = 2.5; 
 
     return [
-      { subject: 'Goals', A: Math.min(100, (stats.goals / (base.G * factor)) * 100), fullMark: 100 },
-      { subject: 'Assists', A: Math.min(100, (stats.assists / (base.A * factor)) * 100), fullMark: 100 },
-      { subject: 'Shots', A: Math.min(100, (stats.shots / (base.S * factor)) * 100), fullMark: 100 },
-      { subject: 'Hits', A: Math.min(100, (stats.hits / (base.H * factor)) * 100), fullMark: 100 },
-      { subject: 'Blocks', A: Math.min(100, (stats.blocks / (base.B * factor)) * 100), fullMark: 100 },
-      { subject: 'PPP', A: Math.min(100, (stats.ppp / (base.PPP * factor)) * 100), fullMark: 100 },
+      { subject: 'Goals', A: safeValue((s.goals / (base.G * factor)) * 100), fullMark: 100 },
+      { subject: 'Assists', A: safeValue((s.assists / (base.A * factor)) * 100), fullMark: 100 },
+      { subject: 'Shots', A: safeValue((s.shots / (base.S * factor)) * 100), fullMark: 100 },
+      { subject: 'Hits', A: safeValue((s.hits / (base.H * factor)) * 100), fullMark: 100 },
+      { subject: 'Blocks', A: safeValue((s.blocks / (base.B * factor)) * 100), fullMark: 100 },
+      { subject: 'PPP', A: safeValue((s.ppp / (base.PPP * factor)) * 100), fullMark: 100 },
     ];
   };
 
@@ -307,21 +322,24 @@ const Roster = () => {
             ...savedLineup.ir
           ]);
           
-          const starters = savedLineup.starters
+          // Helper to deduplicate IDs
+          const uniqueIds = (ids: string[]) => Array.from(new Set(ids));
+
+          const starters = uniqueIds(savedLineup.starters)
             .map(id => {
               const player = playerMap.get(id);
               if (!player) return null;
               return { ...player, starter: true };
             })
-            .filter((p): p is HockeyPlayer => p !== null);
+            .filter((p): p is HockeyPlayer => !!p);
           
-          const bench = savedLineup.bench
+          const bench = uniqueIds(savedLineup.bench)
             .map(id => playerMap.get(id))
-            .filter((p): p is HockeyPlayer => p !== null);
+            .filter((p): p is HockeyPlayer => !!p);
           
-          const ir = savedLineup.ir
+          const ir = uniqueIds(savedLineup.ir)
             .map(id => playerMap.get(id))
-            .filter((p): p is HockeyPlayer => p !== null);
+            .filter((p): p is HockeyPlayer => !!p);
           
           // Add any new players (not in saved lineup) to bench
           transformedPlayers.forEach(player => {
@@ -420,48 +438,53 @@ const Roster = () => {
             ]);
 
             const enrichPlayer = (p: HockeyPlayer) => {
-                // Helper to normalize names for comparison (remove accents, lowercase)
-                const normalize = (str: string) => {
-                    return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+                try {
+                    // Helper to normalize names for comparison (remove accents, lowercase)
+                    const normalize = (str: string) => {
+                        return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+                    }
+
+                    // Try exact match by Name first (most reliable if IDs are mixed)
+                    const findByName = (map: Map<number, any>) => {
+                        const targetName = normalize(p.name);
+                        for (const val of map.values()) {
+                            // Use loose comparison or normalization
+                            if (val.name && normalize(val.name) === targetName) return val;
+                        }
+                        return undefined;
+                    };
+
+                    let d2024 = findByName(data2024);
+                    let d2025 = findByName(data2025);
+                    
+                    // If name match fails, try ID if numeric
+                    if (!d2024 && !d2025) {
+                        const pId = typeof p.id === 'string' ? parseInt(p.id) : p.id;
+                        if (!isNaN(pId)) {
+                            d2024 = data2024.get(pId);
+                            d2025 = data2025.get(pId);
+                        }
+                    }
+
+                    if (!d2025 && !d2024) return p;
+
+                    const projections = {
+                        currentWeek: d2025 ? CitrusPuckService.projectCurrentWeek(d2025) : undefined,
+                        restOfSeason: (d2025) ? CitrusPuckService.projectRestOfSeason(d2024 || null, d2025) : undefined
+                    };
+
+                    return {
+                        ...p,
+                        citrusPuckData: {
+                            currentSeason: d2025,
+                            lastSeason: d2024,
+                            projections
+                        }
+                    };
+                } catch (err) {
+                    console.error(`Error enriching player ${p.name}:`, err);
+                    return p;
                 }
-
-                // Try exact match by Name first (most reliable if IDs are mixed)
-                const findByName = (map: Map<number, any>) => {
-                    const targetName = normalize(p.name);
-                    for (const val of map.values()) {
-                        // Use loose comparison or normalization
-                        if (val.name && normalize(val.name) === targetName) return val;
-                    }
-                    return undefined;
-                };
-
-                let d2024 = findByName(data2024);
-                let d2025 = findByName(data2025);
-                
-                // If name match fails, try ID if numeric
-                if (!d2024 && !d2025) {
-                    const pId = typeof p.id === 'string' ? parseInt(p.id) : p.id;
-                    if (!isNaN(pId)) {
-                        d2024 = data2024.get(pId);
-                        d2025 = data2025.get(pId);
-                    }
-                }
-
-                if (!d2025 && !d2024) return p;
-
-                const projections = {
-                    currentWeek: d2025 ? CitrusPuckService.projectCurrentWeek(d2025) : undefined,
-                    restOfSeason: (d2025) ? CitrusPuckService.projectRestOfSeason(d2024 || null, d2025) : undefined
-                };
-
-                return {
-                    ...p,
-                    citrusPuckData: {
-                        currentSeason: d2025,
-                        lastSeason: d2024,
-                        projections
-                    }
-                };
             };
 
             setRoster(prev => ({
@@ -866,6 +889,7 @@ const Roster = () => {
   };
 
   return (
+    <ErrorBoundary>
     <div className="min-h-screen bg-background text-foreground">
       <Navbar />
       
@@ -1228,6 +1252,7 @@ const Roster = () => {
       
       <Footer />
     </div>
+    </ErrorBoundary>
   );
 };
 
