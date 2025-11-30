@@ -4,7 +4,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Brain, TrendingUp, TrendingDown, AlertCircle, Calendar, ChevronRight, ShieldCheck } from 'lucide-react';
+import { TrendingUp, TrendingDown, AlertCircle, Calendar, ChevronRight, ShieldCheck } from 'lucide-react';
+import { Narwhal } from '@/components/icons/Narwhal';
 
 interface PositionStats {
   position: string;
@@ -104,7 +105,7 @@ const TeamAnalytics = () => {
                   Stormy Analytics
                 </h1>
                 <p className="text-lg text-muted-foreground flex items-center gap-2">
-                  <Brain className="h-5 w-5 text-purple-500" />
+                  <Narwhal className="h-5 w-5 text-purple-500" />
                   AI-Powered Roster Optimization
                 </p>
               </div>
@@ -153,7 +154,7 @@ const TeamAnalytics = () => {
 
                           {pos.suggestion && (
                             <div className="bg-muted/40 p-3 rounded-lg flex gap-3 items-start mt-3 border border-dashed">
-                              <Brain className="h-5 w-5 text-purple-500 shrink-0 mt-0.5" />
+                              <Narwhal className="h-5 w-5 text-purple-500 shrink-0 mt-0.5" />
                               <div className="space-y-1">
                                 <div className="text-sm font-medium text-purple-700 dark:text-purple-400">Stormy's Suggestion</div>
                                 <p className="text-xs text-muted-foreground leading-relaxed">{pos.suggestion}</p>

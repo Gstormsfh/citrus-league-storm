@@ -7,11 +7,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { Calendar, TrendingUp, Filter, List, Grid } from 'lucide-react';
+import { Calendar, TrendingUp, Filter, List, Grid, Star, Info } from 'lucide-react';
 import { PlayerService, Player } from '@/services/PlayerService';
 import { LeagueService } from '@/services/LeagueService';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import PlayerStatsModal from '@/components/PlayerStatsModal';
+import { HockeyPlayer } from '@/components/roster/HockeyPlayerCard';
 
 const FreeAgents = () => {
   const { toast } = useToast();
@@ -21,7 +23,12 @@ const FreeAgents = () => {
   const [activeTab, setActiveTab] = useState('available');
   const [viewMode, setViewMode] = useState<'summary' | 'all'>('summary');
   const [players, setPlayers] = useState<Player[]>([]);
+  const [watchlist, setWatchlist] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
+
+  // Player Stats Modal State
+  const [selectedPlayer, setSelectedPlayer] = useState<HockeyPlayer | null>(null);
+  const [isPlayerDialogOpen, setIsPlayerDialogOpen] = useState(false);
 
   useEffect(() => {
     const tab = searchParams.get('tab');
@@ -29,6 +36,7 @@ const FreeAgents = () => {
       setActiveTab(tab);
     }
     fetchPlayers();
+    setWatchlist(new Set(LeagueService.getWatchlist()));
   }, [searchParams]);
 
   const fetchPlayers = async () => {
@@ -55,6 +63,30 @@ const FreeAgents = () => {
       description: `Claim for ${player.full_name} has been submitted successfully.`,
       variant: "default"
     });
+    // Add transaction record (mock)
+    LeagueService.addTransaction({
+      id: Math.random().toString(),
+      type: 'claim',
+      playerId: player.id,
+      playerName: player.full_name,
+      playerTeam: player.team,
+      date: new Date().toISOString().split('T')[0],
+      status: 'pending'
+    });
+  };
+
+  const toggleWatchlist = (player: Player) => {
+    const newWatchlist = new Set(watchlist);
+    if (newWatchlist.has(player.id)) {
+      newWatchlist.delete(player.id);
+      LeagueService.removeFromWatchlist(player.id);
+      toast({ title: "Removed from Watch List", description: `${player.full_name} removed.` });
+    } else {
+      newWatchlist.add(player.id);
+      LeagueService.addToWatchlist(player.id);
+      toast({ title: "Added to Watch List", description: `${player.full_name} added.` });
+    }
+    setWatchlist(newWatchlist);
   };
 
   // Filter players based on search and position
@@ -71,9 +103,46 @@ const FreeAgents = () => {
 
   const filteredPlayers = getFilteredPlayers(players);
 
+  // Helper to convert Player to HockeyPlayer for the modal
+  const toHockeyPlayer = (p: Player): HockeyPlayer => ({
+    id: p.id,
+    name: p.full_name,
+    position: p.position,
+    number: parseInt(p.jersey_number || '0'),
+    starter: false,
+    stats: {
+      goals: p.goals || 0,
+      assists: p.assists || 0,
+      points: p.points || 0,
+      plusMinus: p.plus_minus || 0,
+      shots: p.shots || 0,
+      hits: p.hits || 0,
+      blockedShots: p.blocks || 0,
+      wins: p.wins || 0,
+      losses: p.losses || 0,
+      otl: p.ot_losses || 0,
+      gaa: p.goals_against_average || 0,
+      savePct: p.save_percentage || 0
+    },
+    team: p.team,
+    teamAbbreviation: p.team,
+    status: p.status === 'injured' ? 'IR' : null,
+    image: p.headshot_url || undefined,
+    projectedPoints: (p.points || 0) / 20
+  });
+
+  const handlePlayerClick = (player: Player) => {
+    setSelectedPlayer(toHockeyPlayer(player));
+    setIsPlayerDialogOpen(true);
+  };
+
   // Derived lists for Summary View
   const topTrending = [...filteredPlayers]
-    .sort((a, b) => (b.points || 0) - (a.points || 0)) // Mock trending with points for now
+    .map(p => ({
+      ...p,
+      adds: Math.floor((p.points || 0) * 15 + (p.full_name.length * 10)) // Mock adds count
+    }))
+    .sort((a, b) => b.adds - a.adds)
     .slice(0, 5);
 
   const topProjected = [...filteredPlayers]
@@ -102,10 +171,9 @@ const FreeAgents = () => {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-4 max-w-2xl mb-6">
+          <TabsList className="grid w-full grid-cols-3 max-w-2xl mb-6">
             <TabsTrigger value="available">Available</TabsTrigger>
             <TabsTrigger value="schedule" className="gap-2"><Calendar className="h-4 w-4" /> Schedule</TabsTrigger>
-            <TabsTrigger value="waivers">Waiver Wire</TabsTrigger>
             <TabsTrigger value="watch">Watch List</TabsTrigger>
           </TabsList>
           
@@ -143,37 +211,76 @@ const FreeAgents = () => {
                         <Button variant="ghost" size="sm" onClick={() => setViewMode('all')}>See All</Button>
                       </CardHeader>
                       <CardContent className="p-0">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>Player</TableHead>
-                              <TableHead className="text-right">Pos</TableHead>
-                              <TableHead className="text-right">Pts</TableHead>
-                              <TableHead className="w-[50px]"></TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {topTrending.map(player => (
+                        {/* Mobile List View */}
+                        <div className="md:hidden">
+                          {topTrending.map(player => (
+                            <div key={player.id} className="p-3 border-b flex items-center justify-between">
+                              <div className="flex flex-col">
+                                <span className="font-medium">{player.full_name}</span>
+                                <span className="text-xs text-muted-foreground">{player.position} • {player.team}</span>
+                              </div>
+                              <div className="flex items-center gap-3">
+                                <div className="text-right">
+                                  <div className="font-bold text-green-600">{player.adds.toLocaleString()}</div>
+                                  <div className="text-[10px] text-muted-foreground">Adds</div>
+                                </div>
+                                <Button size="icon" variant="ghost" className="h-8 w-8 text-primary" onClick={() => handleAddPlayer(player)}>
+                                  +
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Desktop Table View */}
+                        <div className="hidden md:block">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Player</TableHead>
+                                <TableHead className="text-right">Pos</TableHead>
+                                <TableHead className="text-right">Adds</TableHead>
+                                <TableHead className="w-[50px]"></TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {topTrending.map(player => (
                               <TableRow key={player.id}>
                                 <TableCell className="font-medium">
                                   <div className="flex flex-col">
-                                    <span>{player.full_name}</span>
+                                    <span 
+                                      className="hover:underline hover:text-primary cursor-pointer"
+                                      onClick={() => handlePlayerClick(player)}
+                                    >
+                                      {player.full_name}
+                                    </span>
                                     <span className="text-xs text-muted-foreground">{player.team}</span>
                                   </div>
                                 </TableCell>
                                 <TableCell className="text-right">{player.position}</TableCell>
                                 <TableCell className="text-right font-bold text-green-600">
-                                  {player.points || 0}
+                                  {player.adds.toLocaleString()}
                                 </TableCell>
                                 <TableCell>
-                                  <Button size="icon" variant="ghost" className="h-8 w-8 text-primary" onClick={() => handleAddPlayer(player)}>
-                                    +
-                                  </Button>
+                                  <div className="flex gap-1">
+                                    <Button 
+                                      size="icon" 
+                                      variant="ghost" 
+                                      className={`h-8 w-8 ${watchlist.has(player.id) ? 'text-yellow-500' : 'text-muted-foreground'}`}
+                                      onClick={() => toggleWatchlist(player)}
+                                    >
+                                      <Star className={`h-4 w-4 ${watchlist.has(player.id) ? 'fill-current' : ''}`} />
+                                    </Button>
+                                    <Button size="icon" variant="ghost" className="h-8 w-8 text-primary" onClick={() => handleAddPlayer(player)}>
+                                      +
+                                    </Button>
+                                  </div>
                                 </TableCell>
                               </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
                       </CardContent>
                     </Card>
 
@@ -187,21 +294,49 @@ const FreeAgents = () => {
                         <Button variant="ghost" size="sm" onClick={() => setViewMode('all')}>See All</Button>
                       </CardHeader>
                       <CardContent className="p-0">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>Player</TableHead>
-                              <TableHead className="text-right">Pos</TableHead>
-                              <TableHead className="text-right">Proj</TableHead>
-                              <TableHead className="w-[50px]"></TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {topProjected.map(player => (
+                        {/* Mobile List View */}
+                        <div className="md:hidden">
+                          {topProjected.map(player => (
+                            <div key={player.id} className="p-3 border-b flex items-center justify-between">
+                              <div className="flex flex-col">
+                                <span className="font-medium">{player.full_name}</span>
+                                <span className="text-xs text-muted-foreground">{player.position} • {player.team}</span>
+                              </div>
+                              <div className="flex items-center gap-3">
+                                <div className="text-right">
+                                  <div className="font-bold text-blue-600">{((player.points || 0) / 10).toFixed(1)}</div>
+                                  <div className="text-[10px] text-muted-foreground">Proj</div>
+                                </div>
+                                <Button size="icon" variant="ghost" className="h-8 w-8 text-primary" onClick={() => handleAddPlayer(player)}>
+                                  +
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Desktop Table View */}
+                        <div className="hidden md:block">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Player</TableHead>
+                                <TableHead className="text-right">Pos</TableHead>
+                                <TableHead className="text-right">Proj</TableHead>
+                                <TableHead className="w-[50px]"></TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {topProjected.map(player => (
                               <TableRow key={player.id}>
                                 <TableCell className="font-medium">
                                   <div className="flex flex-col">
-                                    <span>{player.full_name}</span>
+                                    <span 
+                                      className="hover:underline hover:text-primary cursor-pointer"
+                                      onClick={() => handlePlayerClick(player)}
+                                    >
+                                      {player.full_name}
+                                    </span>
                                     <span className="text-xs text-muted-foreground">{player.team}</span>
                                   </div>
                                 </TableCell>
@@ -210,14 +345,25 @@ const FreeAgents = () => {
                                   {((player.points || 0) / 10).toFixed(1)}
                                 </TableCell>
                                 <TableCell>
-                                  <Button size="icon" variant="ghost" className="h-8 w-8 text-primary" onClick={() => handleAddPlayer(player)}>
-                                    +
-                                  </Button>
+                                  <div className="flex gap-1">
+                                    <Button 
+                                      size="icon" 
+                                      variant="ghost" 
+                                      className={`h-8 w-8 ${watchlist.has(player.id) ? 'text-yellow-500' : 'text-muted-foreground'}`}
+                                      onClick={() => toggleWatchlist(player)}
+                                    >
+                                      <Star className={`h-4 w-4 ${watchlist.has(player.id) ? 'fill-current' : ''}`} />
+                                    </Button>
+                                    <Button size="icon" variant="ghost" className="h-8 w-8 text-primary" onClick={() => handleAddPlayer(player)}>
+                                      +
+                                    </Button>
+                                  </div>
                                 </TableCell>
                               </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
                       </CardContent>
                     </Card>
                   </div>
@@ -245,7 +391,12 @@ const FreeAgents = () => {
                               <div className="flex-1">
                                 <div className="flex justify-between items-start">
                                   <div>
-                                    <h3 className="font-bold text-lg">{player.full_name}</h3>
+                                    <h3 
+                                      className="font-bold text-lg hover:underline hover:text-primary cursor-pointer"
+                                      onClick={() => handlePlayerClick(player)}
+                                    >
+                                      {player.full_name}
+                                    </h3>
                                     <p className="text-sm text-muted-foreground">{player.position} • {player.team} • {player.status || 'Active'}</p>
                                   </div>
                                   <div className="text-right">
@@ -272,7 +423,18 @@ const FreeAgents = () => {
                                   )}
                                 </div>
                               </div>
-                              <div className="ml-4">
+                              <div className="ml-4 flex flex-col gap-2">
+                                <Button 
+                                  size="sm" 
+                                  variant="ghost" 
+                                  className={`h-8 w-8 ${watchlist.has(player.id) ? 'text-yellow-500' : 'text-muted-foreground'}`}
+                                  onClick={() => toggleWatchlist(player)}
+                                >
+                                  <Star className={`h-4 w-4 ${watchlist.has(player.id) ? 'fill-current' : ''}`} />
+                                </Button>
+                                <Button size="sm" variant="ghost" className="h-8 w-8 text-muted-foreground" onClick={() => handlePlayerClick(player)}>
+                                  <Info className="h-4 w-4" />
+                                </Button>
                                 <Button size="sm" onClick={() => handleAddPlayer(player)}>+</Button>
                               </div>
                             </div>
@@ -297,8 +459,8 @@ const FreeAgents = () => {
 
              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                {[...filteredPlayers, 
-                 { id: 101, full_name: "Joey Daccord", position: "G", team: "SEA", opponent: "4 Games", projectedPoints: 5.8, wins: 12, goals_against_average: 2.3, save_percentage: .920, trend: "up", games: 4, rostered: 42 },
-                 { id: 102, full_name: "Charlie Coyle", position: "C", team: "BOS", opponent: "4 Games", projectedPoints: 6.2, goals: 18, assists: 22, trend: "up", games: 4, rostered: 55 }
+                 { id: '101', full_name: "Joey Daccord", position: "G", team: "SEA", opponent: "4 Games", projectedPoints: 5.8, wins: 12, goals_against_average: 2.3, save_percentage: .920, trend: "up", games: 4, rostered: 42 },
+                 { id: '102', full_name: "Charlie Coyle", position: "C", team: "BOS", opponent: "4 Games", projectedPoints: 6.2, goals: 18, assists: 22, trend: "up", games: 4, rostered: 55 }
                ].filter(p => (p as any).games === 4 || Math.random() > 0.8).slice(0, 6).map((player: any) => (
                  <Card key={player.id} className="overflow-hidden hover:border-blue-500/50 transition-colors border-blue-500/20">
                   <CardContent className="p-0">
@@ -329,7 +491,15 @@ const FreeAgents = () => {
                            ))}
                         </div>
                       </div>
-                      <div className="ml-4">
+                      <div className="ml-4 flex flex-col gap-2">
+                        <Button 
+                          size="sm" 
+                          variant="ghost" 
+                          className={`${watchlist.has(player.id) ? 'text-yellow-500' : 'text-muted-foreground'}`}
+                          onClick={() => toggleWatchlist(player)}
+                        >
+                          <Star className={`h-4 w-4 ${watchlist.has(player.id) ? 'fill-current' : ''}`} />
+                        </Button>
                         <Button size="sm" onClick={() => handleAddPlayer(player)}>+</Button>
                       </div>
                     </div>
@@ -339,18 +509,88 @@ const FreeAgents = () => {
              </div>
           </TabsContent>
           
-          <TabsContent value="waivers">
-            <div className="p-8 text-center text-muted-foreground">
-              No active waiver claims.
-            </div>
-          </TabsContent>
-          
           <TabsContent value="watch">
-            <div className="p-8 text-center text-muted-foreground">
-              Your watch list is empty.
-            </div>
+            {players.filter(p => watchlist.has(p.id)).length === 0 ? (
+               <div className="p-12 text-center border-2 border-dashed rounded-lg">
+                 <Star className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                 <h3 className="text-lg font-medium">Your watch list is empty</h3>
+                 <p className="text-muted-foreground mt-2">Star players to keep track of their performance.</p>
+                 <Button variant="link" onClick={() => setActiveTab('available')} className="mt-4">
+                   Browse Available Players
+                 </Button>
+               </div>
+            ) : (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {players.filter(p => watchlist.has(p.id)).map((player) => (
+                <Card key={player.id} className="overflow-hidden hover:border-yellow-500/50 transition-colors border-yellow-500/10">
+                  <CardContent className="p-0">
+                    <div className="flex items-center p-4">
+                      <div className="h-12 w-12 rounded-full bg-secondary/20 flex items-center justify-center overflow-hidden mr-4 border border-border">
+                        {player.headshot_url ? (
+                          <img src={player.headshot_url} alt={player.full_name} className="w-full h-full object-cover" />
+                        ) : (
+                          <span className="text-secondary-foreground font-bold text-lg">{player.team}</span>
+                        )}
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <h3 className="font-bold text-lg">{player.full_name}</h3>
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                              {player.position} • {player.team}
+                              <Badge variant="outline" className="border-yellow-500/30 text-yellow-600 bg-yellow-500/5">Watched</Badge>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="font-bold text-lg text-primary">{player.points || 0}</div>
+                            <p className="text-xs text-muted-foreground">Season Pts</p>
+                          </div>
+                        </div>
+                        
+                        <div className="mt-3 flex gap-4 text-sm">
+                           {player.position === 'G' ? (
+                             <>
+                               <div><span className="text-muted-foreground">W:</span> {player.wins || 0}</div>
+                               <div><span className="text-muted-foreground">GAA:</span> {player.goals_against_average || '0.00'}</div>
+                             </>
+                           ) : (
+                             <>
+                               <div><span className="text-muted-foreground">G:</span> {player.goals || 0}</div>
+                               <div><span className="text-muted-foreground">A:</span> {player.assists || 0}</div>
+                               <div><span className="text-muted-foreground">AVG:</span> {((player.points || 0) / 82).toFixed(1)}</div>
+                             </>
+                           )}
+                        </div>
+                      </div>
+                      <div className="ml-4 flex flex-col gap-2">
+                        <Button 
+                          size="sm" 
+                          variant="ghost" 
+                          className="text-yellow-500"
+                          onClick={() => toggleWatchlist(player)}
+                        >
+                          <Star className="h-4 w-4 fill-current" />
+                        </Button>
+                        <Button size="sm" variant="ghost" className="h-8 w-8 text-muted-foreground" onClick={() => handlePlayerClick(player)}>
+                          <Info className="h-4 w-4" />
+                        </Button>
+                        <Button size="sm" onClick={() => handleAddPlayer(player)}>+</Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+              </div>
+            )}
           </TabsContent>
         </Tabs>
+
+        {/* Player Stats Modal */}
+        <PlayerStatsModal
+          player={selectedPlayer}
+          isOpen={isPlayerDialogOpen}
+          onClose={() => setIsPlayerDialogOpen(false)}
+        />
       </main>
       <Footer />
     </div>

@@ -1,12 +1,13 @@
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { CheckCircle, Zap, Shield, Users, Trophy, Brain } from "lucide-react";
+import { CheckCircle, Zap, Shield, Users, Trophy } from "lucide-react";
+import { Narwhal } from "@/components/icons/Narwhal";
 
 const Features = () => {
   const features = [
     {
-      icon: Brain,
+      icon: Narwhal,
       title: "Stormy AI Assistant",
       description: "Get real-time draft advice, trade analysis, and lineup optimization from our advanced AI."
     },

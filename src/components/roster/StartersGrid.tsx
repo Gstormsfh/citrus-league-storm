@@ -61,7 +61,7 @@ const StartersGrid = ({ players, slotAssignments = {}, onPlayerClick, className 
      const isEmpty = !player;
 
      return (
-       <div key={slot.id} className="w-[14.28%] min-w-[130px] max-w-[160px] flex-shrink-0 px-1">
+       <div key={slot.id} className="w-full">
          <PositionSlot
            slot={slot}
            players={slotPlayers}
@@ -91,7 +91,7 @@ const StartersGrid = ({ players, slotAssignments = {}, onPlayerClick, className 
   ];
 
   return (
-    <div className={cn("space-y-4", className)}>
+    <div className={cn("space-y-6", className)}>
       <div className="flex items-center justify-between mb-1">
         <h2 className="text-lg font-bold flex items-center gap-2">
           Starting Lineup
@@ -99,21 +99,60 @@ const StartersGrid = ({ players, slotAssignments = {}, onPlayerClick, className 
       </div>
 
       {/* Visual Layout: Stacked Rows */}
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-6">
         
         {/* Row 1: Forwards (LW - C - RW) */}
-        <div className="flex justify-center flex-wrap gap-y-2 -mx-1">
-          {forwardRow.map(slot => renderSlot(slot))}
+        <div className="space-y-2">
+          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+            Forwards
+          </h3>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2">
+            {forwardRow.map(slot => {
+              // Add colored left border based on position
+              const getBorderColor = () => {
+                if (slot.position === 'LW') return 'border-l-2 border-blue-500 pl-1';
+                if (slot.position === 'C') return 'border-l-2 border-primary pl-1';
+                if (slot.position === 'RW') return 'border-l-2 border-purple-500 pl-1';
+                return '';
+              };
+              
+              return (
+                <div key={slot.id} className={getBorderColor()}>
+                  {renderSlot(slot)}
+                </div>
+              );
+            })}
+          </div>
         </div>
 
         {/* Row 2: Defense */}
-        <div className="flex justify-center flex-wrap gap-y-2 -mx-1">
-          {defenseRow.map(slot => renderSlot(slot))}
+        <div className="space-y-2">
+          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+            Defense
+          </h3>
+          <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-4 lg:w-2/3 lg:mx-auto gap-2">
+            {defenseRow.map(slot => renderSlot(slot))}
+          </div>
         </div>
 
         {/* Row 3: Goalies & Utility */}
-        <div className="flex justify-center flex-wrap gap-y-2 -mx-1">
-          {bottomRow.map(slot => renderSlot(slot))}
+        <div className="space-y-2">
+          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+            Goalies & Utility
+          </h3>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:w-1/2 lg:mx-auto gap-2">
+            {bottomRow.map(slot => {
+              // Add colored left border for Utility
+              if (slot.position === 'UTIL') {
+                return (
+                  <div key={slot.id} className="border-l-2 border-orange-500 pl-1">
+                    {renderSlot(slot)}
+                  </div>
+                );
+              }
+              return renderSlot(slot);
+            })}
+          </div>
         </div>
 
       </div>
@@ -147,6 +186,19 @@ const PositionSlot = ({
 
   const playerIds = players.map(p => p.id);
 
+  // Position-specific styling
+  const positionStyles: Record<string, string> = {
+    'LW': 'bg-blue-50/50 dark:bg-blue-950/20 border-blue-200/50 dark:border-blue-800/30',
+    'C': 'bg-primary/10 dark:bg-primary/5 border-primary/30 dark:border-primary/20',
+    'RW': 'bg-purple-50/50 dark:bg-purple-950/20 border-purple-200/50 dark:border-purple-800/30',
+    'UTIL': 'bg-orange-50/50 dark:bg-orange-950/20 border-orange-200/50 dark:border-orange-800/30',
+  };
+
+  const getPositionStyle = () => {
+    if (isEmpty || isOver || isFull) return '';
+    return positionStyles[slot.position] || 'border-border/50 bg-card/50';
+  };
+
   return (
     <Card
       ref={setNodeRef}
@@ -155,7 +207,8 @@ const PositionSlot = ({
         "border",
         isOver && "border-primary bg-primary/5 shadow-md border-2",
         isEmpty && "border-dashed border-muted-foreground/20 bg-muted/5",
-        !isEmpty && !isOver && "border-border/50 bg-card/50 hover:border-border hover:bg-card",
+        !isEmpty && !isOver && !isFull && getPositionStyle(),
+        !isEmpty && !isOver && "hover:border-border hover:bg-card",
         isFull && !isOver && "border-green-500/20 bg-green-500/5"
       )}
     >

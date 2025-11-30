@@ -11,6 +11,30 @@ interface BenchGridProps {
   className?: string;
 }
 
+// Helper to normalize position to standard abbreviations
+const normalizePosition = (position: string): string => {
+  const pos = position.toLowerCase();
+  if (pos.includes('centre') || pos === 'c') return 'C';
+  if (pos.includes('left wing') || pos === 'lw') return 'LW';
+  if (pos.includes('right wing') || pos === 'rw') return 'RW';
+  if (pos.includes('defence') || pos.includes('defense') || pos === 'd') return 'D';
+  if (pos.includes('goalie') || pos === 'g') return 'G';
+  return position.toUpperCase().substring(0, 2);
+};
+
+// Get position border color (matching StartersGrid)
+const getPositionBorderColor = (position: string): string => {
+  const pos = normalizePosition(position);
+  switch (pos) {
+    case 'LW': return 'border-l-2 border-blue-500';
+    case 'C': return 'border-l-2 border-primary';
+    case 'RW': return 'border-l-2 border-purple-500';
+    case 'D': return 'border-l-2 border-slate-400';
+    case 'G': return 'border-l-2 border-amber-500';
+    default: return 'border-l-2 border-border';
+  }
+};
+
 const BenchGrid = ({ players, onPlayerClick, className }: BenchGridProps) => {
   const { setNodeRef, isOver } = useDroppable({
     id: 'bench-grid',
@@ -35,7 +59,7 @@ const BenchGrid = ({ players, onPlayerClick, className }: BenchGridProps) => {
       <Card
         ref={setNodeRef}
         className={cn(
-          "p-4 min-h-[300px] transition-all",
+          "p-3 transition-all",
           "border-2",
           isOver && "border-primary bg-primary/5 border-dashed",
           !isOver && "border-border"
@@ -43,15 +67,20 @@ const BenchGrid = ({ players, onPlayerClick, className }: BenchGridProps) => {
       >
         {players.length > 0 ? (
           <SortableContext items={playerIds} strategy={rectSortingStrategy}>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-              {players.map((player) => (
-                <HockeyPlayerCard
-                  key={player.id}
-                  player={player}
-                  isInSlot={false}
-                  onClick={() => onPlayerClick?.(player)}
-                />
-              ))}
+            {/* Flexbox with fixed-width cards - centered when wrapping to new rows */}
+            <div className="flex flex-wrap justify-center gap-1.5">
+              {players.map((player) => {
+                const borderColor = getPositionBorderColor(player.position);
+                return (
+                  <div key={player.id} className={cn(borderColor, "pl-1 flex-shrink-0 w-[140px]")}>
+                    <HockeyPlayerCard
+                      player={player}
+                      isInSlot={false}
+                      onClick={() => onPlayerClick?.(player)}
+                    />
+                  </div>
+                );
+              })}
             </div>
           </SortableContext>
         ) : (

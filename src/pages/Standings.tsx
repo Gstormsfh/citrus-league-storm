@@ -6,95 +6,13 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-
-// Mock teams data
-const teams = [
-  { 
-    id: 1, 
-    name: 'Touchdown Titans', 
-    owner: 'Alex Johnson',
-    logo: 'TT',
-    record: { wins: 9, losses: 1 },
-    points: 1432,
-    streak: 'W4'
-  },
-  { 
-    id: 2, 
-    name: 'Scoring Sharks', 
-    owner: 'Samantha Lee',
-    logo: 'SS',
-    record: { wins: 8, losses: 2 },
-    points: 1378,
-    streak: 'W2'
-  },
-  { 
-    id: 3, 
-    name: 'Citrus Crushers', 
-    owner: 'You',
-    logo: 'CC',
-    record: { wins: 7, losses: 3 },
-    points: 1247,
-    streak: 'W1'
-  },
-  { 
-    id: 4, 
-    name: 'Field Generals', 
-    owner: 'Carlos Rodriguez',
-    logo: 'FG',
-    record: { wins: 6, losses: 4 },
-    points: 1189,
-    streak: 'L1'
-  },
-  { 
-    id: 5, 
-    name: 'Blitz Brigade', 
-    owner: 'Taylor Kim',
-    logo: 'BB',
-    record: { wins: 5, losses: 5 },
-    points: 1145,
-    streak: 'W3'
-  },
-  { 
-    id: 6, 
-    name: 'Goal Getters', 
-    owner: 'Jamie Zhang',
-    logo: 'GG',
-    record: { wins: 4, losses: 6 },
-    points: 1102,
-    streak: 'L2'
-  },
-  { 
-    id: 7, 
-    name: 'Victory Vipers', 
-    owner: 'Morgan Williams',
-    logo: 'VV',
-    record: { wins: 3, losses: 7 },
-    points: 1067,
-    streak: 'L4'
-  },
-  { 
-    id: 8, 
-    name: 'Hustle Heroes', 
-    owner: 'Jordan Patel',
-    logo: 'HH',
-    record: { wins: 2, losses: 8 },
-    points: 987,
-    streak: 'L1'
-  },
-  { 
-    id: 9, 
-    name: 'Gridiron Gladiators', 
-    owner: 'Casey Thompson',
-    logo: 'GG',
-    record: { wins: 1, losses: 9 },
-    points: 896,
-    streak: 'L6'
-  },
-];
+import { LeagueService } from '@/services/LeagueService';
 
 const Standings = () => {
   const [season, setSeason] = useState("2025");
   const navigate = useNavigate();
+  const teams = LeagueService.getAllTeams(); // Sync call for initial static data is fine, but we assume it's loaded?
+  // Actually getAllTeams returns the static definition which is what we need for standings mainly.
   
   // Animation observer setup
   useEffect(() => {
@@ -185,7 +103,7 @@ const Standings = () => {
                 </thead>
                 <tbody className="divide-y divide-border/40">
                   {sortedTeams.map((team, index) => {
-                    const isUserTeam = team.owner === 'You';
+                    const isUserTeam = team.id === 3; // Hardcoded user ID for now
                     const winPercentage = ((team.record.wins / (team.record.wins + team.record.losses)) * 100).toFixed(1);
                     
                     return (

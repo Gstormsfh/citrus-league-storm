@@ -2,8 +2,10 @@
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useEffect, useRef, useState } from 'react';
-import { Brain, Zap, Sparkles, Send } from 'lucide-react';
+import { Zap, Sparkles, Send } from 'lucide-react';
 import { toast } from 'sonner';
+import { Link } from 'react-router-dom';
+import { Narwhal } from '@/components/icons/Narwhal';
 
 const demoMessages = [
   {
@@ -102,7 +104,7 @@ const StormySection = () => {
           <div className="lg:w-1/2">
             <div className="mb-8 animated-element animate">
               <div className="inline-flex items-center bg-white/70 backdrop-blur-sm rounded-full px-4 py-2 mb-4">
-                <Brain className="h-5 w-5 text-primary mr-2" />
+                <Narwhal className="h-5 w-5 text-primary mr-2" />
                 <span className="text-sm font-medium">Powered by Advanced AI</span>
               </div>
               <h2 className="text-3xl md:text-4xl font-bold mb-4">Meet Stormy, Your AI Assistant GM</h2>
@@ -134,9 +136,11 @@ const StormySection = () => {
             </div>
 
             <div className="mt-10 animated-element animate">
-              <Button size="lg" className="rounded-full">
-                Try Stormy Now
-              </Button>
+              <Link to="/gm-office/stormy">
+                <Button size="lg" className="rounded-full">
+                  Try Stormy Now
+                </Button>
+              </Link>
             </div>
           </div>
 
@@ -144,9 +148,7 @@ const StormySection = () => {
             <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl overflow-hidden">
               <div className="bg-primary/10 p-4 flex items-center">
                 <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center">
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5 text-white">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
-                  </svg>
+                  <Narwhal className="w-6 h-6 text-white" />
                 </div>
                 <div className="ml-3">
                   <h3 className="font-bold">Stormy</h3>
@@ -165,9 +167,7 @@ const StormySection = () => {
                     
                     <div className="flex items-start space-x-2">
                       <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0 mt-1">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4 text-white">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
-                        </svg>
+                        <Narwhal className="w-5 h-5 text-white" />
                       </div>
                       <div className="bg-white rounded-lg rounded-tl-none p-4 max-w-[85%] shadow-sm border border-border">
                         <p className="text-sm leading-relaxed">{displayedAnswer}</p>
@@ -180,9 +180,7 @@ const StormySection = () => {
                 ) : (
                   <div className="flex items-start space-x-2">
                     <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0 mt-1">
-                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4 text-white">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
-                      </svg>
+                      <Narwhal className="w-5 h-5 text-white" />
                     </div>
                     <div className="bg-white rounded-lg rounded-tl-none p-4 max-w-[85%] shadow-sm border border-border">
                       <p className="text-sm leading-relaxed">{displayedAnswer}</p>

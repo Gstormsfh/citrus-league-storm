@@ -10,19 +10,7 @@ import { HockeyPlayer } from '@/components/roster/HockeyPlayerCard';
 import { useState, useEffect } from 'react';
 import { PlayerService } from '@/services/PlayerService';
 import { LeagueService } from '@/services/LeagueService';
-
-// Mock teams data (should match Standings.tsx or be centralized)
-const teams = [
-  { id: 1, name: 'Touchdown Titans', owner: 'Alex Johnson', logo: 'TT', record: { wins: 9, losses: 1 }, points: 1432, streak: 'W4' },
-  { id: 2, name: 'Scoring Sharks', owner: 'Samantha Lee', logo: 'SS', record: { wins: 8, losses: 2 }, points: 1378, streak: 'W2' },
-  { id: 3, name: 'Citrus Crushers', owner: 'You', logo: 'CC', record: { wins: 7, losses: 3 }, points: 1247, streak: 'W1' },
-  { id: 4, name: 'Field Generals', owner: 'Carlos Rodriguez', logo: 'FG', record: { wins: 6, losses: 4 }, points: 1189, streak: 'L1' },
-  { id: 5, name: 'Blitz Brigade', owner: 'Taylor Kim', logo: 'BB', record: { wins: 5, losses: 5 }, points: 1145, streak: 'W3' },
-  { id: 6, name: 'Goal Getters', owner: 'Jamie Zhang', logo: 'GG', record: { wins: 4, losses: 6 }, points: 1102, streak: 'L2' },
-  { id: 7, name: 'Victory Vipers', owner: 'Morgan Williams', logo: 'VV', record: { wins: 3, losses: 7 }, points: 1067, streak: 'L4' },
-  { id: 8, name: 'Hustle Heroes', owner: 'Jordan Patel', logo: 'HH', record: { wins: 2, losses: 8 }, points: 987, streak: 'L1' },
-  { id: 9, name: 'Gridiron Gladiators', owner: 'Casey Thompson', logo: 'GG', record: { wins: 1, losses: 9 }, points: 896, streak: 'L6' },
-];
+import PlayerStatsModal from '@/components/PlayerStatsModal';
 
 // Helper for fantasy position (reused)
 const getFantasyPosition = (position: string): 'C' | 'LW' | 'RW' | 'D' | 'G' | 'UTIL' => {
@@ -45,7 +33,18 @@ const OtherTeam = () => {
     slotAssignments: Record<string, string>;
   }>({ starters: [], bench: [], ir: [], slotAssignments: {} });
 
+  // Player Stats Modal State
+  const [selectedPlayer, setSelectedPlayer] = useState<HockeyPlayer | null>(null);
+  const [isPlayerDialogOpen, setIsPlayerDialogOpen] = useState(false);
+
+  // Get team from LeagueService
+  const teams = LeagueService.getAllTeams();
   const team = teams.find(t => t.id === Number(teamId));
+
+  const handlePlayerClick = (player: HockeyPlayer) => {
+    setSelectedPlayer(player);
+    setIsPlayerDialogOpen(true);
+  };
 
   useEffect(() => {
     const loadRoster = async () => {
@@ -78,47 +77,120 @@ const OtherTeam = () => {
           },
           team: p.team,
           teamAbbreviation: p.team,
-          status: p.status === 'injured' ? 'IR' : null,
+          status: p.status === 'injured' ? 'IR' : (p.status === 'active' ? null : 'WVR'),
           image: p.headshot_url || undefined,
-          nextGame: { opponent: 'vs OPP', isToday: Math.random() > 0.3 },
+          // Use deterministic value for initial assignment (hash player ID for consistency)
+          nextGame: { opponent: 'vs OPP', isToday: (parseInt(String(p.id)) % 2 === 0) },
           projectedPoints: (p.points || 0) / 20
         }));
 
-        // Auto-assign slots
-        const starters: HockeyPlayer[] = [];
-        const bench: HockeyPlayer[] = [];
-        const ir: HockeyPlayer[] = [];
-        const assignments: Record<string, string> = {};
-        
-        const slotsNeeded = { 'C': 2, 'LW': 2, 'RW': 2, 'D': 4, 'G': 2, 'UTIL': 1 };
-        const slotsFilled = { 'C': 0, 'LW': 0, 'RW': 0, 'D': 0, 'G': 0, 'UTIL': 0 };
-
-        transformedPlayers.forEach(p => {
-          if (p.status === 'IR') {
-            ir.push(p);
-            return;
-          }
-          const pos = getFantasyPosition(p.position);
-          let assigned = false;
-
-          if (pos !== 'UTIL' && slotsFilled[pos] < slotsNeeded[pos]) {
-            slotsFilled[pos]++;
-            assigned = true;
-            assignments[p.id] = `slot-${pos}-${slotsFilled[pos]}`;
-          } else if (pos !== 'G' && slotsFilled['UTIL'] < slotsNeeded['UTIL']) {
-            slotsFilled['UTIL']++;
-            assigned = true;
-            assignments[p.id] = `slot-UTIL`;
-          }
-
-          if (assigned) {
-            starters.push({ ...p, starter: true });
-          } else {
-            bench.push(p);
-          }
+        // Sort players consistently by ID for deterministic auto-assignment
+        transformedPlayers.sort((a, b) => {
+          const idA = typeof a.id === 'string' ? parseInt(a.id) : a.id;
+          const idB = typeof b.id === 'string' ? parseInt(b.id) : b.id;
+          return idA - idB;
         });
 
-        setRoster({ starters, bench, ir, slotAssignments: assignments });
+        // Check for saved lineup first (for this team)
+        const savedLineup = await LeagueService.getLineup(Number(teamId));
+        
+        if (savedLineup) {
+          // Restore saved lineup for this team
+          const playerMap = new Map(transformedPlayers.map(p => [String(p.id), p]));
+          const savedPlayerIds = new Set([
+            ...savedLineup.starters,
+            ...savedLineup.bench,
+            ...savedLineup.ir
+          ]);
+          
+          const starters = savedLineup.starters
+            .map(id => {
+              const player = playerMap.get(id);
+              if (!player) return null;
+              return { ...player, starter: true };
+            })
+            .filter((p): p is HockeyPlayer => p !== null);
+          
+          const bench = savedLineup.bench
+            .map(id => playerMap.get(id))
+            .filter((p): p is HockeyPlayer => p !== null);
+          
+          const ir = savedLineup.ir
+            .map(id => playerMap.get(id))
+            .filter((p): p is HockeyPlayer => p !== null);
+          
+          // Add any new players (not in saved lineup) to bench
+          transformedPlayers.forEach(player => {
+            if (!savedPlayerIds.has(String(player.id))) {
+              bench.push(player);
+            }
+          });
+          
+          // Ensure all slot assignments are valid (player still exists)
+          const validSlotAssignments: Record<string, string> = {};
+          Object.entries(savedLineup.slotAssignments).forEach(([playerId, slotId]) => {
+            if (playerMap.has(playerId)) {
+              validSlotAssignments[playerId] = slotId;
+            }
+          });
+          
+          setRoster({ starters, bench, ir, slotAssignments: validSlotAssignments });
+        } else {
+          // No saved lineup - auto-assign slots
+          const starters: HockeyPlayer[] = [];
+          const bench: HockeyPlayer[] = [];
+          const ir: HockeyPlayer[] = [];
+          const assignments: Record<string, string> = {};
+          
+          const slotsNeeded = { 'C': 2, 'LW': 2, 'RW': 2, 'D': 4, 'G': 2, 'UTIL': 1 };
+          const slotsFilled = { 'C': 0, 'LW': 0, 'RW': 0, 'D': 0, 'G': 0, 'UTIL': 0 };
+          
+          let irSlotIndex = 1;
+
+          // Only use actual IR/SUSP status for IR placement (deterministic)
+          // Don't use nextGame.isToday for initial auto-assignment
+          transformedPlayers.forEach(p => {
+            if (p.status === 'IR' || p.status === 'SUSP') {
+              if (irSlotIndex <= 3) {
+                ir.push(p);
+                assignments[p.id] = `ir-slot-${irSlotIndex}`;
+                irSlotIndex++;
+              } else {
+                bench.push(p);
+              }
+              return;
+            }
+            const pos = getFantasyPosition(p.position);
+            let assigned = false;
+
+            if (pos !== 'UTIL' && slotsFilled[pos] < slotsNeeded[pos]) {
+              slotsFilled[pos]++;
+              assigned = true;
+              assignments[p.id] = `slot-${pos}-${slotsFilled[pos]}`;
+            } else if (pos !== 'G' && slotsFilled['UTIL'] < slotsNeeded['UTIL']) {
+              slotsFilled['UTIL']++;
+              assigned = true;
+              assignments[p.id] = `slot-UTIL`;
+            }
+
+            if (assigned) {
+              starters.push({ ...p, starter: true });
+            } else {
+              bench.push(p);
+            }
+          });
+
+          const initialRoster = { starters, bench, ir, slotAssignments: assignments };
+          setRoster(initialRoster);
+          
+          // Save initial lineup for this team
+          await LeagueService.saveLineup(Number(teamId), {
+            starters: starters.map(p => p.id),
+            bench: bench.map(p => p.id),
+            ir: ir.map(p => p.id),
+            slotAssignments: assignments
+          });
+        }
       } catch (e) {
         console.error(e);
       } finally {
@@ -206,17 +278,30 @@ const OtherTeam = () => {
                 players={roster.starters} 
                 slotAssignments={roster.slotAssignments}
                 className="bg-card/50 p-6 rounded-xl border shadow-sm"
+                onPlayerClick={handlePlayerClick}
               />
               <BenchGrid 
                 players={roster.bench}
                 className="bg-card/50 p-6 rounded-xl border shadow-sm"
+                onPlayerClick={handlePlayerClick}
               />
               {roster.ir.length > 0 && (
-                <IRSlot players={roster.ir} />
+                <IRSlot 
+                  players={roster.ir}
+                  slotAssignments={roster.slotAssignments}
+                  onPlayerClick={handlePlayerClick}
+                />
               )}
             </>
           )}
         </div>
+
+        {/* Player Stats Modal */}
+        <PlayerStatsModal
+          player={selectedPlayer}
+          isOpen={isPlayerDialogOpen}
+          onClose={() => setIsPlayerDialogOpen(false)}
+        />
       </main>
       <Footer />
     </div>

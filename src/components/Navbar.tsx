@@ -283,7 +283,7 @@ const Navbar = () => {
       {/* Mobile Navigation */}
       {mobileMenuOpen && (
         <div className="lg:hidden fixed inset-0 top-[calc(var(--header-height)+1px)] z-50 bg-background/95 backdrop-blur-sm animate-in fade-in slide-in-from-top duration-300">
-          <div className="container mx-auto px-4 py-5 h-[calc(100vh-var(--header-height))] flex flex-col">
+          <div className="container mx-auto px-4 py-5 h-[calc(100dvh-var(--header-height))] flex flex-col">
             <div className="flex-1 overflow-y-auto">
               <nav className="flex flex-col space-y-4">
                 <MobileNavSection title="My Team">

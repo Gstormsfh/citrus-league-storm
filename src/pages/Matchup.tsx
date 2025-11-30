@@ -9,9 +9,47 @@ import { MatchupHistory } from "@/components/matchup/MatchupHistory";
 import { LiveUpdates } from "@/components/matchup/LiveUpdates";
 import { Button } from "@/components/ui/button";
 import { MatchupPlayer } from "@/components/matchup/types";
+import { HockeyPlayer } from '@/components/roster/HockeyPlayerCard';
+import PlayerStatsModal from '@/components/PlayerStatsModal';
 
 const Matchup = () => {
   const [activeTab, setActiveTab] = useState("lineup");
+
+  const [selectedPlayer, setSelectedPlayer] = useState<HockeyPlayer | null>(null);
+  const [isPlayerDialogOpen, setIsPlayerDialogOpen] = useState(false);
+
+  const toHockeyPlayer = (p: MatchupPlayer): HockeyPlayer => ({
+    id: p.id.toString(),
+    name: p.name,
+    position: p.position,
+    number: 0,
+    starter: p.isStarter,
+    stats: {
+      goals: p.stats.goals,
+      assists: p.stats.assists,
+      points: p.points,
+      plusMinus: 0,
+      shots: p.stats.sog,
+      hits: 0,
+      blockedShots: p.stats.blk,
+      wins: 0,
+      losses: 0,
+      otl: 0,
+      gaa: 0,
+      savePct: 0,
+      shutouts: 0
+    },
+    team: p.team,
+    teamAbbreviation: p.team,
+    status: p.status === 'Yet to Play' ? null : (p.status === 'In Game' ? 'Active' : null),
+    image: undefined,
+    projectedPoints: 0
+  });
+
+  const handlePlayerClick = (player: MatchupPlayer) => {
+    setSelectedPlayer(toHockeyPlayer(player));
+    setIsPlayerDialogOpen(true);
+  };
 
   const [myTeam] = useState<MatchupPlayer[]>([
     { id: 1, name: "Connor McDavid", position: "C", team: "EDM", points: 32.5, gamesRemaining: 2, status: "In Game", isStarter: true, isToday: true, stats: { goals: 1, assists: 2, sog: 4, blk: 0 }, gameInfo: { opponent: "vs CGY", score: "EDM 4-2", period: "3rd 12:45" } },
@@ -139,12 +177,14 @@ const Matchup = () => {
                   starters={myStarters}
                   bench={myBench}
                   gradientClass="border-t-4 border-fantasy-secondary"
+                  onPlayerClick={handlePlayerClick}
                 />
                 <TeamCard
                   title="Thunder Titans"
                   starters={opponentStarters}
                   bench={opponentBench}
                   gradientClass="border-t-4 border-fantasy-primary"
+                  onPlayerClick={handlePlayerClick}
                 />
               </div>
             </TabsContent>
@@ -164,6 +204,12 @@ const Matchup = () => {
           
           <LiveUpdates updates={updates} />
         </div>
+        
+        <PlayerStatsModal
+          player={selectedPlayer}
+          isOpen={isPlayerDialogOpen}
+          onClose={() => setIsPlayerDialogOpen(false)}
+        />
       </main>
       <Footer />
     </div>

@@ -3,8 +3,9 @@ import { CSS } from "@dnd-kit/utilities";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { AlertCircle, Shield, CalendarDays } from "lucide-react";
+import { AlertCircle, Shield, CalendarDays, Skull, Plus } from "lucide-react";
 import { useState } from "react";
+import { CitrusPuckPlayerData, AggregatedPlayerData } from "@/types/citruspuck";
 
 export interface HockeyPlayer {
   id: number | string;
@@ -34,6 +35,11 @@ export interface HockeyPlayer {
     gaa?: number;
     savePct?: number;
     shutouts?: number;
+    
+    // Advanced / CitrusPuck stats can be mapped here or accessed via citrusPuckData
+    xGoals?: number;
+    corsi?: number;
+    fenwick?: number;
   };
   team: string;
   teamAbbreviation?: string; // e.g., "EDM", "COL"
@@ -48,6 +54,19 @@ export interface HockeyPlayer {
     isToday: boolean;
   };
   projectedPoints?: number;
+  
+  // CitrusPuck Integration
+  citrusPuckData?: {
+    currentSeason?: AggregatedPlayerData;
+    lastSeason?: AggregatedPlayerData;
+    projections?: {
+      currentWeek?: CitrusPuckPlayerData;
+      restOfSeason?: CitrusPuckPlayerData;
+    };
+  };
+  
+  // View Control
+  statView?: 'currentWeek' | 'seasonToDate' | 'lastSeason' | 'restOfSeason';
 }
 
 interface HockeyPlayerCardProps {
@@ -72,9 +91,11 @@ const HockeyPlayerCard = ({
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: player.id });
+  } = useSortable({ id: player?.id || 'unknown' });
   
   const [imageError, setImageError] = useState(false);
+
+  if (!player) return null;
 
   const style = draggable ? {
     transform: CSS.Transform.toString(transform),
@@ -89,7 +110,6 @@ const HockeyPlayerCard = ({
       case 'Left Wing': return 'LW';
       case 'Defence': return 'D';
       case 'Goalie': return 'G';
-      // Handle the case where we already have abbreviations from the DB
       case 'C': return 'C';
       case 'RW': return 'RW';
       case 'LW': return 'LW';
@@ -101,7 +121,6 @@ const HockeyPlayerCard = ({
 
   const getTeamAbbreviation = (): string => {
     if (player.teamAbbreviation) return player.teamAbbreviation;
-    // Extract abbreviation from team name (last word, first 3 letters)
     const words = player.team.split(' ');
     return words[words.length - 1].substring(0, 3).toUpperCase();
   };
@@ -110,34 +129,101 @@ const HockeyPlayerCard = ({
     if (!player.status) return null;
     
     const statusConfig = {
-      'IR': { label: 'IR', variant: 'destructive' as const, color: 'bg-red-500' },
-      'SUSP': { label: 'SUSP', variant: 'destructive' as const, color: 'bg-orange-500' },
-      'GTD': { label: 'GTD', variant: 'secondary' as const, color: 'bg-yellow-500' },
-      'WVR': { label: 'WVR', variant: 'outline' as const, color: 'bg-blue-500' },
+      'IR': { label: 'IR', variant: 'destructive' as const, color: 'bg-red-500', icon: Skull },
+      'SUSP': { label: 'SUSP', variant: 'destructive' as const, color: 'bg-orange-500', icon: AlertCircle },
+      'GTD': { label: 'GTD', variant: 'secondary' as const, color: 'bg-yellow-500', icon: AlertCircle },
+      'WVR': { label: 'WVR', variant: 'outline' as const, color: 'bg-blue-500', icon: null },
     };
 
     const config = statusConfig[player.status];
     if (!config) return null;
 
+    const Icon = config.icon;
+
     return (
       <Badge 
         variant={config.variant}
-        className={cn("absolute top-0.5 left-0.5 text-[7px] font-bold h-3 px-1 z-10", config.color, "text-white")}
+        className={cn("absolute top-0.5 right-0.5 text-[7px] font-bold h-4 px-1 z-10 gap-0.5 flex items-center", config.color, "text-white")}
       >
+        {Icon && <Icon className="w-2 h-2" />}
         {config.label}
       </Badge>
     );
   };
 
-  const isGoalie = player.position === 'Goalie';
+  const getDisplayStats = () => {
+    const view = player.statView || 'seasonToDate';
+    const cp = player.citrusPuckData;
+    
+    let data: CitrusPuckPlayerData | undefined;
+    
+    switch (view) {
+      case 'lastSeason':
+        data = cp?.lastSeason?.allSituation;
+        break;
+      case 'currentWeek':
+        data = cp?.projections?.currentWeek;
+        break;
+      case 'restOfSeason':
+        data = cp?.projections?.restOfSeason;
+        break;
+      case 'seasonToDate':
+      default:
+        data = cp?.currentSeason?.allSituation;
+        break;
+    }
+
+    if (!data) {
+        // If we are in a specific analytics view and have no data, show 0s instead of fallback stats
+        if (['currentWeek', 'restOfSeason', 'lastSeason', 'seasonToDate'].includes(view)) {
+             return {
+                goals: 0,
+                assists: 0,
+                points: 0,
+                plusMinus: 0,
+                shots: 0,
+                wins: 0,
+                gaa: 0,
+                savePct: 0
+            };
+        }
+        // Fallback to existing stats only for default/unknown views
+        return player.stats;
+    }
+
+    // Calculate Assists (Primary + Secondary)
+    // Ensure values are treated as numbers, as Supabase might return them as strings (e.g. "50.0")
+    const primary = typeof data.I_F_primaryAssists === 'string' ? parseFloat(data.I_F_primaryAssists) : (data.I_F_primaryAssists || 0);
+    const secondary = typeof data.I_F_secondaryAssists === 'string' ? parseFloat(data.I_F_secondaryAssists) : (data.I_F_secondaryAssists || 0);
+    const assists = primary + secondary;
+
+    // Map CP data to the stats structure expected by the card
+    // Also ensure other fields are numbers for safety
+    const goals = typeof data.I_F_goals === 'string' ? parseFloat(data.I_F_goals) : (data.I_F_goals || 0);
+    const points = typeof data.I_F_points === 'string' ? parseFloat(data.I_F_points) : (data.I_F_points || 0);
+    const shots = typeof data.I_F_shotsOnGoal === 'string' ? parseFloat(data.I_F_shotsOnGoal) : (data.I_F_shotsOnGoal || 0);
+
+    return {
+        goals: Math.round(goals),
+        assists: Math.round(assists),
+        points: Math.round(points),
+        plusMinus: 0, 
+        shots: Math.round(shots),
+        wins: 0, 
+        gaa: 0,
+        savePct: 0
+    };
+  };
+
+  const displayStats = getDisplayStats();
+  const isGoalie = player.position === 'Goalie' || player.position === 'G';
   const positionAbbr = getPositionAbbreviation(player.position);
   const teamAbbr = getTeamAbbreviation();
   const teamLogoUrl = `https://assets.nhle.com/logos/nhl/svg/${player.teamAbbreviation || 'NHL'}_light.svg`;
 
-  // Projection & Game Data Logic
   const hasGameToday = player.nextGame?.isToday;
   const projectedPoints = hasGameToday ? (player.projectedPoints || 0) : 0;
-  const maxProjectedPoints = 8; // Assumed "full bar" value for a great game
+  const maxProjectedPoints = 8; 
   const projectionPercentage = Math.min((projectedPoints / maxProjectedPoints) * 100, 100);
 
   const dragProps = draggable ? {
@@ -163,7 +249,6 @@ const HockeyPlayerCard = ({
     >
       {/* Compact Header Section */}
       <div className="relative p-1.5 bg-muted/30 border-b border-border/30 flex items-center gap-1.5 min-h-[35px]">
-        {/* Status Badge */}
         {getStatusBadge()}
 
         {/* Team Logo */}
@@ -192,10 +277,13 @@ const HockeyPlayerCard = ({
           >
             {player.name}
           </h3>
-          <div className="flex items-center text-[8px] text-muted-foreground mt-0.5">
+          <div className="flex items-center text-[8px] text-muted-foreground mt-0.5 gap-1">
             <span className="font-medium">{teamAbbr}</span>
-            <span className="mx-1">•</span>
+            <span>•</span>
             <span>#{player.number}</span>
+            {(player.status === 'IR' || player.status === 'SUSP') && (
+              <Plus className="w-3 h-3 text-red-500 ml-0.5 flex-shrink-0 stroke-[3]" />
+            )}
           </div>
         </div>
 
@@ -211,47 +299,45 @@ const HockeyPlayerCard = ({
       {/* Compact Stats Grid - Flex grow to fill space */}
       <div className="p-1 bg-card flex-1 flex items-center justify-center">
         {isGoalie ? (
-          // Goalie Stats - compact
           <div className="grid grid-cols-3 gap-0.5 text-center w-full">
             <div>
               <div className="text-[7px] text-muted-foreground uppercase leading-none mb-0.5">W</div>
-              <div className="font-bold text-[9px]">{player.stats.wins || 0}</div>
+              <div className="font-bold text-[9px]">{displayStats.wins || 0}</div>
             </div>
             <div>
               <div className="text-[7px] text-muted-foreground uppercase leading-none mb-0.5">GAA</div>
-              <div className="font-bold text-[9px]">{player.stats.gaa?.toFixed(2) || '0.00'}</div>
+              <div className="font-bold text-[9px]">{displayStats.gaa?.toFixed(2) || '0.00'}</div>
             </div>
             <div>
               <div className="text-[7px] text-muted-foreground uppercase leading-none mb-0.5">SV%</div>
               <div className="font-bold text-[9px]">
-                {player.stats.savePct ? (player.stats.savePct * 100).toFixed(1) : '0.0'}%
+                {displayStats.savePct ? (displayStats.savePct * 100).toFixed(1) : '0.0'}%
               </div>
             </div>
           </div>
         ) : (
-          // Skater Stats - compact single row
           <div className="grid grid-cols-4 gap-0.5 text-center w-full">
             <div>
               <div className="text-[7px] text-muted-foreground uppercase leading-none mb-0.5">G</div>
-              <div className="font-bold text-[9px]">{player.stats.goals || 0}</div>
+              <div className="font-bold text-[9px]">{displayStats.goals || 0}</div>
             </div>
             <div>
               <div className="text-[7px] text-muted-foreground uppercase leading-none mb-0.5">A</div>
-              <div className="font-bold text-[9px]">{player.stats.assists || 0}</div>
+              <div className="font-bold text-[9px]">{displayStats.assists || 0}</div>
             </div>
             <div>
               <div className="text-[7px] text-muted-foreground uppercase leading-none mb-0.5">+/-</div>
               <div className={cn(
                 "font-bold text-[9px]",
-                (player.stats.plusMinus || 0) > 0 && "text-emerald-600",
-                (player.stats.plusMinus || 0) < 0 && "text-red-600"
+                (displayStats.plusMinus || 0) > 0 && "text-emerald-600",
+                (displayStats.plusMinus || 0) < 0 && "text-red-600"
               )}>
-                {(player.stats.plusMinus || 0) > 0 ? '+' : ''}{player.stats.plusMinus || 0}
+                {(displayStats.plusMinus || 0) > 0 ? '+' : ''}{displayStats.plusMinus || 0}
               </div>
             </div>
             <div>
               <div className="text-[7px] text-muted-foreground uppercase leading-none mb-0.5">SOG</div>
-              <div className="font-bold text-[9px]">{player.stats.shots || 0}</div>
+              <div className="font-bold text-[9px]">{displayStats.shots || 0}</div>
             </div>
           </div>
         )}
@@ -284,7 +370,6 @@ const HockeyPlayerCard = ({
           </div>
         </div>
         
-        {/* Projection Bar */}
         <div className="h-1 bg-muted/50 rounded-full overflow-hidden border border-border/10 w-full">
           <div 
             className={cn("h-full rounded-full transition-all duration-500", 
@@ -299,4 +384,3 @@ const HockeyPlayerCard = ({
 };
 
 export default HockeyPlayerCard;
-

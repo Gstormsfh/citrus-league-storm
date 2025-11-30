@@ -81,6 +81,33 @@ export type Database = {
         }
         Relationships: []
       }
+      team_lineups: {
+        Row: {
+          team_id: number
+          starters: Json
+          bench: Json
+          ir: Json
+          slot_assignments: Json
+          updated_at: string | null
+        }
+        Insert: {
+          team_id: number
+          starters?: Json
+          bench?: Json
+          ir?: Json
+          slot_assignments?: Json
+          updated_at?: string | null
+        }
+        Update: {
+          team_id?: number
+          starters?: Json
+          bench?: Json
+          ir?: Json
+          slot_assignments?: Json
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

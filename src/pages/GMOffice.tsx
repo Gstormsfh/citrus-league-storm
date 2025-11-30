@@ -1,14 +1,15 @@
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeftRight, Users, Brain, TrendingUp, Calendar, FileText, BarChart3, ListChecks, Bell } from 'lucide-react';
+import { ArrowLeftRight, Users, TrendingUp, Calendar, FileText, BarChart3, ListChecks, Bell } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { Narwhal } from '@/components/icons/Narwhal';
 
 const gmActions = [
   {
     title: "Stormy AI Assistant",
     description: "Get personalized advice and insights from your AI GM",
-    icon: Brain,
+    icon: Narwhal,
     gradient: "from-primary to-secondary",
     link: "/gm-office/stormy"
   },

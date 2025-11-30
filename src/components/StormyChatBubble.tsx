@@ -6,7 +6,8 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Brain, X, MessageSquare, Send, Sparkles, Minimize2, Maximize2 } from 'lucide-react';
+import { X, MessageSquare, Send, Sparkles, Minimize2, Maximize2 } from 'lucide-react';
+import { Narwhal } from '@/components/icons/Narwhal';
 
 interface Message {
   id: string;
@@ -99,7 +100,7 @@ export const StormyChatBubble = () => {
         onClick={() => setIsOpen(true)}
         className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-xl bg-gradient-to-r from-primary to-purple-600 hover:scale-105 transition-transform z-[100] p-0"
       >
-        <Brain className="h-7 w-7 text-white" />
+        <Narwhal className="h-7 w-7 text-white" />
         <span className="absolute -top-1 -right-1 h-3 w-3 bg-green-500 rounded-full border-2 border-background animate-pulse" />
       </Button>
     );
@@ -111,7 +112,7 @@ export const StormyChatBubble = () => {
         <div className="flex items-center gap-3">
           <div className="relative">
             <div className="h-10 w-10 rounded-full bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center shadow-inner">
-               <Brain className="h-6 w-6 text-white" />
+               <Narwhal className="h-6 w-6 text-white" />
             </div>
             <div className="absolute -bottom-0.5 -right-0.5 h-3 w-3 bg-green-500 rounded-full border-2 border-background" />
           </div>
@@ -144,7 +145,7 @@ export const StormyChatBubble = () => {
                   >
                     {msg.sender === 'stormy' && (
                       <Avatar className="h-8 w-8 border bg-gradient-to-br from-primary/10 to-purple-600/10">
-                        <AvatarFallback><Brain className="h-4 w-4 text-primary" /></AvatarFallback>
+                        <AvatarFallback><Narwhal className="h-4 w-4 text-primary" /></AvatarFallback>
                       </Avatar>
                     )}
                     <div
