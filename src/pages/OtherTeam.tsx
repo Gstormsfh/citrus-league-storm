@@ -9,7 +9,9 @@ import { StartersGrid, BenchGrid, IRSlot } from '@/components/roster';
 import { HockeyPlayer } from '@/components/roster/HockeyPlayerCard';
 import { useState, useEffect } from 'react';
 import { PlayerService } from '@/services/PlayerService';
-import { LeagueService } from '@/services/LeagueService';
+import { LeagueService, Team } from '@/services/LeagueService';
+import { DraftService } from '@/services/DraftService';
+import { supabase } from '@/integrations/supabase/client';
 import PlayerStatsModal from '@/components/PlayerStatsModal';
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -41,10 +43,8 @@ const OtherTeam = () => {
   // Player Stats Modal State
   const [selectedPlayer, setSelectedPlayer] = useState<HockeyPlayer | null>(null);
   const [isPlayerDialogOpen, setIsPlayerDialogOpen] = useState(false);
-
-  // Get team from LeagueService
-  const teams = LeagueService.getAllTeams();
-  const team = teams.find(t => t.id === Number(teamId));
+  const [team, setTeam] = useState<Team | null>(null);
+  const [ownerName, setOwnerName] = useState<string>('User');
 
   const handlePlayerClick = (player: HockeyPlayer) => {
     setSelectedPlayer(player);
@@ -53,17 +53,90 @@ const OtherTeam = () => {
 
   useEffect(() => {
     const loadRoster = async () => {
+      if (!teamId) {
+        setLoading(false);
+        return;
+      }
+
       setLoading(true);
       try {
-        // Get consistent roster for this team from LeagueService
-        const allPlayers = await PlayerService.getAllPlayers();
-        const teamPlayers = await LeagueService.getTeamRoster(Number(teamId), allPlayers);
+        // Get team from Supabase (handles UUID team IDs)
+        const { data: teamData, error: teamError } = await supabase
+          .from('teams')
+          .select('id, league_id, team_name, owner_id')
+          .eq('id', teamId)
+          .maybeSingle();
 
+        if (teamError || !teamData) {
+          console.error(`Team ${teamId} not found:`, teamError);
+          setLoading(false);
+          return;
+        }
+
+        setTeam(teamData);
+
+        // Get owner profile information
+        if (teamData.owner_id) {
+          const { data: profile, error: profileError } = await supabase
+            .from('profiles')
+            .select('first_name, last_name, username')
+            .eq('id', teamData.owner_id)
+            .maybeSingle();
+          
+          if (!profileError && profile) {
+            const name = profile.first_name && profile.last_name
+              ? `${profile.first_name} ${profile.last_name}`
+              : profile.username || 'User';
+            setOwnerName(name);
+          }
+        } else {
+          setOwnerName('AI Team');
+        }
+
+        // Check if draft is completed
+        const { league: leagueData, error: leagueError } = await LeagueService.getLeague(teamData.league_id);
+        if (leagueError || !leagueData || leagueData.draft_status !== 'completed') {
+          console.log(`Draft not completed for league ${teamData.league_id}`);
+          setRoster({ starters: [], bench: [], ir: [], slotAssignments: {} });
+          setLoading(false);
+          return;
+        }
+
+        // Get all players from staging files
+        const allPlayers = await PlayerService.getAllPlayers();
+        
+        // Get draft picks for this team
+        const { picks: draftPicks } = await DraftService.getDraftPicks(teamData.league_id);
+        const teamPicks = draftPicks.filter(p => p.team_id === teamId);
+        
+        if (teamPicks.length === 0) {
+          console.log(`No draft picks found for team ${teamId}`);
+          setRoster({ starters: [], bench: [], ir: [], slotAssignments: {} });
+          setLoading(false);
+          return;
+        }
+
+        // Map draft picks to players
+        const playerIds = teamPicks.map(p => p.player_id);
+        const teamPlayers = allPlayers.filter(p => playerIds.includes(p.id));
+        
+        console.log(`OtherTeam: Loaded ${teamPlayers.length} players for team ${teamId}`);
+        
+        // CRITICAL: If no players loaded, something is wrong - log and return
+        if (teamPlayers.length === 0) {
+          console.error(`OtherTeam: Team ${teamId} - ❌ NO PLAYERS LOADED! This team has no players assigned.`);
+          setRoster({ starters: [], bench: [], ir: [], slotAssignments: {} });
+          setLoading(false);
+          return;
+        }
+
+        // Transform players from staging files to HockeyPlayer format
+        // All data (names, stats, positions, teams) comes from staging files via PlayerService
         const transformedPlayers: HockeyPlayer[] = teamPlayers.map((p) => ({
           id: p.id,
-          name: p.full_name,
-          position: p.position,
-          number: parseInt(p.jersey_number || '0'),
+          name: p.full_name, // From staging file
+          position: p.position, // From staging file
+          number: parseInt(p.jersey_number || '0'), // Jersey numbers not in staging, default to 0
           starter: false,
           stats: {
             gamesPlayed: p.games_played || 0,
@@ -88,10 +161,26 @@ const OtherTeam = () => {
           teamAbbreviation: p.team,
           status: p.status === 'injured' ? 'IR' : (p.status === 'active' ? null : 'WVR'),
           image: p.headshot_url || undefined,
-          // Use deterministic value for initial assignment (hash player ID for consistency)
-          nextGame: { opponent: 'vs OPP', isToday: (parseInt(String(p.id)) % 2 === 0) },
+          nextGame: undefined, // Will be populated below with real schedule data
           projectedPoints: (p.points || 0) / 20
         }));
+
+        // Load real NHL schedule data for each player
+        const { ScheduleService } = await import('@/services/ScheduleService');
+        for (const player of transformedPlayers) {
+          const { game: nextGame } = await ScheduleService.getNextGameForTeam(player.teamAbbreviation || player.team || '');
+          const hasGameToday = await ScheduleService.hasGameToday(player.teamAbbreviation || player.team || '');
+          const gameInfo = ScheduleService.getGameInfo(nextGame, player.teamAbbreviation || player.team || '');
+          
+          if (gameInfo) {
+            player.nextGame = {
+              opponent: gameInfo.opponent,
+              isToday: hasGameToday
+            };
+          } else {
+            player.nextGame = { opponent: 'No upcoming game', isToday: false };
+          }
+        }
 
         // Sort players consistently by ID for deterministic auto-assignment
         transformedPlayers.sort((a, b) => {
@@ -100,10 +189,29 @@ const OtherTeam = () => {
           return idA - idB;
         });
 
-        // Check for saved lineup first (for this team)
-        const savedLineup = await LeagueService.getLineup(Number(teamId));
+        // Check for saved lineup first (for this team - handles UUID)
+        const savedLineup = await LeagueService.getLineup(teamId);
         
-        if (savedLineup) {
+        // Validate lineup: must have at least 10 starters AND bench players to be considered valid
+        // CRITICAL: If all players are on bench with no starters, lineup is invalid
+        const starterCount = savedLineup?.starters && Array.isArray(savedLineup.starters) 
+          ? savedLineup.starters.length 
+          : 0;
+        const benchCount = savedLineup?.bench && Array.isArray(savedLineup.bench) 
+          ? savedLineup.bench.length 
+          : 0;
+        
+        const isValidLineup = starterCount >= 10 && benchCount > 0;
+        
+        console.log(`OtherTeam: Team ${teamId} lineup check - ${starterCount} starters, ${benchCount} bench, valid: ${isValidLineup}, players loaded: ${transformedPlayers.length}`);
+        
+        // If lineup exists but is invalid (especially if starters is empty), force re-assignment
+        if (savedLineup && !isValidLineup) {
+          console.error(`OtherTeam: Team ${teamId} - ❌ INVALID LINEUP DETECTED! (${starterCount} starters, ${benchCount} bench). All players on bench! Auto-fixing NOW...`);
+          // Fall through to auto-assignment below - don't use the invalid lineup
+          // The auto-assignment will create a proper lineup and save it (same logic as team 2)
+        } else if (isValidLineup) {
+          console.log(`OtherTeam: Team ${teamId} - ✅ Valid lineup found, using saved lineup`);
           // Restore saved lineup for this team
           const playerMap = new Map(transformedPlayers.map(p => [String(p.id), p]));
           const savedPlayerIds = new Set([
@@ -195,13 +303,25 @@ const OtherTeam = () => {
           const initialRoster = { starters, bench, ir, slotAssignments: assignments };
           setRoster(initialRoster);
           
-          // Save initial lineup for this team
-          await LeagueService.saveLineup(Number(teamId), {
-            starters: starters.map(p => p.id),
-            bench: bench.map(p => p.id),
-            ir: ir.map(p => p.id),
-            slotAssignments: assignments
-          });
+          console.log(`OtherTeam: Team ${teamId} - Auto-assigned lineup: ${starters.length} starters, ${bench.length} bench, ${ir.length} IR`);
+          
+          // Save initial lineup for this team (handles UUID)
+          // This ensures the lineup is persisted even if initialization missed it
+          if (starters.length >= 10 && bench.length > 0) {
+            try {
+              await LeagueService.saveLineup(teamId, {
+                starters: starters.map(p => String(p.id)),
+                bench: bench.map(p => String(p.id)),
+                ir: ir.map(p => String(p.id)),
+                slotAssignments: assignments
+              });
+              console.log(`OtherTeam: Team ${teamId} - ✅ Successfully saved fixed lineup to database`);
+            } catch (err) {
+              console.error(`OtherTeam: Team ${teamId} - ❌ FAILED to save lineup:`, err);
+            }
+          } else {
+            console.error(`OtherTeam: Team ${teamId} - ❌ CRITICAL: Generated lineup is still invalid (${starters.length} starters, ${bench.length} bench). This should not happen!`);
+          }
         }
       } catch (e) {
         console.error(e);
@@ -245,30 +365,15 @@ const OtherTeam = () => {
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 relative z-10">
             <div className="flex items-center gap-4">
               <div className="w-20 h-20 rounded-full bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center text-2xl font-bold text-primary border-2 border-primary/20 shadow-inner">
-                {team.logo}
+                {team.team_name.substring(0, 2).toUpperCase()}
               </div>
               <div>
-                <h1 className="text-3xl font-bold tracking-tight">{team.name}</h1>
+                <h1 className="text-3xl font-bold tracking-tight">{team.team_name}</h1>
                 <div className="flex items-center gap-2 text-muted-foreground mt-1">
                   <Star className="w-4 h-4 fill-muted-foreground/30" />
-                  <span>Manager: <span className="font-medium text-foreground">{team.owner}</span></span>
+                  <span>Manager: <span className="font-medium text-foreground">{ownerName}</span></span>
                 </div>
               </div>
-            </div>
-
-            <div className="flex flex-wrap gap-3">
-              <Badge variant="secondary" className="text-lg px-4 py-1.5 h-auto flex flex-col items-center justify-center gap-0.5 bg-background border shadow-sm">
-                <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">Record</span>
-                <span className="font-bold">{team.record.wins}-{team.record.losses}</span>
-              </Badge>
-              <Badge variant="secondary" className="text-lg px-4 py-1.5 h-auto flex flex-col items-center justify-center gap-0.5 bg-background border shadow-sm">
-                <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">Points</span>
-                <span className="font-bold text-primary">{team.points.toLocaleString()}</span>
-              </Badge>
-              <Badge variant="secondary" className="text-lg px-4 py-1.5 h-auto flex flex-col items-center justify-center gap-0.5 bg-background border shadow-sm">
-                <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">Rank</span>
-                <span className="font-bold">#{teams.findIndex(t => t.id === team.id) + 1}</span>
-              </Badge>
             </div>
 
             <Button 

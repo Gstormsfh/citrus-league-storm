@@ -42,9 +42,14 @@ const TradeAnalyzer = () => {
     const fetchData = async () => {
       setLoading(true);
       try {
+        // Get all players from staging files (staging_2025_skaters & staging_2025_goalies)
+        // PlayerService.getAllPlayers() is the ONLY source for player data
         const allPlayers = await PlayerService.getAllPlayers();
+        // LeagueService distributes players to teams, but uses staging file data
         const teams = await LeagueService.getAllTeamsWithRosters(allPlayers);
         
+        // For non-logged-in users, show demo team (Team 3)
+        // For logged-in users, get their actual team
         const myTeam = await LeagueService.getMyTeam(allPlayers);
         setMyTeamRoster(myTeam);
         

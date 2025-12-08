@@ -7,17 +7,30 @@ import {
   SkipForward, 
   RotateCcw, 
   Settings, 
-  Download,
-  Upload,
   Shuffle
 } from 'lucide-react';
 
 interface DraftControlsProps {
   isDraftActive: boolean;
-  onToggleDraft: () => void;
+  onToggleDraft?: () => void; // Keep for backward compatibility
+  onPause?: () => void;
+  onContinue?: () => void;
+  canPause?: boolean;
+  canContinue?: boolean;
 }
 
-export const DraftControls = ({ isDraftActive, onToggleDraft }: DraftControlsProps) => {
+export const DraftControls = ({ 
+  isDraftActive, 
+  onToggleDraft, 
+  onPause, 
+  onContinue, 
+  canPause = true,
+  canContinue = true
+}: DraftControlsProps) => {
+  // Use new handlers if provided, otherwise fall back to toggle
+  const handlePause = onPause || onToggleDraft;
+  const handleContinue = onContinue || onToggleDraft;
+
   return (
     <Card className="p-6">
       <h3 className="font-semibold mb-4 flex items-center gap-2">
@@ -28,23 +41,27 @@ export const DraftControls = ({ isDraftActive, onToggleDraft }: DraftControlsPro
       <div className="space-y-4">
         {/* Main Controls */}
         <div className="space-y-2">
-          <Button 
-            onClick={onToggleDraft}
-            className="w-full"
-            variant={isDraftActive ? "destructive" : "default"}
-          >
-            {isDraftActive ? (
-              <>
-                <Pause className="h-4 w-4 mr-2" />
-                Pause Draft
-              </>
-            ) : (
-              <>
-                <Play className="h-4 w-4 mr-2" />
-                Resume Draft
-              </>
-            )}
-          </Button>
+          {isDraftActive ? (
+            <Button 
+              onClick={handlePause}
+              className="w-full"
+              variant="destructive"
+              disabled={!canPause}
+            >
+              <Pause className="h-4 w-4 mr-2" />
+              Pause Draft
+            </Button>
+          ) : (
+            <Button 
+              onClick={handleContinue}
+              className="w-full"
+              variant="default"
+              disabled={!canContinue}
+            >
+              <Play className="h-4 w-4 mr-2" />
+              Continue Draft
+            </Button>
+          )}
           
           <Button variant="outline" className="w-full" disabled={!isDraftActive}>
             <SkipForward className="h-4 w-4 mr-2" />
@@ -67,20 +84,6 @@ export const DraftControls = ({ isDraftActive, onToggleDraft }: DraftControlsPro
           </Button>
         </div>
 
-        {/* Import/Export */}
-        <div className="space-y-2">
-          <div className="text-sm font-medium text-muted-foreground">Data</div>
-          
-          <Button variant="ghost" className="w-full justify-start text-sm h-8">
-            <Upload className="h-3 w-3 mr-2" />
-            Import Rankings
-          </Button>
-          
-          <Button variant="ghost" className="w-full justify-start text-sm h-8">
-            <Download className="h-3 w-3 mr-2" />
-            Export Results
-          </Button>
-        </div>
 
         {/* Draft Status */}
         <div className="pt-4 border-t space-y-2">

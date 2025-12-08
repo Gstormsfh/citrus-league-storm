@@ -98,7 +98,7 @@ export const StormyChatBubble = () => {
     return (
       <Button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-xl bg-gradient-to-r from-primary to-purple-600 hover:scale-105 transition-transform z-[100] p-0"
+        className="fixed bottom-6 left-6 h-14 w-14 rounded-full shadow-xl bg-gradient-to-r from-primary to-purple-600 hover:scale-105 transition-transform z-[100] p-0"
       >
         <Narwhal className="h-7 w-7 text-white" />
         <span className="absolute -top-1 -right-1 h-3 w-3 bg-green-500 rounded-full border-2 border-background animate-pulse" />
@@ -107,7 +107,7 @@ export const StormyChatBubble = () => {
   }
 
   return (
-    <Card className={`fixed bottom-6 right-6 w-[380px] shadow-2xl z-[100] border-primary/20 flex flex-col transition-all duration-300 ${isMinimized ? 'h-[70px]' : 'h-[600px]'}`}>
+    <Card className={`fixed bottom-6 left-6 w-[380px] shadow-2xl z-[100] border-primary/20 flex flex-col transition-all duration-300 ${isMinimized ? 'h-[70px]' : 'h-[600px]'}`}>
       <CardHeader className="p-4 bg-gradient-to-r from-primary/10 to-purple-600/10 border-b flex flex-row items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
           <div className="relative">

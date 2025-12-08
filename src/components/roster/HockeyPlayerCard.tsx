@@ -346,7 +346,7 @@ const HockeyPlayerCardContent = ({
             <div>
               <div className="text-[7px] text-muted-foreground uppercase leading-none mb-0.5">SV%</div>
               <div className="font-bold text-[9px]">
-                {displayStats.savePct ? (displayStats.savePct * 100).toFixed(1) : '0.0'}%
+                {displayStats.savePct ? (displayStats.savePct * 100).toFixed(2) : '0.00'}%
               </div>
             </div>
           </div>

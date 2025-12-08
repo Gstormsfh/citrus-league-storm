@@ -108,6 +108,165 @@ export type Database = {
         }
         Relationships: []
       }
+      profiles: {
+        Row: {
+          id: string
+          username: string
+          first_name: string | null
+          last_name: string | null
+          phone: string | null
+          location: string | null
+          bio: string | null
+          default_team_name: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id: string
+          username: string
+          first_name?: string | null
+          last_name?: string | null
+          phone?: string | null
+          location?: string | null
+          bio?: string | null
+          default_team_name?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          username?: string
+          first_name?: string | null
+          last_name?: string | null
+          phone?: string | null
+          location?: string | null
+          bio?: string | null
+          default_team_name?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      leagues: {
+        Row: {
+          id: string
+          name: string
+          commissioner_id: string
+          draft_status: 'not_started' | 'queued' | 'in_progress' | 'completed'
+          join_code: string
+          roster_size: number
+          draft_rounds: number
+          settings: Json
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          commissioner_id: string
+          draft_status?: 'not_started' | 'in_progress' | 'completed'
+          join_code?: string
+          roster_size?: number
+          draft_rounds?: number
+          settings?: Json
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          commissioner_id?: string
+          draft_status?: 'not_started' | 'in_progress' | 'completed'
+          join_code?: string
+          roster_size?: number
+          draft_rounds?: number
+          settings?: Json
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      teams: {
+        Row: {
+          id: string
+          league_id: string
+          owner_id: string | null
+          team_name: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          league_id: string
+          owner_id?: string | null
+          team_name: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          league_id?: string
+          owner_id?: string | null
+          team_name?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      draft_picks: {
+        Row: {
+          id: string
+          league_id: string
+          round_number: number
+          pick_number: number
+          team_id: string
+          player_id: string
+          picked_at: string
+        }
+        Insert: {
+          id?: string
+          league_id: string
+          round_number: number
+          pick_number: number
+          team_id: string
+          player_id: string
+          picked_at?: string
+        }
+        Update: {
+          id?: string
+          league_id?: string
+          round_number?: number
+          pick_number?: number
+          team_id?: string
+          player_id?: string
+          picked_at?: string
+        }
+        Relationships: []
+      }
+      draft_order: {
+        Row: {
+          id: string
+          league_id: string
+          round_number: number
+          team_order: Json
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          league_id: string
+          round_number: number
+          team_order: Json
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          league_id?: string
+          round_number?: number
+          team_order?: Json
+          created_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

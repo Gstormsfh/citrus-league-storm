@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
+import { LeagueService } from "@/services/LeagueService";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
@@ -15,17 +17,23 @@ import {
 } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Switch } from "@/components/ui/switch";
-import { Trophy, Users, Settings, CheckCircle } from "lucide-react";
+import { Trophy, Users, Settings, CheckCircle, AlertCircle } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useToast } from "@/hooks/use-toast";
 
 const CreateLeague = () => {
   const navigate = useNavigate();
+  const { user, profile } = useAuth();
+  const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Form State
   const [leagueName, setLeagueName] = useState("");
   const [teamsCount, setTeamsCount] = useState("12");
+  const [draftRounds, setDraftRounds] = useState("21");
   const [scoringType, setScoringType] = useState("h2h-points");
   const [draftType, setDraftType] = useState("snake");
   const [isPublic, setIsPublic] = useState(false);
@@ -70,13 +78,68 @@ const CreateLeague = () => {
     ));
   };
 
-  const handleCreateLeague = () => {
+  const handleCreateLeague = async () => {
+    if (!user) {
+      setError("You must be logged in to create a league");
+      navigate("/auth");
+      return;
+    }
+
+    if (!profile || profile.username.startsWith('user_')) {
+      setError("Please complete your profile setup first");
+      navigate("/profile-setup");
+      return;
+    }
+
+    if (!leagueName.trim()) {
+      setError("League name is required");
+      return;
+    }
+
     setLoading(true);
-    // Simulate API call
-    setTimeout(() => {
+    setError(null);
+
+    try {
+      const enabledStats = leagueStats.filter(s => s.enabled);
+      const settings = {
+        teamsCount: parseInt(teamsCount),
+        scoringType,
+        draftType,
+        isPublic,
+        stats: enabledStats,
+      };
+
+      const { league, team, error: createError } = await LeagueService.createLeague(
+        leagueName.trim(),
+        user.id,
+        21, // Roster size per team
+        parseInt(draftRounds), // Draft rounds from user selection
+        settings
+      );
+
+      if (createError) throw createError;
+      if (!league) throw new Error("Failed to create league");
+
+      // Show success message
+      toast({
+        title: "League Created!",
+        description: `${league.name} has been created successfully.`,
+      });
+
+      // Navigate to league dashboard
+      navigate(`/league/${league.id}`);
+    } catch (err: any) {
+      const errorMessage = err.message || "Failed to create league";
+      setError(errorMessage);
       setLoading(false);
-      navigate("/draft-room"); // Navigate to draft room after creation
-    }, 1500);
+      
+      // Also show toast for errors
+      toast({
+        title: "Error Creating League",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    }
   };
 
   const statsByCategory = {
@@ -119,6 +182,14 @@ const CreateLeague = () => {
             <CardContent className="p-8">
               
               <div className="space-y-8 animate-fade-in">
+                {/* ERROR MESSAGE */}
+                {error && (
+                  <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>{error}</AlertDescription>
+                  </Alert>
+                )}
+
                 {/* BASIC SETTINGS */}
                 <div className="space-y-6">
                   <div className="space-y-3">
@@ -132,7 +203,7 @@ const CreateLeague = () => {
                     />
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div className="space-y-3">
                       <Label htmlFor="teams-count" className="text-base">Number of Teams</Label>
                       <Select value={teamsCount} onValueChange={setTeamsCount}>
@@ -145,6 +216,22 @@ const CreateLeague = () => {
                           <SelectItem value="12">12 Teams</SelectItem>
                           <SelectItem value="14">14 Teams</SelectItem>
                           <SelectItem value="16">16 Teams</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-3">
+                      <Label htmlFor="draft-rounds" className="text-base">Draft Rounds</Label>
+                      <Select value={draftRounds} onValueChange={setDraftRounds}>
+                        <SelectTrigger id="draft-rounds" className="h-12">
+                          <SelectValue placeholder="Select rounds" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="16">16 Rounds</SelectItem>
+                          <SelectItem value="18">18 Rounds</SelectItem>
+                          <SelectItem value="21">21 Rounds</SelectItem>
+                          <SelectItem value="24">24 Rounds</SelectItem>
+                          <SelectItem value="30">30 Rounds</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>

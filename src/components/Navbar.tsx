@@ -6,7 +6,8 @@ import {
   Calendar, LineChart, Newspaper, Medal, Users, Settings, 
   LogOut, Home, FileText, Headphones, BookOpen, CircleUser
 } from 'lucide-react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
 import { 
   NavigationMenu, 
   NavigationMenuContent, 
@@ -22,6 +23,8 @@ const Navbar = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
+  const { user, profile, signOut } = useAuth();
   
   useEffect(() => {
     const handleScroll = () => {
@@ -43,15 +46,24 @@ const Navbar = () => {
     setMobileMenuOpen(false);
   };
 
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/');
+    closeMobileMenu();
+  };
+
   // Check if the current path matches the link path
   const isActive = (path: string) => {
     return location.pathname === path;
   };
+
+  const userInitial = profile?.username?.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase() || 'U';
+  const displayName = profile?.username || user?.email?.split('@')[0] || 'User';
   
   return (
     <header 
       className={cn(
-        "fixed w-full z-40 transition-all duration-500", 
+        "fixed w-full z-50 transition-all duration-500", 
         isScrolled ? 
           "py-3 bg-background/80 backdrop-blur-lg shadow-sm border-b border-border/20" : 
           "py-5 bg-transparent"
@@ -71,30 +83,30 @@ const Navbar = () => {
             </div>
           </Link>
 
-          {/* Desktop Navigation */}
+          {/* Desktop Navigation - Show to everyone for demo exploration */}
           <div className="hidden lg:flex items-center space-x-1">
-            <NavigationMenu>
-              <NavigationMenuList>
-                <NavigationMenuItem>
-                  <NavigationMenuTrigger className={cn(
-                    "text-sm font-medium text-foreground/80",
-                    (isActive("/roster") || isActive("/gm-office")) && "text-primary"
-                  )}>My Team</NavigationMenuTrigger>
-                  <NavigationMenuContent>
-                    <div className="w-[320px] p-2 grid gap-2 grid-cols-2">
-                      <Link to="/roster" onClick={closeMobileMenu} className="flex h-full w-full select-none flex-col justify-end rounded-md bg-gradient-to-b from-primary/5 to-primary/10 p-4 no-underline outline-none focus:shadow-sm hover:shadow-sm hover:scale-[1.01] transition-all duration-200">
-                        <div className="mb-1 mt-2 text-base font-medium">Roster</div>
-                        <p className="text-xs leading-tight text-muted-foreground">Manage your team's lineup</p>
-                        <ChevronRight className="h-3 w-3 mt-2 text-primary" />
-                      </Link>
-                      <Link to="/gm-office" onClick={closeMobileMenu} className="flex h-full w-full select-none flex-col justify-end rounded-md bg-gradient-to-b from-secondary/5 to-secondary/10 p-4 no-underline outline-none focus:shadow-sm hover:shadow-sm hover:scale-[1.01] transition-all duration-200">
-                        <div className="mb-1 mt-2 text-base font-medium">GM's Office</div>
-                        <p className="text-xs leading-tight text-muted-foreground">Team operations center</p>
-                        <ChevronRight className="h-3 w-3 mt-2 text-primary" />
-                      </Link>
-                    </div>
-                  </NavigationMenuContent>
-                </NavigationMenuItem>
+              <NavigationMenu>
+                <NavigationMenuList>
+                  <NavigationMenuItem>
+                    <NavigationMenuTrigger className={cn(
+                      "text-sm font-medium text-foreground/80",
+                      (isActive("/roster") || isActive("/gm-office")) && "text-primary"
+                    )}>My Team</NavigationMenuTrigger>
+                    <NavigationMenuContent>
+                      <div className="w-[320px] p-2 grid gap-2 grid-cols-2">
+                        <Link to="/roster" onClick={closeMobileMenu} className="flex h-full w-full select-none flex-col justify-end rounded-md bg-gradient-to-b from-primary/5 to-primary/10 p-4 no-underline outline-none focus:shadow-sm hover:shadow-sm hover:scale-[1.01] transition-all duration-200">
+                          <div className="mb-1 mt-2 text-base font-medium">Roster</div>
+                          <p className="text-xs leading-tight text-muted-foreground">Manage your team's lineup</p>
+                          <ChevronRight className="h-3 w-3 mt-2 text-primary" />
+                        </Link>
+                        <Link to="/gm-office" onClick={closeMobileMenu} className="flex h-full w-full select-none flex-col justify-end rounded-md bg-gradient-to-b from-secondary/5 to-secondary/10 p-4 no-underline outline-none focus:shadow-sm hover:shadow-sm hover:scale-[1.01] transition-all duration-200">
+                          <div className="mb-1 mt-2 text-base font-medium">GM's Office</div>
+                          <p className="text-xs leading-tight text-muted-foreground">Team operations center</p>
+                          <ChevronRight className="h-3 w-3 mt-2 text-primary" />
+                        </Link>
+                      </div>
+                    </NavigationMenuContent>
+                  </NavigationMenuItem>
                 
                 <NavigationMenuItem>
                   <NavigationMenuTrigger className={cn(
@@ -174,93 +186,105 @@ const Navbar = () => {
 
           {/* Right side navigation - Search, Notifications, User */}
           <div className="hidden lg:flex items-center space-x-2">
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="ghost" size="icon" className="text-foreground hover:text-primary hover:bg-primary/5 h-9 w-9 rounded-md">
-                  <Search className="h-4 w-4" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-64 p-3">
-                <div className="flex flex-col space-y-3">
-                  <h4 className="font-medium text-xs">Quick search</h4>
-                  <div className="relative">
-                    <Search className="absolute left-2 top-2 h-3.5 w-3.5 text-muted-foreground" />
-                    <input
-                      placeholder="Search players, teams..."
-                      className="w-full rounded-md border border-input bg-background pl-7 pr-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
-                    />
-                  </div>
-                  <div className="text-[10px] text-muted-foreground">
-                    Press <kbd className="rounded bg-muted px-1 py-0.5 text-[10px]">⌘</kbd> + <kbd className="rounded bg-muted px-1 py-0.5 text-[10px]">K</kbd> to search
-                  </div>
-                </div>
-              </PopoverContent>
-            </Popover>
-            
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="ghost" size="icon" className="text-foreground hover:text-primary hover:bg-primary/5 relative h-9 w-9 rounded-md">
-                  <Bell className="h-4 w-4" />
-                  <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[9px] text-white">2</span>
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent align="end" className="w-64 p-0">
-                <div className="flex flex-col">
-                  <div className="flex items-center justify-between p-3 border-b border-border/30">
-                    <h4 className="font-medium text-xs">Notifications</h4>
-                    <Button variant="ghost" className="text-[10px] h-auto p-0 hover:bg-transparent hover:text-primary">
-                      Clear all
+            {user ? (
+              <>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="ghost" size="icon" className="text-foreground hover:text-primary hover:bg-primary/5 h-9 w-9 rounded-md">
+                      <Search className="h-4 w-4" />
                     </Button>
-                  </div>
-                  <div className="max-h-[250px] overflow-y-auto">
-                    {[1, 2].map((i) => (
-                      <div key={i} className="flex gap-2 p-2.5 hover:bg-accent/5 cursor-pointer border-b border-border/10">
-                        <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center text-primary shrink-0">
-                          {i === 1 ? <Bell className="h-3 w-3" /> : <User className="h-3 w-3" />}
-                        </div>
-                        <div className="flex-1">
-                          <p className="text-xs font-medium">
-                            {i === 1 ? "Trade offer received" : "New player available"}
-                          </p>
-                          <p className="text-[10px] text-muted-foreground">
-                            {i === 1 ? "2 mins ago" : "1 hour ago"}
-                          </p>
-                        </div>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-64 p-3">
+                    <div className="flex flex-col space-y-3">
+                      <h4 className="font-medium text-xs">Quick search</h4>
+                      <div className="relative">
+                        <Search className="absolute left-2 top-2 h-3.5 w-3.5 text-muted-foreground" />
+                        <input
+                          placeholder="Search players, teams..."
+                          className="w-full rounded-md border border-input bg-background pl-7 pr-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
+                        />
                       </div>
-                    ))}
-                  </div>
-                  <div className="p-2.5">
-                    <Button variant="outline" size="sm" className="w-full text-xs h-7">View all</Button>
-                  </div>
-                </div>
-              </PopoverContent>
-            </Popover>
-            
-            <div className="w-px h-7 bg-border/30 mx-1"></div>
-            
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" className="bg-background rounded-md border-border/30 flex gap-2 pl-2 pr-3 h-9 hover:shadow-sm">
-                  <div className="h-5 w-5 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs font-medium">J</div>
-                  <span className="text-xs font-medium">John</span>
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent align="end" className="w-48 p-1.5">
-                <div className="flex flex-col space-y-1">
-                  <Button variant="ghost" className="justify-start text-xs h-8" asChild>
-                    <Link to="/profile">
-                      <CircleUser className="h-3.5 w-3.5 mr-2" /> Profile
-                    </Link>
-                  </Button>
-                  <Button variant="ghost" className="justify-start text-xs h-8">
-                    <Users className="h-3.5 w-3.5 mr-2" /> Subscription
-                  </Button>
-                  <Button variant="ghost" className="justify-start text-xs h-8 text-destructive hover:text-destructive">
-                    <LogOut className="h-3.5 w-3.5 mr-2" /> Log out
-                  </Button>
-                </div>
-              </PopoverContent>
-            </Popover>
+                      <div className="text-[10px] text-muted-foreground">
+                        Press <kbd className="rounded bg-muted px-1 py-0.5 text-[10px]">⌘</kbd> + <kbd className="rounded bg-muted px-1 py-0.5 text-[10px]">K</kbd> to search
+                      </div>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+                
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="ghost" size="icon" className="text-foreground hover:text-primary hover:bg-primary/5 relative h-9 w-9 rounded-md">
+                      <Bell className="h-4 w-4" />
+                      <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[9px] text-white">2</span>
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent align="end" className="w-64 p-0">
+                    <div className="flex flex-col">
+                      <div className="flex items-center justify-between p-3 border-b border-border/30">
+                        <h4 className="font-medium text-xs">Notifications</h4>
+                        <Button variant="ghost" className="text-[10px] h-auto p-0 hover:bg-transparent hover:text-primary">
+                          Clear all
+                        </Button>
+                      </div>
+                      <div className="max-h-[250px] overflow-y-auto">
+                        {[1, 2].map((i) => (
+                          <div key={i} className="flex gap-2 p-2.5 hover:bg-accent/5 cursor-pointer border-b border-border/10">
+                            <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center text-primary shrink-0">
+                              {i === 1 ? <Bell className="h-3 w-3" /> : <User className="h-3 w-3" />}
+                            </div>
+                            <div className="flex-1">
+                              <p className="text-xs font-medium">
+                                {i === 1 ? "Trade offer received" : "New player available"}
+                              </p>
+                              <p className="text-[10px] text-muted-foreground">
+                                {i === 1 ? "2 mins ago" : "1 hour ago"}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="p-2.5">
+                        <Button variant="outline" size="sm" className="w-full text-xs h-7">View all</Button>
+                      </div>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+                
+                <div className="w-px h-7 bg-border/30 mx-1"></div>
+                
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="bg-background rounded-md border-border/30 flex gap-2 pl-2 pr-3 h-9 hover:shadow-sm">
+                      <div className="h-5 w-5 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs font-medium">{userInitial}</div>
+                      <span className="text-xs font-medium">{displayName}</span>
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent align="end" className="w-48 p-1.5">
+                    <div className="flex flex-col space-y-1">
+                      <Button variant="ghost" className="justify-start text-xs h-8" asChild>
+                        <Link to="/profile">
+                          <CircleUser className="h-3.5 w-3.5 mr-2" /> Profile
+                        </Link>
+                      </Button>
+                      <Button variant="ghost" className="justify-start text-xs h-8">
+                        <Users className="h-3.5 w-3.5 mr-2" /> Subscription
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        className="justify-start text-xs h-8 text-destructive hover:text-destructive"
+                        onClick={handleSignOut}
+                      >
+                        <LogOut className="h-3.5 w-3.5 mr-2" /> Log out
+                      </Button>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              </>
+            ) : (
+              <Button variant="default" asChild>
+                <Link to="/auth">Sign In</Link>
+              </Button>
+            )}
           </div>
 
           {/* Mobile Menu Button */}
@@ -373,46 +397,61 @@ const Navbar = () => {
                   <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
                 </Link>
                 
-                <div className="pt-4">
-                  <div className="bg-primary/5 p-3 rounded-md mb-4">
-                    <div className="flex items-center gap-3 mb-2">
-                      <Bell className="h-4 w-4 text-primary" />
-                      <span className="text-sm font-medium">Recent Notifications</span>
-                    </div>
-                    <div className="space-y-2 mt-2">
-                      <div className="bg-background rounded-md p-2 text-xs">
-                        <p className="font-medium">Trade offer received</p>
-                        <p className="text-muted-foreground text-[10px] mt-0.5">2 mins ago</p>
+                {user && (
+                  <div className="pt-4">
+                    <div className="bg-primary/5 p-3 rounded-md mb-4">
+                      <div className="flex items-center gap-3 mb-2">
+                        <Bell className="h-4 w-4 text-primary" />
+                        <span className="text-sm font-medium">Recent Notifications</span>
                       </div>
-                      <div className="bg-background rounded-md p-2 text-xs">
-                        <p className="font-medium">New player available</p>
-                        <p className="text-muted-foreground text-[10px] mt-0.5">1 hour ago</p>
+                      <div className="space-y-2 mt-2">
+                        <div className="bg-background rounded-md p-2 text-xs">
+                          <p className="font-medium">Trade offer received</p>
+                          <p className="text-muted-foreground text-[10px] mt-0.5">2 mins ago</p>
+                        </div>
+                        <div className="bg-background rounded-md p-2 text-xs">
+                          <p className="font-medium">New player available</p>
+                          <p className="text-muted-foreground text-[10px] mt-0.5">1 hour ago</p>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
+                )}
               </nav>
             </div>
             
-            <div className="border-t border-border/30 pt-4 mt-4">
-              <div className="flex space-x-3 items-center mb-3">
-                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs">J</div>
-                <div>
-                  <p className="text-sm font-medium">John Smith</p>
-                  <p className="text-xs text-muted-foreground">Premium</p>
+            {user ? (
+              <div className="border-t border-border/30 pt-4 mt-4">
+                <div className="flex space-x-3 items-center mb-3">
+                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs">{userInitial}</div>
+                  <div>
+                    <p className="text-sm font-medium">{displayName}</p>
+                    <p className="text-xs text-muted-foreground">User</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2 mt-3">
+                  <Button variant="outline" size="sm" className="w-full text-xs h-8" asChild>
+                    <Link to="/profile" onClick={closeMobileMenu}>
+                      <User className="h-3.5 w-3.5 mr-1.5" /> Profile
+                    </Link>
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="col-span-2 w-full text-xs h-8 text-destructive hover:text-destructive border-destructive/30 hover:bg-destructive/5"
+                    onClick={handleSignOut}
+                  >
+                    <LogOut className="h-3.5 w-3.5 mr-1.5" /> Log out
+                  </Button>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-2 mt-3">
-                <Button variant="outline" size="sm" className="w-full text-xs h-8" asChild>
-                  <Link to="/profile">
-                    <User className="h-3.5 w-3.5 mr-1.5" /> Profile
-                  </Link>
-                </Button>
-                <Button variant="outline" size="sm" className="col-span-2 w-full text-xs h-8 text-destructive hover:text-destructive border-destructive/30 hover:bg-destructive/5">
-                  <LogOut className="h-3.5 w-3.5 mr-1.5" /> Log out
+            ) : (
+              <div className="border-t border-border/30 pt-4 mt-4">
+                <Button variant="default" className="w-full" asChild onClick={closeMobileMenu}>
+                  <Link to="/auth">Sign In</Link>
                 </Button>
               </div>
-            </div>
+            )}
           </div>
         </div>
       )}

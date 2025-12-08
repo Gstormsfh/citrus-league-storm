@@ -106,7 +106,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose }: PlayerStatsModalProps) =>
                     </CardHeader>
                     <CardContent>
                       <div className="text-2xl font-bold">
-                        {stats.savePct ? (stats.savePct * 100).toFixed(1) : '0.0'}%
+                        {stats.savePct ? (stats.savePct * 100).toFixed(3) : '0.000'}%
                       </div>
                     </CardContent>
                   </Card>
@@ -207,7 +207,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose }: PlayerStatsModalProps) =>
                     </CardHeader>
                     <CardContent>
                       <div className="text-2xl font-bold">
-                        {stats.savePct ? (stats.savePct * 100).toFixed(2) : '0.00'}%
+                        {stats.savePct ? (stats.savePct * 100).toFixed(3) : '0.000'}%
                       </div>
                     </CardContent>
                   </Card>

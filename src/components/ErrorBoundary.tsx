@@ -27,14 +27,39 @@ export class ErrorBoundary extends Component<Props, State> {
   public render() {
     if (this.state.hasError) {
       return this.props.fallback || (
-        <div className="flex flex-col items-center justify-center p-4 border border-red-200 bg-red-50 rounded text-red-500 text-xs">
-          <div className="flex items-center mb-2">
-            <AlertCircle className="w-4 h-4 mr-2" />
-            <span className="font-bold">Render Error</span>
+        <div style={{
+          padding: '20px',
+          fontFamily: 'sans-serif',
+          backgroundColor: '#fef2f2',
+          border: '2px solid #ef4444',
+          borderRadius: '8px',
+          color: '#dc2626',
+          minHeight: '100vh',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', marginBottom: '16px', fontSize: '18px', fontWeight: 'bold' }}>
+            <span style={{ marginRight: '8px' }}>⚠️</span>
+            <span>Render Error</span>
           </div>
-          <pre className="text-[10px] bg-white p-2 rounded border overflow-auto max-w-full">
-            {this.state.error?.message}
-            {this.state.error?.stack?.slice(0, 200)}...
+          <pre style={{
+            fontSize: '12px',
+            backgroundColor: 'white',
+            padding: '16px',
+            borderRadius: '4px',
+            border: '1px solid #fca5a5',
+            overflow: 'auto',
+            maxWidth: '90%',
+            maxHeight: '400px'
+          }}>
+            <strong>Error Message:</strong>
+            {this.state.error?.message || 'Unknown error'}
+            
+            {'\n\n'}
+            <strong>Stack Trace:</strong>
+            {this.state.error?.stack || 'No stack trace available'}
           </pre>
         </div>
       );

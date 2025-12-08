@@ -1,9 +1,9 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { AuthProvider } from "@/contexts/AuthContext";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import Roster from "./pages/Roster";
@@ -18,6 +18,7 @@ import GMOffice from "./pages/GMOffice";
 import StormyAssistant from "./pages/StormyAssistant";
 import News from "./pages/News";
 import DraftRoom from "./pages/DraftRoom";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import Profile from "./pages/Profile";
 import TeamAnalytics from "./pages/TeamAnalytics";
 import WaiverWire from "./pages/WaiverWire";
@@ -31,6 +32,10 @@ import About from "./pages/About";
 import Careers from "./pages/Careers";
 import Privacy from "./pages/Privacy";
 import Terms from "./pages/Terms";
+import Auth from "./pages/Auth";
+import ProfileSetup from "./pages/ProfileSetup";
+import LeagueDashboard from "./pages/LeagueDashboard";
+import { ProtectedRoute } from "./components/ProtectedRoute";
 import { StormyChatBubble } from "./components/StormyChatBubble";
 import "./App.css";
 
@@ -45,12 +50,15 @@ const queryClient = new QueryClient({
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner position="top-right" closeButton />
-      <BrowserRouter>
-        <Routes>
+    <AuthProvider>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner position="top-right" closeButton />
+        <BrowserRouter>
+          <Routes>
           <Route path="/" element={<Index />} />
+          <Route path="/auth" element={<Auth />} />
+          <Route path="/profile-setup" element={<ProfileSetup />} />
           <Route path="/roster" element={<Roster />} />
           <Route path="/standings" element={<Standings />} />
           <Route path="/contact" element={<Contact />} />
@@ -62,9 +70,10 @@ const App = () => (
           <Route path="/gm-office" element={<GMOffice />} />
           <Route path="/gm-office/stormy" element={<StormyAssistant />} />
           <Route path="/news" element={<News />} />
-          <Route path="/draft-room" element={<DraftRoom />} />
-          <Route path="/draft" element={<DraftRoom />} /> {/* Fallback route */}
-          <Route path="/create-league" element={<CreateLeague />} />
+          <Route path="/draft-room" element={<ErrorBoundary><DraftRoom /></ErrorBoundary>} />
+          <Route path="/draft" element={<ErrorBoundary><DraftRoom /></ErrorBoundary>} /> {/* Fallback route */}
+          <Route path="/create-league" element={<ProtectedRoute requireProfile><CreateLeague /></ProtectedRoute>} />
+          <Route path="/league/:leagueId" element={<ProtectedRoute><LeagueDashboard /></ProtectedRoute>} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/team-analytics" element={<TeamAnalytics />} />
           <Route path="/waiver-wire" element={<WaiverWire />} />
@@ -83,6 +92,7 @@ const App = () => (
         <StormyChatBubble />
       </BrowserRouter>
     </TooltipProvider>
+    </AuthProvider>
   </QueryClientProvider>
 );
 

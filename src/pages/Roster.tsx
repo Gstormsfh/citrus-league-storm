@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, closestCenter } from '@dnd-kit/core';
 import { arrayMove } from '@dnd-kit/sortable';
+import { useAuth } from '@/contexts/AuthContext';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import { Button } from '@/components/ui/button';
@@ -19,8 +20,10 @@ import { useToast } from '@/hooks/use-toast';
 import HockeyPlayerCard from '@/components/roster/HockeyPlayerCard';
 import { PlayerService } from '@/services/PlayerService';
 import { LeagueService, Transaction } from '@/services/LeagueService';
+import { DraftService } from '@/services/DraftService';
 import { CitrusPuckService } from '@/services/CitrusPuckService';
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { supabase } from '@/integrations/supabase/client';
 
 // Helper function to transform position to fantasy slot
 const getFantasyPosition = (position: string): 'C' | 'LW' | 'RW' | 'D' | 'G' | 'UTIL' => {
@@ -53,14 +56,7 @@ const getTeamAbbreviation = (team: string): string => {
   return abbreviations[team] || team.split(' ').slice(-1)[0].substring(0, 3).toUpperCase();
 };
 
-  const teamStats = {
-    record: "3-1-0",
-    rank: "3rd",
-    totalPoints: 1245.5,
-    avgPoints: 311.4,
-    highScore: 342.8,
-    waiverMoves: 4,
-  };
+  // Team stats will be calculated from real data
 
   // Analytics Helpers
   const calculateTeamCategoryStats = (starters: HockeyPlayer[]) => {
@@ -198,6 +194,7 @@ interface RosterState {
 }
 
 const Roster = () => {
+  const { user, profile } = useAuth();
   const { toast } = useToast();
   const [selectedPlayer, setSelectedPlayer] = useState<HockeyPlayer | null>(null);
   const [isPlayerDialogOpen, setIsPlayerDialogOpen] = useState(false);
@@ -207,6 +204,24 @@ const Roster = () => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [statView, setStatView] = useState<'currentWeek' | 'seasonToDate' | 'lastSeason' | 'restOfSeason'>('seasonToDate');
   const [analyticsLoaded, setAnalyticsLoaded] = useState(false);
+  const [userTeamId, setUserTeamId] = useState<string | number | null>(null);
+  const [userTeam, setUserTeam] = useState<{ id: string; league_id: string; team_name: string } | null>(null);
+  const [teamStats, setTeamStats] = useState({
+    record: "0-0-0",
+    rank: "-",
+    totalPoints: 0,
+    avgPoints: 0,
+    highScore: 0,
+    waiverMoves: 0,
+  });
+
+  // Helper function for rank suffix
+  const getRankSuffix = (rank: number): string => {
+    if (rank === 1) return 'st';
+    if (rank === 2) return 'nd';
+    if (rank === 3) return 'rd';
+    return 'th';
+  };
 
   const [selectedPosMetric, setSelectedPosMetric] = useState<'C' | 'LW' | 'RW' | 'D'>('C');
   
@@ -261,17 +276,67 @@ const Roster = () => {
     return assignments;
   };
 
-  // Fetch and adapt players
+  // Fetch and adapt players from staging files (SINGLE SOURCE OF TRUTH)
   useEffect(() => {
     const loadRoster = async () => {
       setLoading(true);
       try {
-        // Get consistent roster for "My Team" (ID: 3)
+        // Get all players from staging files (staging_2025_skaters & staging_2025_goalies)
+        // PlayerService.getAllPlayers() is the ONLY source for player data
         const allPlayers = await PlayerService.getAllPlayers();
-        const dbPlayers = await LeagueService.getMyTeam(allPlayers);
+        
+        let dbPlayers: Player[];
+        let teamId: number | null = null;
+
+        if (!user) {
+          // Non-logged-in users see demo team (Team 3) from database
+          dbPlayers = await LeagueService.getMyTeam(allPlayers);
+          teamId = 3; // Demo team ID
+          setUserTeamId(3);
+        } else {
+          // Logged-in users: Get their actual team from Supabase
+          const { data: userTeamData, error: teamError } = await supabase
+            .from('teams')
+            .select('id, league_id, team_name')
+            .eq('owner_id', user.id)
+            .maybeSingle();
+
+          if (teamError || !userTeamData) {
+            // User doesn't have a team yet - show empty roster
+            setRoster({ starters: [], bench: [], ir: [], slotAssignments: {} });
+            setUserTeamId(null);
+            setUserTeam(null);
+            setLoading(false);
+            return;
+          }
+
+          // Check if draft is completed before loading roster
+          const { league: leagueData, error: leagueError } = await LeagueService.getLeague(userTeamData.league_id);
+          if (leagueError || !leagueData || leagueData.draft_status !== 'completed') {
+            // Draft not completed - show empty roster
+            setRoster({ starters: [], bench: [], ir: [], slotAssignments: {} });
+            setUserTeamId(userTeamData.id);
+            setUserTeam(userTeamData);
+            setLoading(false);
+            return;
+          }
+
+          teamId = userTeamData.id;
+          setUserTeamId(teamId);
+          setUserTeam(userTeamData);
+          // Draft is completed - get roster from draft picks
+          // getTeamRoster is only for demo teams (numeric IDs)
+          const { picks: draftPicks } = await DraftService.getDraftPicks(userTeamData.league_id);
+          const teamPicks = draftPicks.filter(p => p.team_id === userTeamData.id);
+          // Map draft picks to players
+          const playerIds = teamPicks.map(p => p.player_id);
+          dbPlayers = allPlayers.filter(p => playerIds.includes(p.id));
+        }
+        
         setTransactions(LeagueService.getTransactions());
         
-        // Transform DB players to HockeyPlayer format
+        // Transform players from staging files to HockeyPlayer format
+        // All data (names, stats, positions, teams) comes from staging files via PlayerService
         const transformedPlayers: HockeyPlayer[] = dbPlayers.map((p) => ({
           id: p.id,
           name: p.full_name,
@@ -301,11 +366,26 @@ const Roster = () => {
           teamAbbreviation: p.team, // DB has 'EDM' etc
           status: p.status === 'injured' ? 'IR' : (p.status === 'active' ? null : 'WVR'),
           image: p.headshot_url || undefined,
-          // Mock game data since we don't have schedule API yet
-          // Use deterministic value for initial assignment (hash player ID for consistency)
-          nextGame: { opponent: 'vs OPP', isToday: (parseInt(String(p.id)) % 2 === 0) },
+          nextGame: undefined, // Will be populated below with real schedule data
           projectedPoints: (p.points || 0) / 20 // Rough projection
         }));
+
+        // Load real NHL schedule data for each player
+        const { ScheduleService } = await import('@/services/ScheduleService');
+        for (const player of transformedPlayers) {
+          const { game: nextGame } = await ScheduleService.getNextGameForTeam(player.teamAbbreviation || player.team || '');
+          const hasGameToday = await ScheduleService.hasGameToday(player.teamAbbreviation || player.team || '');
+          const gameInfo = ScheduleService.getGameInfo(nextGame, player.teamAbbreviation || player.team || '');
+          
+          if (gameInfo) {
+            player.nextGame = {
+              opponent: gameInfo.opponent,
+              isToday: hasGameToday
+            };
+          } else {
+            player.nextGame = { opponent: 'No upcoming game', isToday: false };
+          }
+        }
 
         // Sort players consistently by ID for deterministic auto-assignment
         transformedPlayers.sort((a, b) => {
@@ -314,8 +394,8 @@ const Roster = () => {
           return idA - idB;
         });
 
-        // Check for saved lineup first
-        const savedLineup = await LeagueService.getLineup(3); // Team ID 3
+        // Check for saved lineup first (use teamId which could be demo team 3 or user's actual team)
+        const savedLineup = teamId ? await LeagueService.getLineup(teamId) : null;
         
         if (savedLineup) {
           // Restore saved lineup
@@ -409,13 +489,15 @@ const Roster = () => {
           const initialRoster = { starters, bench, ir, slotAssignments: allSlotAssignments };
           setRoster(initialRoster);
           
-          // Save initial lineup
-          await LeagueService.saveLineup(3, {
-            starters: starters.map(p => p.id),
-            bench: bench.map(p => p.id),
-            ir: ir.map(p => p.id),
-            slotAssignments: allSlotAssignments
-          });
+          // Save initial lineup (only for logged-in users with actual teams)
+          if (userTeamId && user) {
+            await LeagueService.saveLineup(userTeamId, {
+              starters: starters.map(p => p.id),
+              bench: bench.map(p => p.id),
+              ir: ir.map(p => p.id),
+              slotAssignments: allSlotAssignments
+            });
+          }
         }
       } catch (e) {
         console.error("Failed to load roster", e);
@@ -426,7 +508,120 @@ const Roster = () => {
     };
 
     loadRoster();
-  }, [toast]);
+  }, [toast, user]);
+
+  // Calculate team stats from league data
+  useEffect(() => {
+    const calculateStats = async () => {
+      if (!userTeam || !user) {
+        // Reset to defaults if no team
+        setTeamStats({
+          record: "0-0-0",
+          rank: "-",
+          totalPoints: 0,
+          avgPoints: 0,
+          highScore: 0,
+          waiverMoves: 0,
+        });
+        return;
+      }
+
+      try {
+        // Get league to check draft status FIRST
+        const { league: leagueData, error: leagueError } = await LeagueService.getLeague(userTeam.league_id);
+        if (leagueError || !leagueData || leagueData.draft_status !== 'completed') {
+          // Draft not completed - show default stats
+          setTeamStats({
+            record: "0-0-0",
+            rank: "-",
+            totalPoints: 0,
+            avgPoints: 0,
+            highScore: 0,
+            waiverMoves: transactions.filter(t => t.type === 'claim' || t.type === 'drop').length,
+          });
+          return;
+        }
+
+        // Get all teams in the league
+        const { teams: leagueTeams, error: teamsError } = await LeagueService.getLeagueTeamsWithOwners(userTeam.league_id);
+        if (teamsError) throw teamsError;
+
+        // Get draft picks for this league (only used if draft is completed)
+        const { picks: draftPicks } = await DraftService.getDraftPicks(userTeam.league_id);
+        
+        // If no draft picks, show default values
+        if (!draftPicks || draftPicks.length === 0) {
+          setTeamStats({
+            record: "0-0-0",
+            rank: "-",
+            totalPoints: 0,
+            avgPoints: 0,
+            highScore: 0,
+            waiverMoves: transactions.filter(t => t.type === 'claim' || t.type === 'drop').length,
+          });
+          return;
+        }
+
+        // Get all players to calculate points
+        const allPlayers = await PlayerService.getAllPlayers();
+
+        // Calculate team standings
+        const calculatedStats = await LeagueService.calculateTeamStandings(
+          userTeam.league_id,
+          leagueTeams,
+          draftPicks,
+          allPlayers
+        );
+
+        // Get user's team stats
+        const userTeamStats = calculatedStats[userTeam.id] || { pointsFor: 0, pointsAgainst: 0, wins: 0, losses: 0 };
+
+        // Calculate rank by sorting teams by pointsFor
+        const sortedTeams = [...leagueTeams].sort((a, b) => {
+          const aPoints = calculatedStats[a.id]?.pointsFor || 0;
+          const bPoints = calculatedStats[b.id]?.pointsFor || 0;
+          return bPoints - aPoints;
+        });
+        const rankIndex = sortedTeams.findIndex(t => t.id === userTeam.id);
+        const rank = rankIndex >= 0 ? `${rankIndex + 1}${getRankSuffix(rankIndex + 1)}` : '-';
+
+        // Use calculated pointsFor from standings (based on all drafted players)
+        const totalPoints = userTeamStats.pointsFor;
+
+        // Calculate average points per player (from all drafted players)
+        const teamPicks = draftPicks.filter(p => p.team_id === userTeam.id);
+        const avgPoints = teamPicks.length > 0 ? (totalPoints / teamPicks.length) : 0;
+
+        // Calculate record
+        const record = `${userTeamStats.wins}-${userTeamStats.losses}-0`;
+
+        // Get waiver moves (from transactions)
+        const waiverMoves = transactions.filter(t => t.type === 'claim' || t.type === 'drop').length;
+
+        setTeamStats({
+          record,
+          rank,
+          totalPoints: Math.round(userTeamStats.pointsFor),
+          avgPoints: Math.round(avgPoints * 10) / 10,
+          highScore: Math.round(userTeamStats.pointsFor), // Placeholder - would need weekly data
+          waiverMoves,
+        });
+      } catch (error) {
+        console.error('Error calculating team stats:', error);
+        // On error, show defaults
+        setTeamStats({
+          record: "0-0-0",
+          rank: "-",
+          totalPoints: 0,
+          avgPoints: 0,
+          highScore: 0,
+          waiverMoves: 0,
+        });
+      }
+    };
+
+    calculateStats();
+  }, [userTeam, user, roster.starters, roster.bench, roster.ir, transactions]);
 
   // Load CitrusPuck Analytics
   useEffect(() => {
@@ -600,13 +795,15 @@ const Roster = () => {
         slotAssignments: newAssignments
       };
       
-      // Save lineup to localStorage
-      LeagueService.saveLineup(3, {
-        starters: newStarters.map(p => p.id),
-        bench: newBench.map(p => p.id),
-        ir: prev.ir.map(p => p.id),
-        slotAssignments: newAssignments
-      }).catch(err => console.error('Failed to save lineup:', err));
+      // Save lineup to Supabase (only for logged-in users)
+      if (userTeamId && user) {
+        LeagueService.saveLineup(userTeamId, {
+          starters: newStarters.map(p => p.id),
+          bench: newBench.map(p => p.id),
+          ir: prev.ir.map(p => p.id),
+          slotAssignments: newAssignments
+        }).catch(err => console.error('Failed to save lineup:', err));
+      }
       
       return updatedRoster;
     });
@@ -722,13 +919,15 @@ const Roster = () => {
           const newBench = arrayMove(prev.bench, oldIndex, newIndex);
           const updatedRoster = { ...prev, bench: newBench };
           
-          // Save lineup to localStorage
-          LeagueService.saveLineup(3, {
-            starters: prev.starters.map(p => p.id),
-            bench: newBench.map(p => p.id),
-            ir: prev.ir.map(p => p.id),
-            slotAssignments: prev.slotAssignments
-          }).catch(err => console.error('Failed to save lineup:', err));
+          // Save lineup to Supabase (only for logged-in users)
+          if (userTeamId && user) {
+            LeagueService.saveLineup(userTeamId, {
+              starters: prev.starters.map(p => p.id),
+              bench: newBench.map(p => p.id),
+              ir: prev.ir.map(p => p.id),
+              slotAssignments: prev.slotAssignments
+            }).catch(err => console.error('Failed to save lineup:', err));
+          }
           
           return updatedRoster;
         }
@@ -878,13 +1077,15 @@ const Roster = () => {
 
         const updatedRoster = { starters: newStarters, bench: newBench, ir: newIR, slotAssignments: newAssignments };
         
-        // Save lineup to localStorage
-        LeagueService.saveLineup(3, {
-          starters: newStarters.map(p => p.id),
-          bench: newBench.map(p => p.id),
-          ir: newIR.map(p => p.id),
-          slotAssignments: newAssignments
-        }).catch(err => console.error('Failed to save lineup:', err));
+        // Save lineup to Supabase (only for logged-in users)
+        if (userTeamId && user) {
+          LeagueService.saveLineup(userTeamId, {
+            starters: newStarters.map(p => p.id),
+            bench: newBench.map(p => p.id),
+            ir: newIR.map(p => p.id),
+            slotAssignments: newAssignments
+          }).catch(err => console.error('Failed to save lineup:', err));
+        }
         
         return updatedRoster;
     });
@@ -904,11 +1105,11 @@ const Roster = () => {
             <div className="flex flex-col md:flex-row justify-between items-center gap-4">
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-2xl font-bold">
-                  HC
+                  {userTeam?.team_name?.substring(0, 2).toUpperCase() || profile?.username?.substring(0, 2).toUpperCase() || 'TM'}
                 </div>
                 <div>
-                  <h1 className="text-2xl font-bold">Hockey Champions</h1>
-                  <div className="text-muted-foreground text-sm">Manager: John Smith</div>
+                  <h1 className="text-2xl font-bold">{userTeam?.team_name || 'My Team'}</h1>
+                  <div className="text-muted-foreground text-sm">Manager: {profile?.username || 'You'}</div>
                 </div>
               </div>
 
@@ -981,6 +1182,21 @@ const Roster = () => {
                   <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
                     <Loader2 className="w-10 h-10 animate-spin mb-4 text-primary" />
                     <p>Loading your roster...</p>
+                  </div>
+                ) : !userTeamId ? (
+                  <div className="flex flex-col items-center justify-center py-20 text-center">
+                    <Trophy className="w-16 h-16 text-muted-foreground mb-4 opacity-50" />
+                    <h3 className="text-xl font-semibold mb-2">No Team Yet</h3>
+                    <p className="text-muted-foreground mb-4">Join or create a league to start building your roster.</p>
+                    <Button asChild>
+                      <a href="/create-league">Create or Join a League</a>
+                    </Button>
+                  </div>
+                ) : roster.starters.length === 0 && roster.bench.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-20 text-center">
+                    <Users className="w-16 h-16 text-muted-foreground mb-4 opacity-50" />
+                    <h3 className="text-xl font-semibold mb-2">Empty Roster</h3>
+                    <p className="text-muted-foreground mb-4">Your roster is empty. Complete your draft to add players.</p>
                   </div>
                 ) : (
                   <DndContext

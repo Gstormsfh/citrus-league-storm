@@ -4,5 +4,9 @@
 			"path": "."
 		}
 	],
-	"settings": {}
+	"settings": {
+		"cursor.chat.allowFileWrites": true,
+		"cursor.agent.allowFileWrites": true,
+		"files.readonly": false
+	}
 }

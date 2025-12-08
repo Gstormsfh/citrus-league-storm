@@ -1,19 +1,180 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { LeagueService } from '@/services/LeagueService';
+import { LeagueService, League, Team } from '@/services/LeagueService';
+import { DraftService } from '@/services/DraftService';
+import { PlayerService } from '@/services/PlayerService';
+import { Loader2 } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+
+interface StandingsTeam {
+  id: string;
+  name: string;
+  owner: string;
+  logo: string;
+  record: { wins: number; losses: number };
+  points: number;
+  pointsFor: number;
+  pointsAgainst: number;
+  streak: string;
+}
 
 const Standings = () => {
+  const { user } = useAuth();
+  const { toast } = useToast();
   const [season, setSeason] = useState("2025");
+  const [loading, setLoading] = useState(true);
+  const [leagues, setLeagues] = useState<League[]>([]);
+  const [selectedLeagueId, setSelectedLeagueId] = useState<string | null>(null);
+  const [teams, setTeams] = useState<StandingsTeam[]>([]);
+  const [leagueTeams, setLeagueTeams] = useState<(Team & { owner_name?: string })[]>([]);
   const navigate = useNavigate();
-  const teams = LeagueService.getAllTeams(); // Sync call for initial static data is fine, but we assume it's loaded?
-  // Actually getAllTeams returns the static definition which is what we need for standings mainly.
   
+  // Load user's leagues and teams
+  useEffect(() => {
+    const loadStandings = async () => {
+      if (!user) {
+        // Not logged in - use demo data
+        const demoTeams = LeagueService.getAllTeams();
+        const standingsTeams: StandingsTeam[] = demoTeams.map(t => ({
+          id: String(t.id),
+          name: t.name,
+          owner: t.owner,
+          logo: t.logo,
+          record: t.record,
+          points: t.points,
+          pointsFor: t.points, // Using points as pointsFor for demo
+          pointsAgainst: Math.floor(t.points * 0.85), // Demo calculation
+          streak: t.streak,
+        }));
+        setTeams(standingsTeams);
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        
+        // Get user's leagues
+        const { leagues: userLeagues, error: leaguesError } = await LeagueService.getUserLeagues(user.id);
+        if (leaguesError) throw leaguesError;
+
+        if (userLeagues.length === 0) {
+          // No leagues - show empty state or demo data
+          const demoTeams = LeagueService.getAllTeams();
+          const standingsTeams: StandingsTeam[] = demoTeams.map(t => ({
+            id: String(t.id),
+            name: t.name,
+            owner: t.owner,
+            logo: t.logo,
+            record: t.record,
+            points: t.points,
+            streak: t.streak,
+          }));
+          setTeams(standingsTeams);
+          setLoading(false);
+          return;
+        }
+
+        setLeagues(userLeagues);
+        const leagueToUse = selectedLeagueId || userLeagues[0].id;
+        setSelectedLeagueId(leagueToUse);
+
+        // Get league to check draft status
+        const { league: leagueData, error: leagueError } = await LeagueService.getLeague(leagueToUse);
+        if (leagueError) throw leagueError;
+
+        // Get teams for selected league with owner information
+        const { teams: leagueTeamsData, error: teamsError } = await LeagueService.getLeagueTeamsWithOwners(leagueToUse);
+        if (teamsError) throw teamsError;
+
+        // Store league teams for user team checking
+        setLeagueTeams(leagueTeamsData);
+
+        // Only calculate stats if draft is completed
+        let teamStats: Record<string, { pointsFor: number; pointsAgainst: number; wins: number; losses: number }> = {};
+        
+        if (leagueData && leagueData.draft_status === 'completed') {
+          // Get draft picks for this league to calculate team stats
+          const { picks: draftPicks } = await DraftService.getDraftPicks(leagueToUse);
+          
+          if (draftPicks && draftPicks.length > 0) {
+            // Get all players to calculate points
+            const allPlayers = await PlayerService.getAllPlayers();
+
+            // Calculate team standings from drafted players
+            teamStats = await LeagueService.calculateTeamStandings(
+              leagueToUse,
+              leagueTeamsData,
+              draftPicks,
+              allPlayers
+            );
+          }
+        }
+
+        // Convert database teams to standings format with calculated stats
+        const standingsTeams: StandingsTeam[] = leagueTeamsData.map((team, index) => {
+          const stats = teamStats[team.id] || { pointsFor: 0, pointsAgainst: 0, wins: 0, losses: 0 };
+          
+          // Calculate streak (simple: based on recent performance)
+          let streak = '-';
+          if (stats.wins > stats.losses) {
+            const winDiff = stats.wins - stats.losses;
+            streak = `W${Math.min(winDiff, 10)}`;
+          } else if (stats.losses > stats.wins) {
+            const lossDiff = stats.losses - stats.wins;
+            streak = `L${Math.min(lossDiff, 10)}`;
+          }
+
+          return {
+            id: team.id,
+            name: team.team_name,
+            owner: (team as any).owner_name || (team.owner_id ? 'User' : 'AI Team'),
+            logo: team.team_name.substring(0, 2).toUpperCase(),
+            record: { wins: stats.wins, losses: stats.losses },
+            points: stats.pointsFor, // Total points for ranking
+            pointsFor: Math.round(stats.pointsFor),
+            pointsAgainst: Math.round(stats.pointsAgainst),
+            streak: streak,
+          };
+        });
+
+        setTeams(standingsTeams);
+      } catch (err: any) {
+        console.error('Error loading standings:', err);
+        toast({
+          title: 'Error',
+          description: err.message || 'Failed to load standings',
+          variant: 'destructive',
+        });
+        // Fallback to demo data
+        const demoTeams = LeagueService.getAllTeams();
+        const standingsTeams: StandingsTeam[] = demoTeams.map(t => ({
+          id: String(t.id),
+          name: t.name,
+          owner: t.owner,
+          logo: t.logo,
+          record: t.record,
+          points: t.points,
+          pointsFor: t.points, // Using points as pointsFor for demo
+          pointsAgainst: Math.floor(t.points * 0.85), // Demo calculation
+          streak: t.streak,
+        }));
+        setTeams(standingsTeams);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadStandings();
+  }, [user, selectedLeagueId, toast]);
+
   // Animation observer setup
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -44,6 +205,8 @@ const Standings = () => {
     // Then by points if wins are the same
     return b.points - a.points;
   });
+
+  const selectedLeague = leagues.find(l => l.id === selectedLeagueId);
   
   return (
     <div className="min-h-screen bg-background relative overflow-hidden">
@@ -61,8 +224,24 @@ const Standings = () => {
           
           <div className="flex flex-col md:flex-row items-center justify-between max-w-5xl mx-auto mb-8">
             <div className="mb-4 md:mb-0 animated-element">
-              <h2 className="text-2xl font-bold text-foreground">CitrusSports League</h2>
+              <h2 className="text-2xl font-bold text-foreground">
+                {selectedLeague ? selectedLeague.name : 'CitrusSports League'}
+              </h2>
               <p className="text-muted-foreground">Regular Season Standings</p>
+              {leagues.length > 1 && (
+                <Select value={selectedLeagueId || ''} onValueChange={setSelectedLeagueId}>
+                  <SelectTrigger className="w-64 mt-2">
+                    <SelectValue placeholder="Select League" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {leagues.map(league => (
+                      <SelectItem key={league.id} value={league.id}>
+                        {league.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
             
             <div className="flex items-center space-x-4 animated-element">
@@ -97,20 +276,36 @@ const Standings = () => {
                     <th className="px-6 py-4 font-semibold text-xs uppercase tracking-wider text-muted-foreground">Team</th>
                     <th className="px-6 py-4 font-semibold text-xs uppercase tracking-wider text-muted-foreground text-center">Record</th>
                     <th className="px-6 py-4 font-semibold text-xs uppercase tracking-wider text-muted-foreground text-center">Win %</th>
-                    <th className="px-6 py-4 font-semibold text-xs uppercase tracking-wider text-muted-foreground text-right">Points</th>
+                    <th className="px-6 py-4 font-semibold text-xs uppercase tracking-wider text-muted-foreground text-right">PF</th>
+                    <th className="px-6 py-4 font-semibold text-xs uppercase tracking-wider text-muted-foreground text-right">PA</th>
                     <th className="px-6 py-4 font-semibold text-xs uppercase tracking-wider text-muted-foreground text-center">Streak</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/40">
-                  {sortedTeams.map((team, index) => {
-                    const isUserTeam = team.id === 3; // Hardcoded user ID for now
+                  {loading ? (
+                    <tr>
+                      <td colSpan={7} className="px-6 py-12 text-center">
+                        <Loader2 className="h-6 w-6 animate-spin mx-auto" />
+                        <p className="mt-2 text-muted-foreground">Loading standings...</p>
+                      </td>
+                    </tr>
+                  ) : sortedTeams.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="px-6 py-12 text-center text-muted-foreground">
+                        No teams found in this league.
+                      </td>
+                    </tr>
+                  ) : (
+                    sortedTeams.map((team, index) => {
+                      // Check if it's user's team by comparing with user's ID from teams data
+                      const isUserTeam = user && leagueTeams.some(t => t.id === team.id && t.owner_id === user.id);
                     const winPercentage = ((team.record.wins / (team.record.wins + team.record.losses)) * 100).toFixed(1);
                     
                     return (
                       <tr 
                         key={team.id} 
                         className={`${isUserTeam ? 'bg-primary/5' : 'hover:bg-muted/30 cursor-pointer'} transition-colors`}
-                        onClick={() => !isUserTeam && navigate(`/team/${team.id}`)}
+                        onClick={() => navigate(`/team/${team.id}`)}
                       >
                         <td className="px-6 py-4 font-medium">
                           <div className="flex items-center gap-2">
@@ -143,7 +338,10 @@ const Standings = () => {
                           {winPercentage}%
                         </td>
                         <td className="px-6 py-4 text-right font-bold tabular-nums">
-                          {team.points.toLocaleString()}
+                          {team.pointsFor.toLocaleString()}
+                        </td>
+                        <td className="px-6 py-4 text-right font-medium tabular-nums text-muted-foreground">
+                          {team.pointsAgainst.toLocaleString()}
                         </td>
                         <td className="px-6 py-4 text-center">
                           <span className={`inline-flex px-2.5 py-1 text-[10px] font-bold rounded-full border ${
@@ -156,7 +354,8 @@ const Standings = () => {
                         </td>
                       </tr>
                     );
-                  })}
+                  })
+                  )}
                 </tbody>
               </Table>
             </div>
@@ -222,31 +421,34 @@ const Standings = () => {
             <Card className="animated-element card-citrus p-0 border-none shadow-md overflow-hidden h-full">
               <CardHeader className="bg-[hsl(var(--vibrant-purple))]/5 pb-4 border-b border-border/40">
                 <CardTitle className="text-lg font-bold flex items-center gap-2">
-                  <span className="w-8 h-8 rounded-full bg-[hsl(var(--vibrant-purple))]/10 flex items-center justify-center text-[hsl(var(--vibrant-purple))]">📅</span>
-                  Recent Results
+                  <span className="w-8 h-8 rounded-full bg-[hsl(var(--vibrant-purple))]/10 flex items-center justify-center text-[hsl(var(--vibrant-purple))]">📊</span>
+                  League Stats
                 </CardTitle>
               </CardHeader>
               <CardContent className="pt-6">
                 <div className="space-y-4">
                   <div className="p-3 bg-muted/20 rounded-xl border border-border/40">
-                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold mb-2">Week 10</div>
-                    <div className="flex items-center justify-between">
-                      <div className="font-medium text-sm">Citrus Crushers</div>
-                      <div className="font-bold text-green-600 text-sm bg-green-100 px-2 py-0.5 rounded-md">W 132-118</div>
-                    </div>
-                    <div className="text-xs text-muted-foreground mt-1 text-right">vs. Hustle Heroes</div>
+                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold mb-2">Total Teams</div>
+                    <div className="text-2xl font-bold">{teams.length}</div>
                   </div>
                   
                   <div className="p-3 bg-muted/20 rounded-xl border border-border/40">
-                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold mb-2">Week 9</div>
-                    <div className="flex items-center justify-between">
-                      <div className="font-medium text-sm">Citrus Crushers</div>
-                      <div className="font-bold text-red-600 text-sm bg-red-100 px-2 py-0.5 rounded-md">L 119-126</div>
+                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold mb-2">Avg Points For</div>
+                    <div className="text-2xl font-bold">
+                      {teams.length > 0 
+                        ? Math.round(teams.reduce((sum, t) => sum + t.pointsFor, 0) / teams.length).toLocaleString()
+                        : '0'}
                     </div>
-                    <div className="text-xs text-muted-foreground mt-1 text-right">vs. Touchdown Titans</div>
                   </div>
                   
-                  <Button variant="ghost" className="w-full text-xs text-muted-foreground hover:text-primary mt-2">View All Results</Button>
+                  <div className="p-3 bg-muted/20 rounded-xl border border-border/40">
+                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold mb-2">Avg Points Against</div>
+                    <div className="text-2xl font-bold">
+                      {teams.length > 0 
+                        ? Math.round(teams.reduce((sum, t) => sum + t.pointsAgainst, 0) / teams.length).toLocaleString()
+                        : '0'}
+                    </div>
+                  </div>
                 </div>
               </CardContent>
             </Card>

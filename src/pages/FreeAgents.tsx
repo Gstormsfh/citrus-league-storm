@@ -42,7 +42,10 @@ const FreeAgents = () => {
   const fetchPlayers = async () => {
     try {
       setLoading(true);
+      // Get all players from staging files (staging_2025_skaters & staging_2025_goalies)
+      // PlayerService.getAllPlayers() is the ONLY source for player data
       const allPlayers = await PlayerService.getAllPlayers();
+      // LeagueService determines free agents, but uses staging file data
       const freeAgents = await LeagueService.getFreeAgents(allPlayers);
       setPlayers(freeAgents);
     } catch (error) {
@@ -413,8 +416,8 @@ const FreeAgents = () => {
                                   {player.position === 'G' ? (
                                     <>
                                       <div><span className="text-muted-foreground">W:</span> {player.wins || 0}</div>
-                                      <div><span className="text-muted-foreground">GAA:</span> {player.goals_against_average || '0.00'}</div>
-                                      <div><span className="text-muted-foreground">SV%:</span> {player.save_percentage || '.000'}</div>
+                                      <div><span className="text-muted-foreground">GAA:</span> {typeof player.goals_against_average === 'number' ? player.goals_against_average.toFixed(2) : '0.00'}</div>
+                                      <div><span className="text-muted-foreground">SV%:</span> {typeof player.save_percentage === 'number' ? player.save_percentage.toFixed(3) : '.000'}</div>
                                     </>
                                   ) : (
                                     <>
@@ -555,7 +558,8 @@ const FreeAgents = () => {
                            {player.position === 'G' ? (
                              <>
                                <div><span className="text-muted-foreground">W:</span> {player.wins || 0}</div>
-                               <div><span className="text-muted-foreground">GAA:</span> {player.goals_against_average || '0.00'}</div>
+                               <div><span className="text-muted-foreground">GAA:</span> {typeof player.goals_against_average === 'number' ? player.goals_against_average.toFixed(2) : '0.00'}</div>
+                               <div><span className="text-muted-foreground">SV%:</span> {typeof player.save_percentage === 'number' ? player.save_percentage.toFixed(3) : '.000'}</div>
                              </>
                            ) : (
                              <>

@@ -1,9 +1,6 @@
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { History, Clock } from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
+import { History } from 'lucide-react';
 
 interface DraftPick {
   id: string;
@@ -15,6 +12,7 @@ interface DraftPick {
   round: number;
   pick: number;
   timestamp: number;
+  playerTeam?: string; // Optional: player's NHL team
 }
 
 interface DraftHistoryProps {
@@ -37,53 +35,45 @@ export const DraftHistory = ({ draftHistory }: DraftHistoryProps) => {
       </div>
 
       {draftHistory.length > 0 ? (
-        <ScrollArea className="h-[600px]">
-          <div className="space-y-3">
-            {sortedHistory.map((pick, index) => (
-              <div 
-                key={pick.id}
-                className={`
-                  flex items-center justify-between p-4 rounded-lg border
-                  ${index === 0 ? 'bg-primary/5 border-primary/20' : 'bg-muted/30'}
-                `}
-              >
-                <div className="flex items-center gap-4">
-                  <div className="text-center">
-                    <div className="text-lg font-bold text-primary">
-                      {pick.pick}
-                    </div>
-                    <div className="text-xs text-muted-foreground">
+        <div className="border border-fantasy-border rounded-lg overflow-hidden bg-white">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-fantasy-light/50 border-b border-fantasy-border">
+                <tr>
+                  <th className="px-3 py-2 text-left font-semibold">Pick</th>
+                  <th className="px-3 py-2 text-left font-semibold">Player</th>
+                  <th className="px-3 py-2 text-left font-semibold">Pos</th>
+                  <th className="px-3 py-2 text-left font-semibold">Team</th>
+                  <th className="px-3 py-2 text-left font-semibold">Drafted By</th>
+                  <th className="px-3 py-2 text-center font-semibold">Round</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sortedHistory.map((pick) => (
+                  <tr 
+                    key={pick.id}
+                    className="border-b border-fantasy-border/50 hover:bg-fantasy-light/30 transition-colors"
+                  >
+                    <td className="px-3 py-2 text-center font-medium text-primary">
+                      #{pick.pick}
+                    </td>
+                    <td className="px-3 py-2 font-medium">{pick.playerName}</td>
+                    <td className="px-3 py-2">
+                      <Badge variant="outline" className="text-xs">
+                        {pick.position}
+                      </Badge>
+                    </td>
+                    <td className="px-3 py-2 text-xs text-muted-foreground">{pick.playerTeam || '-'}</td>
+                    <td className="px-3 py-2 text-sm">{pick.teamName}</td>
+                    <td className="px-3 py-2 text-center text-muted-foreground">
                       R{pick.round}
-                    </div>
-                  </div>
-                  
-                  <Avatar className="h-10 w-10">
-                    <AvatarFallback className="text-xs">
-                      {pick.playerName.split(' ').map(n => n[0]).join('')}
-                    </AvatarFallback>
-                  </Avatar>
-                  
-                  <div>
-                    <div className="font-medium">{pick.playerName}</div>
-                    <div className="text-sm text-muted-foreground">
-                      Selected by {pick.teamName}
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="flex items-center gap-3">
-                  <Badge variant="outline">{pick.position}</Badge>
-                  <div className="text-right">
-                    <div className="text-xs text-muted-foreground flex items-center gap-1">
-                      <Clock className="h-3 w-3" />
-                      {formatDistanceToNow(pick.timestamp, { addSuffix: true })}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        </ScrollArea>
+        </div>
       ) : (
         <div className="text-center py-12">
           <History className="h-12 w-12 text-muted-foreground mx-auto mb-4" />

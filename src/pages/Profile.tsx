@@ -1,4 +1,9 @@
 import { useState, useEffect } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
+import { Link } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
+import { LeagueService } from '@/services/LeagueService';
+import { DraftService } from '@/services/DraftService';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import { Button } from '@/components/ui/button';
@@ -33,10 +38,13 @@ import {
   Lock,
   Smartphone,
   Check,
-  Crown
+  Crown,
+  RotateCcw,
+  AlertTriangle
 } from 'lucide-react';
 
 const Profile = () => {
+  const { user, profile, refreshProfile } = useAuth();
   const { toast } = useToast();
   const [isEditing, setIsEditing] = useState(false);
   
@@ -68,19 +76,66 @@ const Profile = () => {
     };
   }, [activeTab]);
   
-  // User & Team Data
+  // User & Team Data - Initialize from profile
   const [formData, setFormData] = useState({
-    firstName: 'John',
-    lastName: 'Smith',
-    email: 'john.smith@email.com',
-    phone: '+1 (555) 123-4567',
-    location: 'New York, NY',
-    bio: 'Fantasy sports enthusiast with 8+ years of experience. Love analyzing player stats and finding hidden gems.',
-    teamName: 'Thunder Bolts',
-    teamAbbr: 'TB',
-    favoriteTeam: 'New York Rangers',
-    teamDescription: 'A fierce competitor with a zesty strategy.'
+    firstName: '',
+    lastName: '',
+    email: '',
+    phone: '',
+    location: '',
+    bio: '',
+    teamName: '',
+    teamAbbr: '',
+    favoriteTeam: '',
+    teamDescription: ''
   });
+
+  // Initialize form data from profile when it loads
+  useEffect(() => {
+    if (profile) {
+      setFormData({
+        firstName: profile.first_name || '',
+        lastName: profile.last_name || '',
+        email: user?.email || '',
+        phone: profile.phone || '',
+        location: profile.location || '',
+        bio: profile.bio || '',
+        teamName: profile.default_team_name || '',
+        teamAbbr: '',
+        favoriteTeam: '',
+        teamDescription: ''
+      });
+    }
+  }, [profile, user]);
+
+  // Load commissioner leagues
+  useEffect(() => {
+    const loadCommissionerLeagues = async () => {
+      if (!user) return;
+      
+      try {
+        setLoadingLeagues(true);
+        const { leagues, error } = await LeagueService.getUserLeagues(user.id);
+        if (error) {
+          console.error('Error loading leagues:', error);
+          return;
+        }
+        // Filter to only leagues where user is commissioner
+        const commLeagues = leagues.filter(l => l.commissioner_id === user.id);
+        setCommissionerLeagues(commLeagues.map(l => ({
+          id: l.id,
+          name: l.name,
+          draft_status: l.draft_status
+        })));
+      } catch (error) {
+        console.error('Error loading commissioner leagues:', error);
+      } finally {
+        setLoadingLeagues(false);
+      }
+    };
+
+    loadCommissionerLeagues();
+  }, [user]);
 
   // Password Management
   const [passwords, setPasswords] = useState({
@@ -98,30 +153,63 @@ const Profile = () => {
     publicProfile: true
   });
 
+  // Commissioner leagues for reset
+  const [commissionerLeagues, setCommissionerLeagues] = useState<Array<{ id: string; name: string; draft_status: string }>>([]);
+  const [loadingLeagues, setLoadingLeagues] = useState(false);
+
+  // User stats - will be populated from actual league data later
   const userStats = {
-    totalSeasons: 8,
-    championships: 2,
-    playoffAppearances: 6,
-    overallRecord: '142-86',
-    currentRank: 3,
-    bestFinish: 1,
-    totalPoints: 12847,
-    avgPointsPerGame: 118.4
+    totalSeasons: 0,
+    championships: 0,
+    playoffAppearances: 0,
+    overallRecord: '0-0',
+    currentRank: null,
+    bestFinish: null,
+    totalPoints: 0,
+    avgPointsPerGame: 0
   };
 
-  const achievements = [
-    { title: 'League Champion', year: '2023', icon: Trophy, color: 'text-yellow-500' },
-    { title: 'Playoff Streak', description: '5 consecutive years', icon: Target, color: 'text-blue-500' },
-    { title: 'High Scorer', description: 'Most points in week 12', icon: TrendingUp, color: 'text-green-500' },
-    { title: 'Draft Master', description: 'Best draft grade 2024', icon: Medal, color: 'text-purple-500' }
-  ];
+  // Achievements - empty for new users
+  const achievements: Array<{ title: string; year?: string; description?: string; icon: any; color: string }> = [];
 
-  const recentActivity = [
-    { action: 'Won matchup vs Storm Riders', points: '124.3 - 98.7', date: '3 days ago' },
-    { action: 'Picked up Tyler Lockett from waivers', date: '5 days ago' },
-    { action: 'Traded Mike Evans for Josh Jacobs', date: '1 week ago' },
-    { action: 'Won matchup vs Lightning Bolts', points: '132.1 - 119.8', date: '1 week ago' }
-  ];
+  // Recent activity - empty for new users
+  const recentActivity: Array<{ action: string; points?: string; date: string }> = [];
+
+  // Get user's initials for avatar
+  const getInitials = () => {
+    if (profile?.first_name && profile?.last_name) {
+      return `${profile.first_name[0]}${profile.last_name[0]}`.toUpperCase();
+    }
+    if (profile?.username) {
+      return profile.username.substring(0, 2).toUpperCase();
+    }
+    if (user?.email) {
+      return user.email.substring(0, 2).toUpperCase();
+    }
+    return 'U';
+  };
+
+  // Get display name
+  const getDisplayName = () => {
+    if (profile?.first_name && profile?.last_name) {
+      return `${profile.first_name} ${profile.last_name}`;
+    }
+    if (profile?.first_name) {
+      return profile.first_name;
+    }
+    if (profile?.username) {
+      return profile.username;
+    }
+    return 'User';
+  };
+
+  // Get member since year
+  const getMemberSince = () => {
+    if (profile?.created_at) {
+      return new Date(profile.created_at).getFullYear();
+    }
+    return new Date().getFullYear();
+  };
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -135,13 +223,112 @@ const Profile = () => {
     });
   };
 
-  const handleSave = () => {
-    setIsEditing(false);
-    toast({
-      title: "Profile updated",
-      description: "Your profile information has been saved successfully.",
-      variant: "default"
-    });
+  const handleSave = async () => {
+    if (!user || !profile) return;
+
+    try {
+      // Build update object with only provided fields
+      const updateData: any = {};
+      
+      if (formData.firstName.trim()) updateData.first_name = formData.firstName.trim();
+      if (formData.lastName.trim()) updateData.last_name = formData.lastName.trim();
+      if (formData.phone.trim()) updateData.phone = formData.phone.trim();
+      if (formData.location.trim()) updateData.location = formData.location.trim();
+      if (formData.bio.trim()) updateData.bio = formData.bio.trim();
+
+      // Try to update - if bio column doesn't exist, try without it
+      let { error } = await supabase
+        .from('profiles')
+        .update(updateData)
+        .eq('id', user.id);
+
+      // If error mentions bio column, try again without it
+      if (error && error.message?.includes('bio')) {
+        const { bio, ...updateWithoutBio } = updateData;
+        const { error: retryError } = await supabase
+          .from('profiles')
+          .update(updateWithoutBio)
+          .eq('id', user.id);
+        
+        if (retryError) throw retryError;
+        
+        // Show warning about bio
+        toast({
+          title: "Profile updated",
+          description: "Profile saved, but bio field is not available yet. Please run the database migration.",
+          variant: "default"
+        });
+      } else if (error) {
+        throw error;
+      } else {
+        toast({
+          title: "Profile updated",
+          description: "Your profile information has been saved successfully.",
+          variant: "default"
+        });
+      }
+
+      setIsEditing(false);
+      await refreshProfile();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update profile. Make sure all database columns exist.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleSaveTeamName = async () => {
+    if (!user || !profile) return;
+
+    try {
+      const updateData: any = {};
+      
+      if (formData.teamName.trim()) {
+        updateData.default_team_name = formData.teamName.trim();
+      }
+
+      const { error } = await supabase
+        .from('profiles')
+        .update(updateData)
+        .eq('id', user.id);
+
+      if (error) throw error;
+
+      // Also update all existing teams owned by this user
+      if (formData.teamName.trim()) {
+        const { error: teamUpdateError, updatedCount } = await LeagueService.updateUserTeamNames(
+          user.id,
+          formData.teamName.trim()
+        );
+        
+        if (teamUpdateError) {
+          console.error('Error updating existing team names:', teamUpdateError);
+          toast({
+            title: "Partial update",
+            description: "Profile updated, but some teams may not have been updated. Please refresh the draft room.",
+            variant: "default"
+          });
+        } else if (updatedCount && updatedCount > 0) {
+          console.log(`Successfully updated ${updatedCount} team(s) with new name`);
+        }
+      }
+
+      toast({
+        title: "Team name saved",
+        description: "Your default team name has been saved and updated across all your existing teams.",
+        variant: "default"
+      });
+
+      await refreshProfile();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to save team name.",
+        variant: "destructive"
+      });
+    }
   };
 
   const handlePasswordChange = (e: React.FormEvent) => {
@@ -154,6 +341,79 @@ const Profile = () => {
     setPasswords({ current: '', new: '', confirm: '' });
   };
 
+  const handleResetLeagueDraft = async (leagueId: string, leagueName: string) => {
+    const confirmed = confirm(
+      `Are you sure you want to reset the draft for "${leagueName}"?\n\n` +
+      `This will permanently delete all draft data (picks and draft order) and reset the league to "not started" status.\n\n` +
+      `This action cannot be undone.`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      const { error } = await DraftService.hardDeleteDraft(leagueId);
+      
+      if (error) {
+        throw error;
+      }
+
+      toast({
+        title: "Draft reset successful",
+        description: `The draft for "${leagueName}" has been reset. You can now start a fresh draft.`,
+        variant: "default"
+      });
+
+      // Reload leagues to update status
+      const { leagues, error: reloadError } = await LeagueService.getUserLeagues(user!.id);
+      if (!reloadError) {
+        const commLeagues = leagues.filter(l => l.commissioner_id === user!.id);
+        setCommissionerLeagues(commLeagues.map(l => ({
+          id: l.id,
+          name: l.name,
+          draft_status: l.draft_status
+        })));
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error resetting draft",
+        description: error.message || "Failed to reset the draft. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // If user is not logged in, show signup prompt
+  if (!user) {
+    return (
+      <div className="min-h-screen">
+        <Navbar />
+        <main className="pt-24 pb-16">
+          <div className="container mx-auto px-4">
+            <div className="max-w-2xl mx-auto">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Sign In Required</CardTitle>
+                  <CardDescription>
+                    Please sign in or create an account to view your profile
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <Button asChild className="w-full">
+                    <Link to="/auth">Sign In / Sign Up</Link>
+                  </Button>
+                  <Button asChild variant="outline" className="w-full">
+                    <Link to="/">Go to Homepage</Link>
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen">
       <Navbar />
@@ -165,26 +425,29 @@ const Profile = () => {
                 <div className="flex items-center gap-4 animated-element">
                   <div className="relative group">
                     <Avatar className="h-24 w-24 border-4 border-primary/20">
-                      <AvatarImage src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?q=80&w=400&auto=format&fit=crop" alt="John Smith" />
-                      <AvatarFallback className="text-2xl font-bold bg-primary/10 text-primary">JS</AvatarFallback>
+                      <AvatarImage src="" alt={getDisplayName()} />
+                      <AvatarFallback className="text-2xl font-bold bg-primary/10 text-primary">
+                        {getInitials()}
+                      </AvatarFallback>
                     </Avatar>
                     <div className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
                       <Camera className="h-6 w-6 text-white" />
                     </div>
                   </div>
                   <div>
-                    <h1 className="text-3xl font-bold">{formData.firstName} {formData.lastName}</h1>
+                    <h1 className="text-3xl font-bold">{getDisplayName()}</h1>
                     <p className="text-muted-foreground flex items-center gap-2 mt-1">
                       <Users className="h-4 w-4" />
-                      {formData.teamName} • League Member since 2016
+                      {formData.teamName || 'No team yet'} • League Member since {getMemberSince()}
                     </p>
-                        <div className="flex items-center gap-2 mt-2">
-                      <Badge variant="secondary" className="bg-primary/10 text-primary border-0">
-                        <Trophy className="h-3 w-3 mr-1" />
-                        2x Stanley Cup
-                      </Badge>
-                      <Badge variant="outline">Premium Member</Badge>
-                    </div>
+                    {userStats.championships > 0 && (
+                      <div className="flex items-center gap-2 mt-2">
+                        <Badge variant="secondary" className="bg-primary/10 text-primary border-0">
+                          <Trophy className="h-3 w-3 mr-1" />
+                          {userStats.championships}x Champion
+                        </Badge>
+                      </div>
+                    )}
                   </div>
                 </div>
                 
@@ -318,20 +581,26 @@ const Profile = () => {
                         </CardTitle>
                       </CardHeader>
                       <CardContent>
-                        <div className="space-y-4">
-                          {recentActivity.map((activity, index) => (
-                            <div key={index} className="flex items-start gap-3 p-3 rounded-lg hover:bg-accent/5 transition-colors">
-                              <div className="h-2 w-2 rounded-full bg-primary mt-2 flex-shrink-0" />
-                              <div className="flex-1">
-                                <p className="text-sm font-medium">{activity.action}</p>
-                                {activity.points && (
-                                  <p className="text-sm text-primary font-medium">{activity.points}</p>
-                                )}
-                                <p className="text-xs text-muted-foreground">{activity.date}</p>
+                        {recentActivity.length > 0 ? (
+                          <div className="space-y-4">
+                            {recentActivity.map((activity, index) => (
+                              <div key={index} className="flex items-start gap-3 p-3 rounded-lg hover:bg-accent/5 transition-colors">
+                                <div className="h-2 w-2 rounded-full bg-primary mt-2 flex-shrink-0" />
+                                <div className="flex-1">
+                                  <p className="text-sm font-medium">{activity.action}</p>
+                                  {activity.points && (
+                                    <p className="text-sm text-primary font-medium">{activity.points}</p>
+                                  )}
+                                  <p className="text-xs text-muted-foreground">{activity.date}</p>
+                                </div>
                               </div>
-                            </div>
-                          ))}
-                        </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-sm text-muted-foreground text-center py-8">
+                            No recent activity. Join a league to get started!
+                          </p>
+                        )}
                       </CardContent>
                     </Card>
                   </div>
@@ -345,7 +614,9 @@ const Profile = () => {
                       <CardContent className="space-y-4">
                         <div className="grid grid-cols-2 gap-4">
                           <div className="text-center p-3 rounded-lg bg-primary/5">
-                            <div className="text-2xl font-bold text-primary">{userStats.currentRank}</div>
+                            <div className="text-2xl font-bold text-primary">
+                              {userStats.currentRank ?? '—'}
+                            </div>
                             <div className="text-xs text-muted-foreground">Current Rank</div>
                           </div>
                           <div className="text-center p-3 rounded-lg bg-green-500/5">
@@ -378,12 +649,14 @@ const Profile = () => {
                       <CardContent className="space-y-3">
                         <div>
                           <Label className="text-xs text-muted-foreground">Fantasy Team</Label>
-                          <p className="font-medium">{formData.teamName}</p>
+                          <p className="font-medium">{formData.teamName || 'No team yet'}</p>
                         </div>
-                        <div>
-                          <Label className="text-xs text-muted-foreground">Favorite NHL Team</Label>
-                          <p className="font-medium">{formData.favoriteTeam}</p>
-                        </div>
+                        {formData.favoriteTeam && (
+                          <div>
+                            <Label className="text-xs text-muted-foreground">Favorite NHL Team</Label>
+                            <p className="font-medium">{formData.favoriteTeam}</p>
+                          </div>
+                        )}
                       </CardContent>
                     </Card>
                   </div>
@@ -428,56 +701,67 @@ const Profile = () => {
                     <CardDescription>Your finish position over the years</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <div className="space-y-4">
-                      {[
-                        { year: '2024', finish: 3, playoffs: true, points: 1642 },
-                        { year: '2023', finish: 1, playoffs: true, points: 1789 },
-                        { year: '2022', finish: 2, playoffs: true, points: 1701 },
-                        { year: '2021', finish: 5, playoffs: true, points: 1534 },
-                        { year: '2020', finish: 8, playoffs: false, points: 1423 }
-                      ].map((season) => (
-                        <div key={season.year} className="flex items-center justify-between p-4 rounded-lg border bg-card">
-                          <div className="flex items-center gap-4">
-                            <div className="text-lg font-bold w-12">{season.year}</div>
-                            <div className="flex items-center gap-2">
-                              {season.finish === 1 && <Trophy className="h-4 w-4 text-yellow-500" />}
-                              {season.playoffs && <Badge variant="outline" className="text-xs">Playoffs</Badge>}
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <div className="font-bold">#{season.finish}</div>
-                            <div className="text-sm text-muted-foreground">{season.points} pts</div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                    {userStats.totalSeasons > 0 ? (
+                      <div className="space-y-4">
+                        {/* Performance history will be populated from actual league data */}
+                        <p className="text-sm text-muted-foreground text-center py-8">
+                          No season history yet. Join a league to start tracking your performance!
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="text-center py-12">
+                        <TrendingUp className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+                        <h3 className="text-lg font-semibold mb-2">No Performance History</h3>
+                        <p className="text-sm text-muted-foreground mb-4">
+                          Join a league and complete a season to see your performance history here.
+                        </p>
+                        <Button asChild>
+                          <Link to="/create-league">Create or Join a League</Link>
+                        </Button>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               </TabsContent>
 
               <TabsContent value="achievements" className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {achievements.map((achievement, index) => (
-                    <Card key={index} className="animated-element hover:shadow-md transition-shadow">
-                      <CardContent className="p-6">
-                        <div className="flex items-start gap-4">
-                          <div className={`p-3 rounded-lg bg-accent/10`}>
-                            <achievement.icon className={`h-6 w-6 ${achievement.color}`} />
+                {achievements.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {achievements.map((achievement, index) => (
+                      <Card key={index} className="animated-element hover:shadow-md transition-shadow">
+                        <CardContent className="p-6">
+                          <div className="flex items-start gap-4">
+                            <div className={`p-3 rounded-lg bg-accent/10`}>
+                              <achievement.icon className={`h-6 w-6 ${achievement.color}`} />
+                            </div>
+                            <div className="flex-1">
+                              <h3 className="font-semibold mb-1">{achievement.title}</h3>
+                              {achievement.description && (
+                                <p className="text-sm text-muted-foreground mb-2">{achievement.description}</p>
+                              )}
+                              {achievement.year && (
+                                <Badge variant="secondary" className="text-xs">{achievement.year}</Badge>
+                              )}
+                            </div>
                           </div>
-                          <div className="flex-1">
-                            <h3 className="font-semibold mb-1">{achievement.title}</h3>
-                            {achievement.description && (
-                              <p className="text-sm text-muted-foreground mb-2">{achievement.description}</p>
-                            )}
-                            {achievement.year && (
-                              <Badge variant="secondary" className="text-xs">{achievement.year}</Badge>
-                            )}
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                ) : (
+                  <Card>
+                    <CardContent className="p-12 text-center">
+                      <Trophy className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+                      <h3 className="text-lg font-semibold mb-2">No Achievements Yet</h3>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        Join a league and start competing to earn achievements!
+                      </p>
+                      <Button asChild>
+                        <Link to="/create-league">Create or Join a League</Link>
+                      </Button>
+                    </CardContent>
+                  </Card>
+                )}
               </TabsContent>
 
               <TabsContent value="settings" className="space-y-6">
@@ -592,9 +876,66 @@ const Profile = () => {
                           className="min-h-[80px]"
                         />
                       </div>
-                      <Button onClick={() => toast({ title: "Team settings saved" })}>Save Team Details</Button>
+                      <Button onClick={handleSaveTeamName}>Save Team Details</Button>
                     </CardContent>
                   </Card>
+
+                  {/* League Reset (Commissioner Only) */}
+                  {commissionerLeagues.length > 0 && (
+                    <Card className="animated-element border-destructive/20">
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2 text-destructive">
+                          <RotateCcw className="h-5 w-5" />
+                          League Draft Reset
+                        </CardTitle>
+                        <CardDescription>
+                          Reset draft data for leagues you commission. This permanently deletes all draft picks and orders.
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        {loadingLeagues ? (
+                          <p className="text-sm text-muted-foreground">Loading leagues...</p>
+                        ) : (
+                          <div className="space-y-3">
+                            {commissionerLeagues.map((league) => (
+                              <div 
+                                key={league.id} 
+                                className="flex items-center justify-between p-3 border rounded-lg bg-muted/30"
+                              >
+                                <div className="flex-1">
+                                  <p className="font-semibold">{league.name}</p>
+                                  <p className="text-sm text-muted-foreground">
+                                    Status: <span className="capitalize">{league.draft_status.replace('_', ' ')}</span>
+                                  </p>
+                                </div>
+                                <Button
+                                  variant="destructive"
+                                  size="sm"
+                                  onClick={() => handleResetLeagueDraft(league.id, league.name)}
+                                  disabled={league.draft_status === 'not_started'}
+                                >
+                                  <RotateCcw className="h-4 w-4 mr-2" />
+                                  Reset Draft
+                                </Button>
+                              </div>
+                            ))}
+                            {commissionerLeagues.length === 0 && (
+                              <p className="text-sm text-muted-foreground text-center py-4">
+                                You are not a commissioner of any leagues.
+                              </p>
+                            )}
+                          </div>
+                        )}
+                        <div className="flex items-start gap-2 p-3 bg-destructive/5 border border-destructive/20 rounded-lg">
+                          <AlertTriangle className="h-4 w-4 text-destructive mt-0.5 flex-shrink-0" />
+                          <p className="text-xs text-destructive/80">
+                            <strong>Warning:</strong> Resetting a draft will permanently delete all draft picks and draft order data. 
+                            This action cannot be undone. Only reset if you need to start the draft completely fresh.
+                          </p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
 
                   {/* Game Preferences */}
                   <Card className="animated-element">
