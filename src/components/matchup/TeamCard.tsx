@@ -120,18 +120,8 @@ export const TeamCard = ({ title, starters, bench, gradientClass, slotAssignment
   const organizedStarters = orderStartersBySlots(starters);
   const finalBench = bench;
 
-  // Get display position - show "UTIL" if player is in UTIL slot, otherwise show actual position
-  const getDisplayPosition = (player: MatchupPlayer): string => {
-    const slot = slotAssignments[String(player.id)];
-    if (slot === 'slot-UTIL') {
-      return 'UTIL';
-    }
-    return player.position;
-  };
-
   const renderMobilePlayerRow = (player: MatchupPlayer, isBench: boolean = false) => {
-    const displayPos = getDisplayPosition(player);
-    const posStyles = getPositionStyles(displayPos, isBench);
+    const posStyles = getPositionStyles(player.position, isBench);
     return (
     <div 
       key={player.id} 
@@ -153,7 +143,7 @@ export const TeamCard = ({ title, starters, bench, gradientClass, slotAssignment
                )}
              </div>
              <div className="text-[11px] text-muted-foreground leading-none mt-0.5 flex items-center gap-1">
-               <span className={`font-medium ${posStyles.text ? `${posStyles.text} font-bold` : ''}`}>{displayPos}</span>
+               <span className={`font-medium ${posStyles.text ? `${posStyles.text} font-bold` : ''}`}>{player.position}</span>
                <span>•</span>
                {player.gameInfo ? (
                  <span className={`${player.status === 'In Game' ? 'text-primary font-medium' : ''}`}>
@@ -230,15 +220,14 @@ export const TeamCard = ({ title, starters, bench, gradientClass, slotAssignment
             </TableHeader>
             <TableBody>
               {organizedStarters.map(player => {
-                const displayPos = getDisplayPosition(player);
-                const posStyles = getPositionStyles(displayPos, false);
+                const posStyles = getPositionStyles(player.position, false);
                 return (
                 <TableRow 
                   key={player.id} 
                   className={`hover:bg-muted/10 border-b border-border/40 ${player.isToday ? 'bg-primary/5' : ''} ${posStyles.bg} ${posStyles.border} cursor-pointer`}
                   onClick={() => onPlayerClick?.(player)}
                 >
-                  <TableCell className={`w-12 font-medium text-xs border-r border-border/20 py-3 ${posStyles.text ? `${posStyles.text} font-bold` : 'text-muted-foreground'}`}>{displayPos}</TableCell>
+                  <TableCell className={`w-12 font-medium text-xs border-r border-border/20 py-3 ${posStyles.text ? `${posStyles.text} font-bold` : 'text-muted-foreground'}`}>{player.position}</TableCell>
                   <TableCell className="py-3">
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold text-muted-foreground overflow-hidden border border-border/50 shadow-sm">

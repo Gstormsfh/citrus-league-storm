@@ -38,6 +38,15 @@ dist-ssr
 *.class
 *.pyc
 
+# Temporary files
+temp_*.json
+test-*.html
+fix_*.sql
+*.ps1
+git-*.txt
+git-*.log
+git-diagnostic-output/
+
 # Flutter/Dart/Pub related
 **/doc/api/
 **/ios/Flutter/.last_build_id
