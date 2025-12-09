@@ -1,6 +1,7 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, closestCenter } from '@dnd-kit/core';
 import { arrayMove } from '@dnd-kit/sortable';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
@@ -13,6 +14,7 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, Legend, Cell
 } from 'recharts';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import PlayerStatsModal from '@/components/PlayerStatsModal';
 import { StartersGrid, BenchGrid, IRSlot } from '@/components/roster';
 import { HockeyPlayer } from '@/components/roster/HockeyPlayerCard';
@@ -36,6 +38,19 @@ const getFantasyPosition = (position: string): 'C' | 'LW' | 'RW' | 'D' | 'G' | '
   if (['G', 'GOALIE'].includes(pos)) return 'G';
   
   return 'UTIL';
+};
+
+// Helper function to format position for display (L -> LW, R -> RW)
+const formatPositionForDisplay = (position: string): string => {
+  const pos = position?.toUpperCase() || '';
+  if (pos === 'L' || pos === 'LEFT' || pos === 'LEFTWING') return 'LW';
+  if (pos === 'R' || pos === 'RIGHT' || pos === 'RIGHTWING') return 'RW';
+  if (pos.includes('LW')) return 'LW';
+  if (pos.includes('RW')) return 'RW';
+  if (pos.includes('C') && !pos.includes('LW') && !pos.includes('RW')) return 'C';
+  if (pos.includes('D')) return 'D';
+  if (pos.includes('G')) return 'G';
+  return position; // Return original if no match
 };
 
 // Helper function to get team abbreviation
@@ -196,8 +211,11 @@ interface RosterState {
 const Roster = () => {
   const { user, profile } = useAuth();
   const { toast } = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [selectedPlayer, setSelectedPlayer] = useState<HockeyPlayer | null>(null);
   const [isPlayerDialogOpen, setIsPlayerDialogOpen] = useState(false);
+  const [pendingAddPlayer, setPendingAddPlayer] = useState<{ id: string; name: string } | null>(null);
+  const [isDropDialogOpen, setIsDropDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("roster");
   const [activeId, setActiveId] = useState<string | number | null>(null);
   const [loading, setLoading] = useState(true);
@@ -277,12 +295,17 @@ const Roster = () => {
   };
 
   // Fetch and adapt players from staging files (SINGLE SOURCE OF TRUTH)
-  useEffect(() => {
-    const loadRoster = async () => {
+  // Extract loadRoster so it can be called manually for refresh
+  const loadRoster = useCallback(async (keepCurrentRoster = false) => {
+    // Only set loading if not keeping current roster (prevents flash during refresh)
+    if (!keepCurrentRoster) {
       setLoading(true);
-      try {
-        // Reset roster state in case of previous errors
+    }
+    try {
+      // Only reset roster state if not keeping current (prevents flash of "No roster")
+      if (!keepCurrentRoster) {
         setRoster({ starters: [], bench: [], ir: [], slotAssignments: {} });
+      }
         // Get all players from staging files (staging_2025_skaters & staging_2025_goalies)
         // PlayerService.getAllPlayers() is the ONLY source for player data
         const allPlayers = await PlayerService.getAllPlayers();
@@ -405,17 +428,35 @@ const Roster = () => {
           projectedPoints: (p.points || 0) / 20 // Rough projection
         }));
 
-        // Load real NHL schedule data for each player
+        // Load real NHL schedule data for all players (batch query for performance)
         const { ScheduleService } = await import('@/services/ScheduleService');
         // Get user timezone from profile (default to Mountain Time)
         const userTimezone = profile?.timezone || 'America/Denver';
-        for (const player of transformedPlayers) {
-          const hasGameToday = await ScheduleService.hasGameToday(player.teamAbbreviation || player.team || '');
+        
+        // Get unique team abbreviations from all players
+        const uniqueTeams = Array.from(new Set(
+          transformedPlayers
+            .map(p => p.teamAbbreviation || p.team || '')
+            .filter(team => team !== '')
+        ));
+        
+        // Batch fetch: check which teams have games today and get next games
+        const [hasGamesTodayMap, nextGamesMap] = await Promise.all([
+          ScheduleService.hasGamesTodayBatch(uniqueTeams),
+          ScheduleService.getNextGamesForTeams(uniqueTeams)
+        ]);
+        
+        // Map schedule data back to players
+        transformedPlayers.forEach(player => {
+          const teamAbbrev = player.teamAbbreviation || player.team || '';
+          if (!teamAbbrev) return;
+          
+          const hasGameToday = hasGamesTodayMap.get(teamAbbrev) || false;
           
           // Only show game info if player has a game today
           if (hasGameToday) {
-            const { game: nextGame } = await ScheduleService.getNextGameForTeam(player.teamAbbreviation || player.team || '');
-            const gameInfo = ScheduleService.getGameInfo(nextGame, player.teamAbbreviation || player.team || '', userTimezone);
+            const nextGame = nextGamesMap.get(teamAbbrev);
+            const gameInfo = ScheduleService.getGameInfo(nextGame || null, teamAbbrev, userTimezone);
             
             if (gameInfo) {
               player.nextGame = {
@@ -426,7 +467,7 @@ const Roster = () => {
             }
           }
           // If no game today, don't set nextGame (will show "No Game" in the card)
-        }
+        });
 
         // Sort players consistently by ID for deterministic auto-assignment
         transformedPlayers.sort((a, b) => {
@@ -437,11 +478,19 @@ const Roster = () => {
 
         // Check for saved lineup first (use teamId which could be demo team 3 or user's actual team)
         // For real teams, use league_id from userTeam; for demo teams, skip league_id check (demo league)
-        const savedLineup = teamId && userTeam?.league_id 
-          ? await LeagueService.getLineup(teamId, userTeam.league_id) 
-          : teamId && typeof teamId === 'number' && teamId <= 10
-          ? await LeagueService.getLineup(teamId, 'demo-league-id') // Demo league fallback
-          : null;
+        let savedLineup = null;
+        if (teamId && userTeam?.league_id) {
+          // Real user team - use actual league_id
+          savedLineup = await LeagueService.getLineup(teamId, userTeam.league_id);
+        } else if (teamId && typeof teamId === 'number' && teamId <= 10 && !user) {
+          // Demo team for non-logged-in users only - try demo league fallback with error handling
+          try {
+            savedLineup = await LeagueService.getLineup(teamId, 'demo-league-id');
+          } catch (error) {
+            // Silently ignore demo league errors - demo teams don't need saved lineups
+            console.debug('Demo league lineup lookup skipped (expected for demo teams)');
+          }
+        }
         
         if (savedLineup) {
           // Restore saved lineup
@@ -546,24 +595,43 @@ const Roster = () => {
           }
         }
       } catch (e: any) {
-        console.error("Failed to load roster", e);
-        console.error("Error details:", {
-          message: e?.message,
-          stack: e?.stack,
-          name: e?.name
-        });
-        toast({ 
-          title: "Error", 
-          description: `Could not load roster. ${e?.message || 'Unknown error'}`,
-          variant: "destructive" 
-        });
+        // Filter out demo league errors - they're expected and harmless
+        const errorMessage = e?.message || '';
+        const isDemoLeagueError = errorMessage.toLowerCase().includes('demo') || 
+                                  errorMessage.toLowerCase().includes('league') && 
+                                  (errorMessage.toLowerCase().includes('id') || errorMessage.toLowerCase().includes('uuid'));
+        
+        if (!isDemoLeagueError) {
+          console.error("Failed to load roster", e);
+          console.error("Error details:", {
+            message: e?.message,
+            stack: e?.stack,
+            name: e?.name
+          });
+          toast({ 
+            title: "Error", 
+            description: `Could not load roster. ${errorMessage || 'Unknown error'}`,
+            variant: "destructive" 
+          });
+        } else {
+          // Silently ignore demo league errors
+          console.debug("Demo league error (expected and harmless):", errorMessage);
+        }
       } finally {
+        // Always set loading to false at the end
         setLoading(false);
       }
-    };
+  }, [user, profile, toast]);
 
+  // Initial load on mount
+  useEffect(() => {
     loadRoster();
-  }, [toast, user]);
+  }, [loadRoster]);
+
+  // Expose refreshRoster function for manual refresh (e.g., after add/drop)
+  const refreshRoster = useCallback(() => {
+    loadRoster(true); // Keep current roster visible during refresh
+  }, [loadRoster]);
 
   // Calculate team stats from league data
   useEffect(() => {
@@ -767,6 +835,21 @@ const Roster = () => {
         ir: prev.ir.map(p => ({ ...p, statView }))
     }));
   }, [statView]);
+
+  // Handle addPlayer query parameter (from FreeAgents when roster is full)
+  useEffect(() => {
+    const addPlayerId = searchParams.get('addPlayer');
+    const playerName = searchParams.get('playerName');
+    
+    // Only open dialog if roster is loaded (not loading and has a team)
+    if (addPlayerId && playerName && !loading && userTeamId) {
+      setPendingAddPlayer({
+        id: addPlayerId,
+        name: decodeURIComponent(playerName)
+      });
+      setIsDropDialogOpen(true);
+    }
+  }, [searchParams, loading, userTeamId]);
 
   const handleAutoLineup = () => {
     setRoster((prev) => {
@@ -1604,6 +1687,105 @@ const Roster = () => {
             }
           }}
         />
+
+        {/* Drop Player Dialog for Adding New Player */}
+        <Dialog open={isDropDialogOpen} onOpenChange={setIsDropDialogOpen}>
+          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Roster Full - Drop a Player</DialogTitle>
+              <DialogDescription>
+                Your roster is full. Drop a player to add <strong>{pendingAddPlayer?.name}</strong>.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 mt-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {[...roster.starters, ...roster.bench, ...roster.ir].map((player) => (
+                  <Card key={player.id} className="p-4 hover:border-primary cursor-pointer transition-colors" onClick={async () => {
+                    if (!user || !userTeam?.league_id || !pendingAddPlayer) return;
+                    
+                    try {
+                      // Drop the selected player
+                      const { success: dropSuccess, error: dropError } = await LeagueService.dropPlayer(
+                        userTeam.league_id,
+                        user.id,
+                        String(player.id),
+                        'Roster Page - Make Room'
+                      );
+
+                      if (!dropSuccess) {
+                        toast({
+                          title: "Error",
+                          description: dropError?.message || "Failed to drop player.",
+                          variant: "destructive"
+                        });
+                        return;
+                      }
+
+                      // Add the new player
+                      const { success: addSuccess, error: addError } = await LeagueService.addPlayer(
+                        userTeam.league_id,
+                        user.id,
+                        pendingAddPlayer.id,
+                        'Roster Page - After Drop'
+                      );
+
+                      if (addSuccess) {
+                        toast({
+                          title: "Success",
+                          description: `Dropped ${player.name} and added ${pendingAddPlayer.name} to your roster.`,
+                        });
+                        // Clear query params and close dialog
+                        setSearchParams({});
+                        setIsDropDialogOpen(false);
+                        setPendingAddPlayer(null);
+                        // Refresh roster without full page reload (keeps current roster visible)
+                        refreshRoster();
+                      } else {
+                        toast({
+                          title: "Error",
+                          description: addError?.message || "Failed to add player.",
+                          variant: "destructive"
+                        });
+                      }
+                    } catch (error: any) {
+                      toast({
+                        title: "Error",
+                        description: error?.message || "An error occurred.",
+                        variant: "destructive"
+                      });
+                    }
+                  }}>
+                    <CardContent className="p-0">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="font-semibold">{player.name}</div>
+                          <div className="text-sm text-muted-foreground">
+                            {formatPositionForDisplay(player.position)} • {player.team}
+                          </div>
+                          <div className="text-xs text-muted-foreground mt-1">
+                            {player.stats?.points || 0} pts • {player.stats?.gamesPlayed || 0} GP
+                          </div>
+                        </div>
+                        <Button variant="destructive" size="sm">
+                          Drop
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+              <div className="flex justify-end gap-2 pt-4 border-t">
+                <Button variant="outline" onClick={() => {
+                  setSearchParams({});
+                  setIsDropDialogOpen(false);
+                  setPendingAddPlayer(null);
+                }}>
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </main>
       
       <Footer />

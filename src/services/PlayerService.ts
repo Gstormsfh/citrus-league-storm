@@ -49,12 +49,35 @@ export interface Player {
   goalsSavedAboveExpected: number;
 }
 
+// In-memory cache for player data
+interface CacheEntry {
+  data: Player[];
+  timestamp: number;
+}
+
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes in milliseconds
+let playersCache: CacheEntry | null = null;
+
 export const PlayerService = {
+  /**
+   * Clear the player cache (call this when player data is updated)
+   */
+  clearCache(): void {
+    playersCache = null;
+  },
+
   /**
    * Get all players from staging files (SINGLE SOURCE OF TRUTH)
    * Returns both skaters and goalies with all stats from staging_2025_skaters and staging_2025_goalies
+   * Results are cached for 5 minutes to improve performance
    */
   async getAllPlayers(): Promise<Player[]> {
+    // Check cache first
+    const now = Date.now();
+    if (playersCache && (now - playersCache.timestamp) < CACHE_TTL) {
+      return playersCache.data;
+    }
+
     try {
       // 1. Fetch Skaters from staging_2025_skaters (situation = 'all')
       // This is the ONLY source for skater data - names, stats, positions, teams all come from here
@@ -188,7 +211,15 @@ export const PlayerService = {
       });
 
       // Return sorted by points (all data from staging files)
-      return Array.from(uniquePlayers.values()).sort((a, b) => b.points - a.points);
+      const sortedPlayers = Array.from(uniquePlayers.values()).sort((a, b) => b.points - a.points);
+      
+      // Cache the results
+      playersCache = {
+        data: sortedPlayers,
+        timestamp: Date.now()
+      };
+      
+      return sortedPlayers;
 
     } catch (error) {
       console.error('Error fetching players from staging tables (staging_2025_skaters/staging_2025_goalies):', error);

@@ -112,7 +112,7 @@ export const TeamCard = ({ title, starters, bench, gradientClass, slotAssignment
       slotToPlayerMap.set(slot, player);
     }
   });
-
+      
   // Build organized starters array with empty slots
   // This ensures both teams always show the same structure
   const organizedStarters: Array<{ player: MatchupPlayer | null; slot: string; position: string }> = 
@@ -151,10 +151,10 @@ export const TeamCard = ({ title, starters, bench, gradientClass, slotAssignment
              <div className="text-[11px] text-muted-foreground leading-none mt-0.5 flex items-center gap-1">
                <span className={`font-medium ${posStyles.text ? `${posStyles.text} font-bold` : ''}`}>{formatPositionForDisplay(displayPos)}</span>
                <span>•</span>
-              {player.gameInfo ? (
-                <span className={`${player.status === 'In Game' ? 'text-primary font-medium' : ''}`}>
-                  {player.gameInfo.opponent} {player.gameInfo.score ? `(${player.gameInfo.score})` : ''} {player.gameInfo.time ? `• ${player.gameInfo.time}` : ''}
-                </span>
+               {player.gameInfo ? (
+                 <span className={`${player.status === 'In Game' ? 'text-primary font-medium' : ''}`}>
+                   {player.gameInfo.opponent} {player.gameInfo.score ? `(${player.gameInfo.score})` : ''} {player.gameInfo.time ? `• ${player.gameInfo.time}` : ''}
+                 </span>
               ) : null}
              </div>
           </div>
@@ -247,9 +247,9 @@ export const TeamCard = ({ title, starters, bench, gradientClass, slotAssignment
         {/* Desktop View */}
         <div className="hidden md:block overflow-x-auto">
           <div className="min-w-full">
-            <Table>
-              <TableHeader>
-                <TableRow className="hover:bg-transparent border-b border-border/50">
+          <Table>
+            <TableHeader>
+              <TableRow className="hover:bg-transparent border-b border-border/50">
                   <TableHead className="w-12 text-xs font-semibold text-muted-foreground h-9 whitespace-nowrap">Pos</TableHead>
                   <TableHead className="text-xs font-semibold text-muted-foreground h-9 min-w-[200px]">Player</TableHead>
                   <TableHead className="w-8 text-center text-[10px] font-bold text-muted-foreground h-9 p-0 whitespace-nowrap">G</TableHead>
@@ -258,8 +258,8 @@ export const TeamCard = ({ title, starters, bench, gradientClass, slotAssignment
                   <TableHead className="w-10 text-center text-[10px] font-bold text-muted-foreground h-9 p-0 whitespace-nowrap">BLK</TableHead>
                   <TableHead className="w-16 text-right text-xs font-semibold text-muted-foreground h-9 whitespace-nowrap">Pts</TableHead>
                   <TableHead className="w-24 text-right text-xs font-semibold text-muted-foreground h-9 whitespace-nowrap">Status</TableHead>
-                </TableRow>
-              </TableHeader>
+              </TableRow>
+            </TableHeader>
             <TableBody>
               {organizedStarters.map(({ player, position, slot }, index) => {
                 const posStyles = getPositionStyles(position, false);
@@ -268,78 +268,78 @@ export const TeamCard = ({ title, starters, bench, gradientClass, slotAssignment
                 
                 if (player) {
                   // Player exists in this slot
-                  return (
-                    <TableRow 
-                      key={player.id} 
+                return (
+                <TableRow 
+                  key={player.id} 
                       className={`hover:bg-muted/10 border-b border-border/40 ${player.isToday ? 'bg-primary/5' : ''} ${posStyles.bg} ${posStyles.border} cursor-pointer min-h-[60px]`}
-                      onClick={() => onPlayerClick?.(player)}
-                    >
+                  onClick={() => onPlayerClick?.(player)}
+                >
                       <TableCell className={`w-12 font-medium text-xs border-r border-border/20 py-3 min-h-[60px] align-middle ${posStyles.text ? `${posStyles.text} font-bold` : 'text-muted-foreground'}`}>{displayPosition}</TableCell>
                       <TableCell className="py-3 min-h-[60px] align-middle">
                         <div className="flex items-center gap-3 min-h-[44px]">
                           <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold text-muted-foreground overflow-hidden border border-border/50 shadow-sm flex-shrink-0">
-                            {player.team}
-                          </div>
+                        {player.team}
+                      </div>
                           <div className="flex flex-col justify-center min-h-[36px] flex-1">
                             <div className="font-semibold text-sm flex items-center gap-2 leading-tight mb-0.5 text-foreground/90 hover:text-primary transition-colors">
-                              {player.name}
-                              {player.isToday && (
+                          {player.name}
+                          {player.isToday && (
                                 <span className="inline-flex items-center rounded-md bg-primary/10 px-1.5 py-0.5 text-[9px] font-bold text-primary ring-1 ring-inset ring-primary/20 whitespace-nowrap">
-                                  TODAY
-                                </span>
-                              )}
-                            </div>
-                            <div className="text-[11px] text-muted-foreground leading-tight">
-                              {player.gameInfo ? (
-                                 <span className="flex items-center gap-1 flex-wrap">
-                                   <span className="font-medium text-foreground/80">{player.gameInfo.opponent}</span>
-                                   {player.gameInfo.time && <span>• {player.gameInfo.time}</span>}
-                                   {player.gameInfo.score && <span>• {player.gameInfo.score}</span>}
-                                   {player.gameInfo.period && <span className="text-primary font-medium">• {player.gameInfo.period}</span>}
-                                 </span>
-                               ) : (
-                                 <span className="break-words">{player.team} • {player.gamesRemaining} Gms Left</span>
-                               )}
-                            </div>
-                          </div>
+                              TODAY
+                            </span>
+                          )}
                         </div>
-                      </TableCell>
-                      
-                      {/* Stats Columns */}
+                            <div className="text-[11px] text-muted-foreground leading-tight">
+                          {player.gameInfo ? (
+                                 <span className="flex items-center gap-1 flex-wrap">
+                               <span className="font-medium text-foreground/80">{player.gameInfo.opponent}</span>
+                               {player.gameInfo.time && <span>• {player.gameInfo.time}</span>}
+                               {player.gameInfo.score && <span>• {player.gameInfo.score}</span>}
+                               {player.gameInfo.period && <span className="text-primary font-medium">• {player.gameInfo.period}</span>}
+                             </span>
+                           ) : (
+                                 <span className="break-words">{player.team} • {player.gamesRemaining} Gms Left</span>
+                           )}
+                        </div>
+                      </div>
+                    </div>
+                  </TableCell>
+                  
+                  {/* Stats Columns */}
                       <TableCell className="w-8 text-center p-0 min-h-[60px] align-middle">
-                        <span className={`text-xs ${player.stats?.goals > 0 ? 'font-bold text-foreground' : 'text-muted-foreground/30'}`}>
-                          {player.stats?.goals || 0}
-                        </span>
-                      </TableCell>
+                    <span className={`text-xs ${player.stats?.goals > 0 ? 'font-bold text-foreground' : 'text-muted-foreground/30'}`}>
+                      {player.stats?.goals || 0}
+                    </span>
+                  </TableCell>
                       <TableCell className="w-8 text-center p-0 min-h-[60px] align-middle">
-                        <span className={`text-xs ${player.stats?.assists > 0 ? 'font-bold text-foreground' : 'text-muted-foreground/30'}`}>
-                          {player.stats?.assists || 0}
-                        </span>
-                      </TableCell>
+                    <span className={`text-xs ${player.stats?.assists > 0 ? 'font-bold text-foreground' : 'text-muted-foreground/30'}`}>
+                      {player.stats?.assists || 0}
+                    </span>
+                  </TableCell>
                       <TableCell className="w-10 text-center p-0 min-h-[60px] align-middle">
-                        <span className="text-xs text-muted-foreground/70">
-                          {player.stats?.sog || 0}
-                        </span>
-                      </TableCell>
+                    <span className="text-xs text-muted-foreground/70">
+                      {player.stats?.sog || 0}
+                    </span>
+                  </TableCell>
                       <TableCell className="w-10 text-center p-0 min-h-[60px] align-middle">
-                        <span className="text-xs text-muted-foreground/70">
-                          {player.stats?.blk || 0}
-                        </span>
-                      </TableCell>
+                    <span className="text-xs text-muted-foreground/70">
+                      {player.stats?.blk || 0}
+                    </span>
+                  </TableCell>
 
                       <TableCell className="text-right font-bold w-16 border-l border-border/20 bg-muted/5 py-3 min-h-[60px] align-middle">
                         <div className="flex flex-col items-end justify-center min-h-[44px] leading-tight">
-                          <span className="text-sm">{player.points}</span>
-                          {player.isToday && (
-                            <span className="text-[10px] text-primary font-medium">+{getDailyPoints(player.stats)}</span>
-                          )}
-                        </div>
-                      </TableCell>
+                      <span className="text-sm">{player.points}</span>
+                      {player.isToday && (
+                        <span className="text-[10px] text-primary font-medium">+{getDailyPoints(player.stats)}</span>
+                      )}
+                    </div>
+                  </TableCell>
                       <TableCell className="text-right w-24 py-3 min-h-[60px] align-middle">
                         {player.status && (
                           <div className={`text-xs font-medium ${player.status === 'In Game' ? 'text-primary animate-pulse font-bold' : 'text-muted-foreground'} break-words`}>
-                            {player.status}
-                          </div>
+                      {player.status}
+                    </div>
                         )}
                       </TableCell>
                     </TableRow>
@@ -393,9 +393,9 @@ export const TeamCard = ({ title, starters, bench, gradientClass, slotAssignment
                       </TableCell>
                       <TableCell className="text-right w-24 py-3 min-h-[60px] align-middle">
                         <div className="text-xs text-muted-foreground/40 break-words">—</div>
-                      </TableCell>
-                    </TableRow>
-                  );
+                  </TableCell>
+                </TableRow>
+              );
                 }
               })}
             </TableBody>
@@ -499,7 +499,7 @@ export const TeamCard = ({ title, starters, bench, gradientClass, slotAssignment
                       </TableCell>
                       <TableCell className="text-right w-24 py-3">
                           {player.status && (
-                            <div className="text-xs text-muted-foreground">{player.status}</div>
+                          <div className="text-xs text-muted-foreground">{player.status}</div>
                           )}
                       </TableCell>
                     </TableRow>

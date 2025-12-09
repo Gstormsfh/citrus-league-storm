@@ -7,6 +7,20 @@ import { getFirstWeekStartDate, getWeekStartDate, getWeekEndDate, getAvailableWe
 import { HockeyPlayer } from '@/components/roster/HockeyPlayerCard';
 import { ScheduleService, NHLGame, GameInfo } from './ScheduleService';
 
+// Roster cache for performance optimization
+interface RosterCacheEntry {
+  roster: HockeyPlayer[];
+  timestamp: number;
+}
+
+const ROSTER_CACHE_TTL = 2 * 60 * 1000; // 2 minutes in milliseconds
+const rosterCache = new Map<string, RosterCacheEntry>();
+
+// Helper to generate cache key
+const getRosterCacheKey = (teamId: string, leagueId: string): string => {
+  return `${leagueId}:${teamId}`;
+};
+
 export interface Matchup {
   id: string;
   league_id: string;
@@ -198,7 +212,32 @@ export const MatchupService = {
   },
 
   /**
-   * Get roster data for a team from draft picks
+   * Clear roster cache (call this when rosters change)
+   * @param teamId - Optional: clear cache for specific team, or all teams if not provided
+   * @param leagueId - Optional: clear cache for specific league
+   */
+  clearRosterCache(teamId?: string, leagueId?: string): void {
+    if (teamId && leagueId) {
+      // Clear specific team's cache
+      const key = getRosterCacheKey(teamId, leagueId);
+      rosterCache.delete(key);
+    } else if (leagueId) {
+      // Clear all teams in a league
+      const keysToDelete: string[] = [];
+      rosterCache.forEach((_, key) => {
+        if (key.startsWith(`${leagueId}:`)) {
+          keysToDelete.push(key);
+        }
+      });
+      keysToDelete.forEach(key => rosterCache.delete(key));
+    } else {
+      // Clear all caches
+      rosterCache.clear();
+    }
+  },
+
+  /**
+   * Get roster data for a team from draft picks (optimized with caching and direct queries)
    */
   async getTeamRoster(
     teamId: string,
@@ -206,47 +245,51 @@ export const MatchupService = {
     allPlayers: Player[]
   ): Promise<HockeyPlayer[]> {
     try {
-      // Get draft picks for this team
-      const { picks: draftPicks } = await DraftService.getDraftPicks(leagueId);
-      const teamPicks = draftPicks.filter(p => p.team_id === teamId);
+      // Check cache first
+      const cacheKey = getRosterCacheKey(teamId, leagueId);
+      const now = Date.now();
+      const cached = rosterCache.get(cacheKey);
+      
+      if (cached && (now - cached.timestamp) < ROSTER_CACHE_TTL) {
+        return cached.roster;
+      }
+
+      // Optimized: Query draft picks directly for this team (not all league picks)
+      // This matches the efficient pattern used in Roster.tsx
+      const { data: teamDraftPicks, error: picksError } = await supabase
+        .from('draft_picks')
+        .select('*')
+        .eq('league_id', leagueId)
+        .eq('team_id', teamId)
+        .is('deleted_at', null)
+        .order('pick_number', { ascending: true });
+      
+      if (picksError) {
+        console.error('Error fetching draft picks for team:', picksError);
+        // Fallback to old method if direct query fails
+        const { picks: draftPicks } = await DraftService.getDraftPicks(leagueId);
+        const teamPicks = draftPicks.filter(p => p.team_id === teamId);
+        const playerIds = teamPicks.map(p => p.player_id);
+        const teamPlayers = allPlayers.filter(p => playerIds.includes(p.id));
+        
+        const roster = teamPlayers.map((p) => this.transformToHockeyPlayer(p));
+        
+        // Cache the result
+        rosterCache.set(cacheKey, { roster, timestamp: now });
+        return roster;
+      }
       
       // Map draft picks to players
-      const playerIds = teamPicks.map(p => p.player_id);
+      const playerIds = (teamDraftPicks || []).map(p => p.player_id);
       const teamPlayers = allPlayers.filter(p => playerIds.includes(p.id));
 
       // Transform to HockeyPlayer format
-      return teamPlayers.map((p) => ({
-        id: p.id,
-        name: p.full_name,
-        position: p.position,
-        number: parseInt(p.jersey_number || '0'),
-        starter: false, // Will be determined by lineup
-        stats: {
-          gamesPlayed: p.games_played || 0,
-          goals: p.goals || 0,
-          assists: p.assists || 0,
-          points: p.points || 0,
-          plusMinus: p.plus_minus || 0,
-          shots: p.shots || 0,
-          hits: p.hits || 0,
-          blockedShots: p.blocks || 0,
-          xGoals: p.xGoals || 0,
-          corsi: p.corsi || 0,
-          fenwick: p.fenwick || 0,
-          wins: p.wins || 0,
-          losses: p.losses || 0,
-          otl: p.ot_losses || 0,
-          gaa: p.goals_against_average || 0,
-          savePct: p.save_percentage || 0,
-          shutouts: 0
-        },
-        team: p.team,
-        teamAbbreviation: p.team,
-        status: p.status === 'injured' ? 'IR' : (p.status === 'active' ? null : 'WVR'),
-        image: p.headshot_url || undefined,
-        nextGame: { opponent: 'vs OPP', isToday: false },
-        projectedPoints: (p.points || 0) / 20
-      }));
+      const roster = teamPlayers.map((p) => this.transformToHockeyPlayer(p));
+      
+      // Cache the result
+      rosterCache.set(cacheKey, { roster, timestamp: now });
+      
+      return roster;
     } catch (error) {
       console.error('Error getting team roster:', error);
       return [];
@@ -254,24 +297,57 @@ export const MatchupService = {
   },
 
   /**
-   * Transform HockeyPlayer to MatchupPlayer format with real schedule data
+   * Helper to transform Player to HockeyPlayer format
    */
-  async transformToMatchupPlayer(
+  transformToHockeyPlayer(p: Player): HockeyPlayer {
+    return {
+      id: p.id,
+      name: p.full_name,
+      position: p.position,
+      number: parseInt(p.jersey_number || '0'),
+      starter: false, // Will be determined by lineup
+      stats: {
+        gamesPlayed: p.games_played || 0,
+        goals: p.goals || 0,
+        assists: p.assists || 0,
+        points: p.points || 0,
+        plusMinus: p.plus_minus || 0,
+        shots: p.shots || 0,
+        hits: p.hits || 0,
+        blockedShots: p.blocks || 0,
+        xGoals: p.xGoals || 0,
+        corsi: p.corsi || 0,
+        fenwick: p.fenwick || 0,
+        wins: p.wins || 0,
+        losses: p.losses || 0,
+        otl: p.ot_losses || 0,
+        gaa: p.goals_against_average || 0,
+        savePct: p.save_percentage || 0,
+        shutouts: 0
+      },
+      team: p.team,
+      teamAbbreviation: p.team,
+      status: p.status === 'injured' ? 'IR' : (p.status === 'active' ? null : 'WVR'),
+      image: p.headshot_url || undefined,
+      nextGame: { opponent: 'vs OPP', isToday: false },
+      projectedPoints: (p.points || 0) / 20
+    };
+  },
+
+  /**
+   * Transform HockeyPlayer to MatchupPlayer format with pre-fetched schedule data (optimized)
+   */
+  transformToMatchupPlayerWithGames(
     player: HockeyPlayer,
     isStarter: boolean,
     weekStart: Date,
     weekEnd: Date,
-    timezone: string = 'America/Denver'
-  ): Promise<MatchupPlayer> {
+    timezone: string = 'America/Denver',
+    games: NHLGame[]
+  ): MatchupPlayer {
     const teamAbbrev = player.teamAbbreviation || player.team || '';
     
     try {
-      // Get games for this player's team in the matchup week
-      const { games, error: gamesError } = await ScheduleService.getGamesForTeamInWeek(teamAbbrev, weekStart, weekEnd);
-      
-      if (gamesError) {
-        console.warn(`Error fetching games for ${teamAbbrev}:`, gamesError);
-      }
       
       // Calculate games remaining (scheduled or live games from today onwards)
       // Use test date if in test mode (December 8, 2025)
@@ -373,6 +449,34 @@ export const MatchupService = {
   },
 
   /**
+   * Transform HockeyPlayer to MatchupPlayer format with real schedule data
+   * (Legacy method - now calls transformToMatchupPlayerWithGames after fetching games)
+   */
+  async transformToMatchupPlayer(
+    player: HockeyPlayer,
+    isStarter: boolean,
+    weekStart: Date,
+    weekEnd: Date,
+    timezone: string = 'America/Denver'
+  ): Promise<MatchupPlayer> {
+    const teamAbbrev = player.teamAbbreviation || player.team || '';
+    
+    try {
+      // Get games for this player's team in the matchup week
+      const { games, error: gamesError } = await ScheduleService.getGamesForTeamInWeek(teamAbbrev, weekStart, weekEnd);
+      
+      if (gamesError) {
+        console.warn(`Error fetching games for ${teamAbbrev}:`, gamesError);
+      }
+      
+      return this.transformToMatchupPlayerWithGames(player, isStarter, weekStart, weekEnd, timezone, games || []);
+    } catch (error) {
+      console.error(`Error transforming player ${player.name} to matchup player:`, error);
+      return this.transformToMatchupPlayerWithGames(player, isStarter, weekStart, weekEnd, timezone, []);
+    }
+  },
+
+  /**
    * Get matchup rosters for both teams with real schedule data
    */
   async getMatchupRosters(
@@ -404,18 +508,20 @@ export const MatchupService = {
       const weekStart = new Date(matchup.week_start_date);
       const weekEnd = new Date(matchup.week_end_date);
 
-      // Get rosters for both teams
-      const team1Roster = await this.getTeamRoster(matchup.team1_id, matchup.league_id, allPlayers);
-      const team2Roster = matchup.team2_id
-        ? await this.getTeamRoster(matchup.team2_id, matchup.league_id, allPlayers)
-        : [];
+      // Parallelize: Get rosters and lineups for both teams simultaneously
+      const [team1Roster, team2Roster, team1LineupResult, team2LineupResult] = await Promise.all([
+        this.getTeamRoster(matchup.team1_id, matchup.league_id, allPlayers),
+        matchup.team2_id
+          ? this.getTeamRoster(matchup.team2_id, matchup.league_id, allPlayers)
+          : Promise.resolve([]),
+        LeagueService.getLineup(matchup.team1_id, matchup.league_id),
+        matchup.team2_id
+          ? LeagueService.getLineup(matchup.team2_id, matchup.league_id)
+          : Promise.resolve(null)
+      ]);
 
-      // Get lineups to determine starters using LeagueService (handles both UUID and integer)
-      // STRICT: Only use saved lineups - if they don't exist, try to initialize them first
-      let team1Lineup = await LeagueService.getLineup(matchup.team1_id, matchup.league_id);
-      let team2Lineup = matchup.team2_id 
-        ? await LeagueService.getLineup(matchup.team2_id, matchup.league_id)
-        : null;
+      let team1Lineup = team1LineupResult;
+      let team2Lineup = team2LineupResult;
 
       // If lineup doesn't exist, try to initialize it first
       if (!team1Lineup || !team1Lineup.starters || team1Lineup.starters.length === 0) {
@@ -479,15 +585,39 @@ export const MatchupService = {
         ? (team2Lineup.slotAssignments || {})
         : {};
 
+      // Batch schedule queries: Get all unique teams from both rosters
+      const allTeams = Array.from(new Set([
+        ...team1Roster.map(p => p.teamAbbreviation || p.team || ''),
+        ...team2Roster.map(p => p.teamAbbreviation || p.team || '')
+      ].filter(team => team !== '')));
+
+      // Fetch all games for all teams in one batch query
+      const { gamesByTeam } = await ScheduleService.getGamesForTeams(allTeams, weekStart, weekEnd);
+
+      // Transform players with pre-fetched schedule data
       const team1MatchupPlayers = await Promise.all(
         team1Roster.map(p =>
-          this.transformToMatchupPlayer(p, team1Starters.has(String(p.id)), weekStart, weekEnd, timezone)
+          this.transformToMatchupPlayerWithGames(
+            p,
+            team1Starters.has(String(p.id)),
+            weekStart,
+            weekEnd,
+            timezone,
+            gamesByTeam.get(p.teamAbbreviation || p.team || '') || []
+          )
         )
       );
 
       const team2MatchupPlayers = await Promise.all(
         team2Roster.map(p =>
-          this.transformToMatchupPlayer(p, team2Starters.has(String(p.id)), weekStart, weekEnd, timezone)
+          this.transformToMatchupPlayerWithGames(
+            p,
+            team2Starters.has(String(p.id)),
+            weekStart,
+            weekEnd,
+            timezone,
+            gamesByTeam.get(p.teamAbbreviation || p.team || '') || []
+          )
         )
       );
 

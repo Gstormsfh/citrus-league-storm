@@ -1160,6 +1160,19 @@ export const LeagueService = {
     slotAssignments: Record<string, string> 
   } | null> {
     try {
+      // Skip Supabase query if leagueId is not a valid UUID (e.g., 'demo-league-id')
+      // UUIDs are 36 characters with dashes: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+      const isValidUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(leagueId);
+      if (!isValidUUID) {
+        // For non-UUID league IDs (like demo league), skip Supabase and try localStorage
+        const key = `lineup_team_${teamId}`;
+        const saved = localStorage.getItem(key);
+        if (saved) {
+          return JSON.parse(saved);
+        }
+        return null;
+      }
+
       // Try Supabase first (shared database, with league_id for isolation)
       const { data, error } = await supabase
         .from('team_lineups')
@@ -1470,6 +1483,20 @@ export const LeagueService = {
         return { success: false, error: new Error(result.message) };
       }
 
+      // Clear roster cache for the user's team when player is dropped
+      // Get team ID to clear cache
+      const { data: teamData } = await supabase
+        .from('teams')
+        .select('id')
+        .eq('league_id', leagueId)
+        .eq('owner_id', userId)
+        .maybeSingle();
+      
+      if (teamData) {
+        const { MatchupService } = await import('./MatchupService');
+        MatchupService.clearRosterCache(teamData.id, leagueId);
+      }
+
       return { success: true, error: null };
     } catch (error) {
       return { success: false, error };
@@ -1539,6 +1566,12 @@ export const LeagueService = {
       const result = data as { status: string; message: string };
       if (result.status === 'error') {
         return { success: false, error: new Error(result.message) };
+      }
+
+      // Clear roster cache for this team when player is added
+      if (teamData) {
+        const { MatchupService } = await import('./MatchupService');
+        MatchupService.clearRosterCache(teamData.id, leagueId);
       }
 
       return { success: true, error: null };

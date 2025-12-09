@@ -500,25 +500,25 @@ const Matchup = () => {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 {/* User's Team - Always on the LEFT - First in DOM order */}
                 <div className="order-1 lg:order-1">
-                  <TeamCard
-                    title={user ? (userTeam?.team_name || 'My Team') : 'Citrus Crushers'}
-                    starters={myStarters}
-                    bench={myBench}
-                    slotAssignments={myTeamSlotAssignments}
-                    gradientClass="border-t-4 border-fantasy-secondary"
-                    onPlayerClick={handlePlayerClick}
-                  />
+                <TeamCard
+                  title={user ? (userTeam?.team_name || 'My Team') : 'Citrus Crushers'}
+                  starters={myStarters}
+                  bench={myBench}
+                  slotAssignments={myTeamSlotAssignments}
+                  gradientClass="border-t-4 border-fantasy-secondary"
+                  onPlayerClick={handlePlayerClick}
+                />
                 </div>
                 {/* Opponent Team - Always on the RIGHT - Second in DOM order */}
                 <div className="order-2 lg:order-2">
-                  <TeamCard
-                    title={user ? (opponentTeam?.team_name || 'Bye Week') : 'Thunder Titans'}
-                    starters={opponentStarters}
-                    bench={opponentBench}
-                    slotAssignments={opponentTeamSlotAssignments}
-                    gradientClass="border-t-4 border-fantasy-primary"
-                    onPlayerClick={handlePlayerClick}
-                  />
+                <TeamCard
+                  title={user ? (opponentTeam?.team_name || 'Bye Week') : 'Thunder Titans'}
+                  starters={opponentStarters}
+                  bench={opponentBench}
+                  slotAssignments={opponentTeamSlotAssignments}
+                  gradientClass="border-t-4 border-fantasy-primary"
+                  onPlayerClick={handlePlayerClick}
+                />
                 </div>
               </div>
             </TabsContent>

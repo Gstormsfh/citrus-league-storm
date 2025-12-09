@@ -2200,27 +2200,27 @@ const DraftRoom = () => {
               </div>
             </Card>
 
-            <Card className="card-citrus border-none shadow-md">
-               <CardHeader>
-                  <CardTitle>Draft Board Results</CardTitle>
-               </CardHeader>
-               <CardContent>
-                  <DraftBoard 
-                     teams={(orderedTeamsForBoard.length > 0 ? orderedTeamsForBoard : teams).map(t => ({
-                       id: t.id,
-                       name: t.team_name,
-                       owner: t.owner_id ? 'Owner' : 'AI',
-                       color: '#7CB518',
-                       picks: teamPicksMap.get(t.id) || []
-                     }))}
-                     draftHistory={transformedDraftHistory}
-                     currentPick={draftState?.currentPick || 1}
-                     currentRound={draftState?.currentRound || 1}
-                     totalRounds={league?.draft_rounds || draftSettings.rounds || 21}
-                     onPlayerClick={handlePlayerClick}
-                  />
-               </CardContent>
-            </Card>
+                  <Card className="card-citrus border-none shadow-md">
+                     <CardHeader>
+                        <CardTitle>Draft Board Results</CardTitle>
+                     </CardHeader>
+                     <CardContent>
+                        <DraftBoard 
+                           teams={(orderedTeamsForBoard.length > 0 ? orderedTeamsForBoard : teams).map(t => ({
+                             id: t.id,
+                             name: t.team_name,
+                             owner: t.owner_id ? 'Owner' : 'AI',
+                             color: '#7CB518',
+                             picks: teamPicksMap.get(t.id) || []
+                           }))}
+                           draftHistory={transformedDraftHistory}
+                           currentPick={draftState?.currentPick || 1}
+                           currentRound={draftState?.currentRound || 1}
+                           totalRounds={league?.draft_rounds || draftSettings.rounds || 21}
+                           onPlayerClick={handlePlayerClick}
+                        />
+                     </CardContent>
+                  </Card>
             
             {isCommissioner && (
                <div className="fixed bottom-4 left-4">

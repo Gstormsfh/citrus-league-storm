@@ -83,6 +83,71 @@ export const ScheduleService = {
   },
 
   /**
+   * Get games for multiple teams at once (batch query for performance)
+   * Returns a map of team abbreviation -> games array
+   */
+  async getGamesForTeams(
+    teamAbbrevs: string[],
+    startDate?: Date,
+    endDate?: Date
+  ): Promise<{ gamesByTeam: Map<string, NHLGame[]>; error: any }> {
+    try {
+      if (teamAbbrevs.length === 0) {
+        return { gamesByTeam: new Map(), error: null };
+      }
+
+      // Build OR condition for all teams
+      // Format: (home_team.eq.TEAM1,away_team.eq.TEAM1),(home_team.eq.TEAM2,away_team.eq.TEAM2),...
+      const orConditions = teamAbbrevs
+        .map(team => `home_team.eq.${team},away_team.eq.${team}`)
+        .join(',');
+
+      let query = supabase
+        .from('nhl_games')
+        .select('*')
+        .or(orConditions)
+        .order('game_date', { ascending: true })
+        .order('game_time', { ascending: true });
+
+      if (startDate) {
+        query = query.gte('game_date', startDate.toISOString().split('T')[0]);
+      }
+      if (endDate) {
+        query = query.lte('game_date', endDate.toISOString().split('T')[0]);
+      }
+
+      const { data, error } = await query;
+      if (error) {
+        if (error.message?.includes('does not exist') || error.message?.includes('relation')) {
+          console.warn('nhl_games table does not exist yet. Run the migration and fetch script.');
+          return { gamesByTeam: new Map(), error: null };
+        }
+        throw error;
+      }
+
+      // Group games by team
+      const gamesByTeam = new Map<string, NHLGame[]>();
+      teamAbbrevs.forEach(team => {
+        gamesByTeam.set(team, []);
+      });
+
+      (data || []).forEach((game: NHLGame) => {
+        if (game.home_team && gamesByTeam.has(game.home_team)) {
+          gamesByTeam.get(game.home_team)!.push(game);
+        }
+        if (game.away_team && gamesByTeam.has(game.away_team)) {
+          gamesByTeam.get(game.away_team)!.push(game);
+        }
+      });
+
+      return { gamesByTeam, error: null };
+    } catch (error) {
+      console.error('Error fetching games for teams:', error);
+      return { gamesByTeam: new Map(), error };
+    }
+  },
+
+  /**
    * Get games for a specific team
    */
   async getGamesForTeam(
@@ -236,6 +301,99 @@ export const ScheduleService = {
     }
 
     return gameInfo;
+  },
+
+  /**
+   * Batch check if multiple teams have games today
+   * Returns a map of team abbreviation -> boolean
+   */
+  async hasGamesTodayBatch(teamAbbrevs: string[]): Promise<Map<string, boolean>> {
+    try {
+      if (teamAbbrevs.length === 0) {
+        return new Map();
+      }
+
+      const todayStr = getTodayString();
+      const orConditions = teamAbbrevs
+        .map(team => `home_team.eq.${team},away_team.eq.${team}`)
+        .join(',');
+
+      const { data: games, error } = await supabase
+        .from('nhl_games')
+        .select('home_team, away_team')
+        .or(orConditions)
+        .eq('game_date', todayStr)
+        .in('status', ['scheduled', 'live', 'final']);
+
+      if (error) {
+        if (error.message?.includes('does not exist') || error.message?.includes('relation')) {
+          return new Map(teamAbbrevs.map(team => [team, false]));
+        }
+        console.error('Error checking games today batch:', error);
+        return new Map(teamAbbrevs.map(team => [team, false]));
+      }
+
+      // Build set of teams with games today
+      const teamsWithGames = new Set<string>();
+      (games || []).forEach((game: { home_team: string; away_team: string }) => {
+        if (teamAbbrevs.includes(game.home_team)) teamsWithGames.add(game.home_team);
+        if (teamAbbrevs.includes(game.away_team)) teamsWithGames.add(game.away_team);
+      });
+
+      // Return map
+      return new Map(teamAbbrevs.map(team => [team, teamsWithGames.has(team)]));
+    } catch (error) {
+      console.error('Error checking games today batch:', error);
+      return new Map(teamAbbrevs.map(team => [team, false]));
+    }
+  },
+
+  /**
+   * Batch get next games for multiple teams
+   * Returns a map of team abbreviation -> game
+   */
+  async getNextGamesForTeams(teamAbbrevs: string[]): Promise<Map<string, NHLGame | null>> {
+    try {
+      if (teamAbbrevs.length === 0) {
+        return new Map();
+      }
+
+      const todayStr = getTodayString();
+      const orConditions = teamAbbrevs
+        .map(team => `home_team.eq.${team},away_team.eq.${team}`)
+        .join(',');
+
+      const { data: games, error } = await supabase
+        .from('nhl_games')
+        .select('*')
+        .or(orConditions)
+        .gte('game_date', todayStr)
+        .in('status', ['scheduled', 'live', 'final'])
+        .order('game_date', { ascending: true })
+        .order('game_time', { ascending: true });
+
+      if (error) {
+        if (error.message?.includes('does not exist') || error.message?.includes('relation')) {
+          return new Map(teamAbbrevs.map(team => [team, null]));
+        }
+        console.error('Error fetching next games batch:', error);
+        return new Map(teamAbbrevs.map(team => [team, null]));
+      }
+
+      // Find next game for each team
+      const nextGames = new Map<string, NHLGame | null>();
+      teamAbbrevs.forEach(team => {
+        const teamGame = (games || []).find((g: NHLGame) => 
+          g.home_team === team || g.away_team === team
+        );
+        nextGames.set(team, teamGame || null);
+      });
+
+      return nextGames;
+    } catch (error) {
+      console.error('Error fetching next games batch:', error);
+      return new Map(teamAbbrevs.map(team => [team, null]));
+    }
   },
 
   /**
