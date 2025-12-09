@@ -461,8 +461,9 @@ Before going live:
 ## Deployment Notes
 
 ### Frontend (Already Deployed):
-- Hosted on Lovable
-- Automatic deployments on push
+- Hosted on Firebase Hosting
+- Deploy with: `npm run deploy`
+- Live URL: https://citrus-fantasy-sports.web.app
 
 ### Backend Setup:
 1. Configure Supabase project
