@@ -905,7 +905,32 @@ export const LeagueService = {
     return cachedLeagueState?.[teamId] || [];
   },
 
-  async getFreeAgents(allPlayers: Player[]): Promise<Player[]> {
+  async getFreeAgents(allPlayers: Player[], leagueId?: string): Promise<Player[]> {
+    // If leagueId is provided, use real database data
+    if (leagueId) {
+      try {
+        // Get all active draft picks for this league (only non-deleted)
+        const { picks: draftPicks } = await DraftService.getDraftPicks(leagueId);
+        
+        // Get player IDs that are currently owned (active picks only)
+        const ownedPlayerIds = new Set(draftPicks.map(pick => pick.player_id));
+        
+        // Filter out owned players - only return players NOT in the owned set
+        // This includes:
+        // 1. Players never drafted
+        // 2. Players that were dropped (deleted_at is not null, so not in draftPicks)
+        const freeAgents = allPlayers.filter(player => !ownedPlayerIds.has(player.id));
+        
+        return freeAgents;
+      } catch (error) {
+        console.error('Error getting free agents from database:', error);
+        // Fallback to demo data if database query fails
+        await this.initializeLeague(allPlayers);
+        return cachedFreeAgents || [];
+      }
+    }
+    
+    // No leagueId provided - use demo data
     await this.initializeLeague(allPlayers);
     return cachedFreeAgents || [];
   },
@@ -928,6 +953,130 @@ export const LeagueService = {
 
   addTransaction(transaction: Transaction) {
     cachedTransactions.unshift(transaction);
+  },
+
+  /**
+   * Fetch real transactions from roster_transactions table
+   */
+  /**
+   * Fetch real transactions from roster_transactions table
+   */
+  async fetchTransactions(leagueId: string): Promise<{ transactions: Transaction[]; error: any }> {
+    try {
+      const { data, error } = await supabase
+        .from('roster_transactions')
+        .select(`
+          id,
+          type,
+          player_id,
+          created_at,
+          source,
+          teams(team_name),
+          profiles(full_name)
+        `)
+        .eq('league_id', leagueId)
+        .order('created_at', { ascending: false })
+        .limit(100);
+
+      if (error) {
+        console.error('Error fetching transactions:', error);
+        return { transactions: [], error };
+      }
+
+      // Get all players to map player_id to player details
+      const allPlayers = await PlayerService.getAllPlayers();
+      const playerMap = new Map(allPlayers.map(p => [p.id, p]));
+
+      const transactions: Transaction[] = (data || []).map((tx: any) => {
+        const player = playerMap.get(tx.player_id);
+        const type = tx.type.toLowerCase() as 'claim' | 'drop' | 'trade';
+        
+        return {
+          id: tx.id,
+          type: type === 'add' ? 'claim' : type, // Map 'ADD' to 'claim' for UI
+          playerId: tx.player_id,
+          playerName: player?.full_name || 'Unknown Player',
+          playerTeam: player?.team || 'N/A',
+          date: new Date(tx.created_at).toLocaleDateString('en-US', { 
+            month: 'short', 
+            day: 'numeric', 
+            year: 'numeric' 
+          }),
+          status: 'processed' as const, // All transactions in DB are processed
+        };
+      });
+
+      return { transactions, error: null };
+    } catch (error) {
+      console.error('Error in fetchTransactions:', error);
+      return { transactions: [], error };
+    }
+  },
+
+  /**
+   * Fetch recent transactions for notifications (last 10, across all user's leagues)
+   */
+  async fetchRecentTransactionsForNotifications(userId: string): Promise<Transaction[]> {
+    try {
+      // Get all leagues the user is in
+      const { data: userTeams, error: teamsError } = await supabase
+        .from('teams')
+        .select('league_id')
+        .eq('owner_id', userId);
+
+      if (teamsError || !userTeams || userTeams.length === 0) {
+        return [];
+      }
+
+      const leagueIds = userTeams.map(t => t.league_id);
+
+      const { data, error } = await supabase
+        .from('roster_transactions')
+        .select(`
+          id,
+          type,
+          player_id,
+          created_at,
+          source,
+          league_id,
+          teams(team_name)
+        `)
+        .in('league_id', leagueIds)
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      if (error || !data) {
+        return [];
+      }
+
+      // Get all players to map player_id to player details
+      const allPlayers = await PlayerService.getAllPlayers();
+      const playerMap = new Map(allPlayers.map(p => [p.id, p]));
+
+      const transactions: Transaction[] = data.map((tx: any) => {
+        const player = playerMap.get(tx.player_id);
+        const type = tx.type.toLowerCase() as 'claim' | 'drop' | 'trade';
+        
+        return {
+          id: tx.id,
+          type: type === 'add' ? 'claim' : type,
+          playerId: tx.player_id,
+          playerName: player?.full_name || 'Unknown Player',
+          playerTeam: player?.team || 'N/A',
+          date: new Date(tx.created_at).toLocaleDateString('en-US', { 
+            month: 'short', 
+            day: 'numeric', 
+            year: 'numeric' 
+          }),
+          status: 'processed' as const,
+        };
+      });
+
+      return transactions;
+    } catch (error) {
+      console.error('Error fetching notifications:', error);
+      return [];
+    }
   },
 
   getAllTeams(): LeagueTeam[] {
@@ -1286,6 +1435,110 @@ export const LeagueService = {
     } catch (error) {
       console.error(`Error initializing lineup for team ${teamId}:`, error);
       return { lineup: null, error };
+    }
+  },
+
+  /**
+   * Drop a player from the roster using handle_roster_transaction
+   */
+  async dropPlayer(
+    leagueId: string,
+    userId: string,
+    playerId: string,
+    source: string = 'Roster Tab'
+  ): Promise<{ success: boolean; error: any }> {
+    try {
+      const { data, error } = await supabase.rpc('handle_roster_transaction', {
+        p_league_id: leagueId,
+        p_user_id: userId,
+        p_drop_player_id: playerId,
+        p_add_player_id: null,
+        p_transaction_source: source
+      });
+
+      if (error) {
+        return { success: false, error };
+      }
+
+      const result = data as { status: string; message: string };
+      if (result.status === 'error') {
+        return { success: false, error: new Error(result.message) };
+      }
+
+      return { success: true, error: null };
+    } catch (error) {
+      return { success: false, error };
+    }
+  },
+
+  /**
+   * Add a player to the roster (with roster size check)
+   */
+  async addPlayer(
+    leagueId: string,
+    userId: string,
+    playerId: string,
+    source: string = 'Roster Tab'
+  ): Promise<{ success: boolean; error: any }> {
+    try {
+      // First check roster size limit
+      const { league, error: leagueError } = await this.getLeague(leagueId);
+      if (leagueError || !league) {
+        return { success: false, error: leagueError || new Error('League not found') };
+      }
+
+      // Get current roster size
+      const { data: teamData } = await supabase
+        .from('teams')
+        .select('id')
+        .eq('league_id', leagueId)
+        .eq('owner_id', userId)
+        .single();
+
+      if (!teamData) {
+        return { success: false, error: new Error('Team not found') };
+      }
+
+      const { data: lineupData } = await supabase
+        .from('team_lineups')
+        .select('starters, bench, ir')
+        .eq('team_id', teamData.id)
+        .single();
+
+      const currentRosterSize = 
+        (lineupData?.starters?.length || 0) +
+        (lineupData?.bench?.length || 0) +
+        (lineupData?.ir?.length || 0);
+
+      const maxRosterSize = league.roster_size + 3; // roster_size + 3 IR slots
+
+      if (currentRosterSize >= maxRosterSize) {
+        return { 
+          success: false, 
+          error: new Error(`Roster is full. Maximum size is ${maxRosterSize} (${league.roster_size} roster + 3 IR slots)`) 
+        };
+      }
+
+      const { data, error } = await supabase.rpc('handle_roster_transaction', {
+        p_league_id: leagueId,
+        p_user_id: userId,
+        p_drop_player_id: null,
+        p_add_player_id: playerId,
+        p_transaction_source: source
+      });
+
+      if (error) {
+        return { success: false, error };
+      }
+
+      const result = data as { status: string; message: string };
+      if (result.status === 'error') {
+        return { success: false, error: new Error(result.message) };
+      }
+
+      return { success: true, error: null };
+    } catch (error) {
+      return { success: false, error };
     }
   }
 };

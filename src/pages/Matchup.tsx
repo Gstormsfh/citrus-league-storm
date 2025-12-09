@@ -13,7 +13,7 @@ import { MatchupPlayer } from "@/components/matchup/types";
 import { HockeyPlayer } from '@/components/roster/HockeyPlayerCard';
 import PlayerStatsModal from '@/components/PlayerStatsModal';
 import { LeagueService, League, Team } from '@/services/LeagueService';
-import { MatchupService } from '@/services/MatchupService';
+import { MatchupService, Matchup } from '@/services/MatchupService';
 import { PlayerService } from '@/services/PlayerService';
 import { getDraftCompletionDate, getFirstWeekStartDate, getCurrentWeekNumber, getAvailableWeeks, getWeekLabel } from '@/utils/weekCalculator';
 import { Loader2 } from 'lucide-react';
@@ -40,6 +40,9 @@ const Matchup = () => {
   const [opponentTeamSlotAssignments, setOpponentTeamSlotAssignments] = useState<Record<string, string>>({});
   const [myTeamRecord, setMyTeamRecord] = useState<{ wins: number; losses: number }>({ wins: 0, losses: 0 });
   const [opponentTeamRecord, setOpponentTeamRecord] = useState<{ wins: number; losses: number }>({ wins: 0, losses: 0 });
+  const [currentMatchup, setCurrentMatchup] = useState<Matchup | null>(null);
+  const [myDailyPoints, setMyDailyPoints] = useState<number[]>([]);
+  const [opponentDailyPoints, setOpponentDailyPoints] = useState<number[]>([]);
 
   // Demo data - shown to non-logged-in users (keep as is)
   const [demoMyTeam] = useState<MatchupPlayer[]>(user ? [] : [
@@ -127,8 +130,22 @@ const Matchup = () => {
   };
 
   // Use real data if logged in, otherwise demo data
+  // CRITICAL: Ensure myTeam is always the user's team (left side)
+  // and opponentTeamPlayers is always the opponent (right side)
   const displayMyTeam = user ? myTeam : demoMyTeam;
   const displayOpponentTeam = user ? opponentTeamPlayers : demoOpponentTeam;
+
+  // DEBUG: Log team data for verification
+  if (user && myTeam.length > 0 && opponentTeamPlayers.length > 0) {
+    console.log('Display teams:', {
+      myTeamName: userTeam?.team_name,
+      myTeamPlayerCount: displayMyTeam.length,
+      opponentTeamName: opponentTeam?.team_name,
+      opponentTeamPlayerCount: displayOpponentTeam.length,
+      myStartersCount: displayMyTeam.filter(p => p.isStarter).length,
+      opponentStartersCount: displayOpponentTeam.filter(p => p.isStarter).length
+    });
+  }
 
   const myTeamPoints = getTeamPoints(displayMyTeam);
   const opponentTeamPoints = getTeamPoints(displayOpponentTeam);
@@ -139,8 +156,15 @@ const Matchup = () => {
   const opponentBench = displayOpponentTeam.filter(p => !p.isStarter);
 
   const dayLabels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-  const myDailyPoints = [15.2, 22.8, 18.5, 29.1, 24.7, 30.2, 42.8];
-  const opponentDailyPoints = [18.9, 20.4, 22.1, 22.5, 19.3, 26.8, 38.7];
+  
+  // Calculate daily points - only if matchup has started and has scores
+  const hasMatchupData = currentMatchup && 
+    (currentMatchup.status === 'in_progress' || currentMatchup.status === 'completed') &&
+    (parseFloat(String(currentMatchup.team1_score)) > 0 || parseFloat(String(currentMatchup.team2_score)) > 0);
+  
+  // For demo/non-logged-in users, use empty arrays (will show empty state)
+  const displayMyDailyPoints = user ? myDailyPoints : [];
+  const displayOpponentDailyPoints = user ? opponentDailyPoints : [];
 
   // Load real matchup data for logged-in users
   useEffect(() => {
@@ -209,8 +233,8 @@ const Matchup = () => {
         const { teams: leagueTeams } = await LeagueService.getLeagueTeams(currentLeague.id);
         await MatchupService.generateMatchupsForLeague(currentLeague.id, leagueTeams, firstWeek);
 
-        // Load matchup for selected week
-        await loadMatchupForWeek(currentLeague.id, user.id, weekToShow, firstWeek);
+        // Load matchup for selected week (pass userTeamData to avoid race condition)
+        await loadMatchupForWeek(currentLeague.id, user.id, weekToShow, firstWeek, userTeamData);
 
       } catch (err: any) {
         console.error('Error loading matchup data:', err);
@@ -223,8 +247,11 @@ const Matchup = () => {
     loadMatchupData();
   }, [user]);
 
-  const loadMatchupForWeek = async (leagueId: string, userId: string, weekNumber: number, firstWeekStart: Date) => {
+  const loadMatchupForWeek = async (leagueId: string, userId: string, weekNumber: number, firstWeekStart: Date, userTeamData?: Team) => {
     try {
+      // Use passed userTeamData or fall back to state
+      const effectiveUserTeam = userTeamData || userTeam;
+      
       // Get matchup for this week
       const { matchup, error: matchupError } = await MatchupService.getUserMatchup(leagueId, userId, weekNumber);
       if (matchupError) throw matchupError;
@@ -234,23 +261,52 @@ const Matchup = () => {
         return;
       }
 
+      // Store current matchup for daily points calculation
+      setCurrentMatchup(matchup);
+
       // Validate: Ensure team1_id !== team2_id (prevent duplicate teams)
       if (matchup.team2_id && matchup.team1_id === matchup.team2_id) {
         setError(`Invalid matchup: Both teams are the same (${matchup.team1_id}). Please contact the commissioner to fix this matchup.`);
         return;
       }
 
-      // Get opponent team
-      const isTeam1 = matchup.team1_id === userTeam?.id;
+      // Determine which team the user is (team1 or team2)
+      const isTeam1 = matchup.team1_id === effectiveUserTeam?.id;
       const opponentTeamId = isTeam1 ? matchup.team2_id : matchup.team1_id;
       
+      // Get opponent team object - this is the actual opponent, never swapped
+      let opponentTeamObj: Team | null = null;
       if (opponentTeamId) {
         const { teams } = await LeagueService.getLeagueTeams(leagueId);
-        const opponent = teams.find(t => t.id === opponentTeamId);
-        setOpponentTeam(opponent || null);
-      } else {
-        setOpponentTeam(null); // Bye week
+        opponentTeamObj = teams.find(t => t.id === opponentTeamId) || null;
       }
+      
+      // DEBUG: Log team identification
+      console.log('Matchup team identification:', {
+        userTeamId: effectiveUserTeam?.id,
+        userTeamName: effectiveUserTeam?.team_name,
+        matchupTeam1Id: matchup.team1_id,
+        matchupTeam2Id: matchup.team2_id,
+        isTeam1,
+        opponentTeamId,
+        opponentTeamName: opponentTeamObj?.team_name
+      });
+      
+      // Validate: Ensure opponentTeam is different from userTeam
+      if (opponentTeamObj && effectiveUserTeam && opponentTeamObj.id === effectiveUserTeam.id) {
+        console.error('ERROR: Opponent team is the same as user team!', {
+          userTeamId: effectiveUserTeam.id,
+          userTeamName: effectiveUserTeam.team_name,
+          opponentTeamId: opponentTeamObj.id,
+          opponentTeamName: opponentTeamObj.team_name
+        });
+        setError('Invalid matchup: Opponent team cannot be the same as your team.');
+        return;
+      }
+      
+      // ALWAYS set opponentTeam to the actual opponent (not swapped)
+      // userTeam is already set correctly (always the user's team, never swapped)
+      setOpponentTeam(opponentTeamObj);
 
       // Load all players
       const allPlayers = await PlayerService.getAllPlayers();
@@ -275,16 +331,18 @@ const Matchup = () => {
         return;
       }
 
-      // Set rosters and slot assignments - ALWAYS ensure user's team is on the left
-      // If user is team1, use team1 data for myTeam; if user is team2, swap so user is always on left
+      // CRITICAL: ALWAYS ensure user's team data is in myTeam/myStarters/myBench (LEFT side)
+      // and opponent's team data is in opponentTeamPlayers/opponentStarters/opponentBench (RIGHT side)
+      // This ensures consistent display regardless of whether user is team1 or team2
       if (isTeam1) {
-        // User is team1 - already on left, use as-is
+        // User is team1 - team1 data goes to myTeam (left), team2 data goes to opponent (right)
         setMyTeam(team1Roster);
         setOpponentTeamPlayers(team2Roster);
         setMyTeamSlotAssignments(team1SlotAssignments);
         setOpponentTeamSlotAssignments(team2SlotAssignments);
       } else {
-        // User is team2 - swap so user's team is always displayed on the left
+        // User is team2 - swap rosters so user's team (team2) goes to myTeam (left)
+        // and opponent (team1) goes to opponentTeamPlayers (right)
         setMyTeam(team2Roster);
         setOpponentTeamPlayers(team1Roster);
         setMyTeamSlotAssignments(team2SlotAssignments);
@@ -292,13 +350,42 @@ const Matchup = () => {
       }
 
       // Get team records from matchup history
-      if (userTeam) {
-        const myRecord = await MatchupService.getTeamRecord(userTeam.id, leagueId);
+      // Always fetch records for user's team and opponent team (correctly identified above)
+      if (effectiveUserTeam) {
+        const myRecord = await MatchupService.getTeamRecord(effectiveUserTeam.id, leagueId);
         setMyTeamRecord(myRecord);
       }
-      if (opponentTeam) {
-        const oppRecord = await MatchupService.getTeamRecord(opponentTeam.id, leagueId);
+      if (opponentTeamObj) {
+        const oppRecord = await MatchupService.getTeamRecord(opponentTeamObj.id, leagueId);
         setOpponentTeamRecord(oppRecord);
+      } else {
+        // Bye week - set default record
+        setOpponentTeamRecord({ wins: 0, losses: 0 });
+      }
+
+      // Calculate daily points if matchup has data
+      const matchupStatus = matchup.status;
+      const team1Score = parseFloat(String(matchup.team1_score)) || 0;
+      const team2Score = parseFloat(String(matchup.team2_score)) || 0;
+      const hasScores = team1Score > 0 || team2Score > 0;
+      const shouldCalculatePoints = (matchupStatus === 'in_progress' || matchupStatus === 'completed') && hasScores;
+
+      if (shouldCalculatePoints) {
+        // For now, distribute points evenly across the week
+        // TODO: Implement actual daily calculation based on game schedules
+        const myTotalPoints = isTeam1 ? team1Score : team2Score;
+        const oppTotalPoints = isTeam1 ? team2Score : team1Score;
+        
+        // Simple distribution: divide by 7 days
+        const myDaily = Array(7).fill(myTotalPoints / 7);
+        const oppDaily = Array(7).fill(oppTotalPoints / 7);
+        
+        setMyDailyPoints(myDaily);
+        setOpponentDailyPoints(oppDaily);
+      } else {
+        // No data yet - set empty arrays
+        setMyDailyPoints([]);
+        setOpponentDailyPoints([]);
       }
 
     } catch (err: any) {
@@ -311,7 +398,7 @@ const Matchup = () => {
   const handleWeekChange = async (weekNumber: number) => {
     if (!league || !user || !firstWeekStart) return;
     setSelectedWeek(weekNumber);
-    await loadMatchupForWeek(league.id, user.id, weekNumber, firstWeekStart);
+    await loadMatchupForWeek(league.id, user.id, weekNumber, firstWeekStart, userTeam);
   };
 
   return (
@@ -409,35 +496,49 @@ const Matchup = () => {
             
             <TabsContent value="lineup" className="mt-6">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                <TeamCard
-                  title={user ? (userTeam?.team_name || 'My Team') : 'Citrus Crushers'}
-                  starters={myStarters}
-                  bench={myBench}
-                  slotAssignments={myTeamSlotAssignments}
-                  gradientClass="border-t-4 border-fantasy-secondary"
-                  onPlayerClick={handlePlayerClick}
-                />
-                <TeamCard
-                  title={user ? (opponentTeam?.team_name || 'Bye Week') : 'Thunder Titans'}
-                  starters={opponentStarters}
-                  bench={opponentBench}
-                  slotAssignments={opponentTeamSlotAssignments}
-                  gradientClass="border-t-4 border-fantasy-primary"
-                  onPlayerClick={handlePlayerClick}
-                />
+                {/* User's Team - Always on the LEFT - First in DOM order */}
+                <div className="order-1 lg:order-1">
+                  <TeamCard
+                    title={user ? (userTeam?.team_name || 'My Team') : 'Citrus Crushers'}
+                    starters={myStarters}
+                    bench={myBench}
+                    slotAssignments={myTeamSlotAssignments}
+                    gradientClass="border-t-4 border-fantasy-secondary"
+                    onPlayerClick={handlePlayerClick}
+                  />
+                </div>
+                {/* Opponent Team - Always on the RIGHT - Second in DOM order */}
+                <div className="order-2 lg:order-2">
+                  <TeamCard
+                    title={user ? (opponentTeam?.team_name || 'Bye Week') : 'Thunder Titans'}
+                    starters={opponentStarters}
+                    bench={opponentBench}
+                    slotAssignments={opponentTeamSlotAssignments}
+                    gradientClass="border-t-4 border-fantasy-primary"
+                    onPlayerClick={handlePlayerClick}
+                  />
+                </div>
               </div>
             </TabsContent>
             
             <TabsContent value="dailyPoints" className="mt-8">
               <DailyPointsChart
                 dayLabels={dayLabels}
-                myDailyPoints={myDailyPoints}
-                opponentDailyPoints={opponentDailyPoints}
+                myDailyPoints={displayMyDailyPoints}
+                opponentDailyPoints={displayOpponentDailyPoints}
+                hasData={hasMatchupData}
               />
             </TabsContent>
             
             <TabsContent value="matchupHistory" className="mt-8">
-              <MatchupHistory />
+              <MatchupHistory
+                leagueId={league?.id}
+                userTeamId={userTeam?.id}
+                opponentTeamId={opponentTeam?.id}
+                userTeamName={userTeam?.team_name}
+                opponentTeamName={opponentTeam?.team_name}
+                firstWeekStart={firstWeekStart}
+              />
             </TabsContent>
           </Tabs>
           

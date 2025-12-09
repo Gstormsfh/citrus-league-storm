@@ -24,11 +24,25 @@ export const TeamCard = ({ title, starters, bench, gradientClass, slotAssignment
   const normalizePosition = (position: string): string => {
     const pos = position?.toUpperCase() || '';
     if (pos.includes('C') && !pos.includes('LW') && !pos.includes('RW')) return 'C';
-    if (pos.includes('LW')) return 'LW';
-    if (pos.includes('RW')) return 'RW';
+    if (pos.includes('LW') || pos === 'L' || pos === 'LEFT' || pos === 'LEFTWING') return 'LW';
+    if (pos.includes('RW') || pos === 'R' || pos === 'RIGHT' || pos === 'RIGHTWING') return 'RW';
     if (pos.includes('D')) return 'D';
     if (pos.includes('G')) return 'G';
     return 'UTIL';
+  };
+
+  // Helper to format position for display (ensures L->LW, R->RW, UTIL->Util)
+  const formatPositionForDisplay = (position: string): string => {
+    const pos = position?.toUpperCase() || '';
+    if (pos === 'UTIL' || pos === 'UTILITY') return 'Util';
+    if (pos === 'L' || pos === 'LEFT' || pos === 'LEFTWING') return 'LW';
+    if (pos === 'R' || pos === 'RIGHT' || pos === 'RIGHTWING') return 'RW';
+    if (pos.includes('LW')) return 'LW';
+    if (pos.includes('RW')) return 'RW';
+    if (pos.includes('C') && !pos.includes('LW') && !pos.includes('RW')) return 'C';
+    if (pos.includes('D')) return 'D';
+    if (pos.includes('G')) return 'G';
+    return position; // Return original if no match
   };
 
   // Position color mapping matching RosterDepthChart
@@ -72,56 +86,48 @@ export const TeamCard = ({ title, starters, bench, gradientClass, slotAssignment
     return styles[pos] || { bg: '', border: '', text: '' };
   };
 
-  // Slot order matching roster tab lineup structure
-  // Handles both numbered slots (slot-C-1) and unnumbered slots (slot-C)
-  const slotOrder = [
-    'slot-C-1', 'slot-C-2', 'slot-C',
-    'slot-RW-1', 'slot-RW-2', 'slot-RW',
-    'slot-LW-1', 'slot-LW-2', 'slot-LW',
-    'slot-D-1', 'slot-D-2', 'slot-D-3', 'slot-D-4', 'slot-D',
-    'slot-G-1', 'slot-G-2', 'slot-G',
-    'slot-UTIL'
+  // Standard starting lineup structure - ALWAYS show all slots, even if empty
+  // 2C, 2RW, 2LW, 4D, 2G, 1UTIL
+  const standardSlotOrder: Array<{ slot: string; position: string }> = [
+    { slot: 'slot-C-1', position: 'C' },
+    { slot: 'slot-C-2', position: 'C' },
+    { slot: 'slot-RW-1', position: 'RW' },
+    { slot: 'slot-RW-2', position: 'RW' },
+    { slot: 'slot-LW-1', position: 'LW' },
+    { slot: 'slot-LW-2', position: 'LW' },
+    { slot: 'slot-D-1', position: 'D' },
+    { slot: 'slot-D-2', position: 'D' },
+    { slot: 'slot-D-3', position: 'D' },
+    { slot: 'slot-D-4', position: 'D' },
+    { slot: 'slot-G-1', position: 'G' },
+    { slot: 'slot-G-2', position: 'G' },
+    { slot: 'slot-UTIL', position: 'UTIL' }
   ];
 
-  // Order starters by their slot assignments (exactly as in roster tab)
-  const orderStartersBySlots = (players: MatchupPlayer[]): MatchupPlayer[] => {
-    // Create a map for quick slot order lookup
-    const slotOrderMap = new Map<string, number>();
-    slotOrder.forEach((slot, index) => {
-      slotOrderMap.set(slot, index);
-    });
+  // Create a map of slot -> player for quick lookup
+  const slotToPlayerMap = new Map<string, MatchupPlayer>();
+  starters.forEach(player => {
+    const slot = slotAssignments[String(player.id)];
+    if (slot) {
+      slotToPlayerMap.set(slot, player);
+    }
+  });
 
-    // Sort players by their slot assignment
-    const sorted = [...players].sort((a, b) => {
-      const slotA = slotAssignments[String(a.id)] || '';
-      const slotB = slotAssignments[String(b.id)] || '';
-      
-      // Get order index for each slot (or -1 if not found)
-      const orderA = slotOrderMap.get(slotA) ?? -1;
-      const orderB = slotOrderMap.get(slotB) ?? -1;
-      
-      // If both have valid slots, sort by order
-      if (orderA >= 0 && orderB >= 0) {
-        return orderA - orderB;
-      }
-      
-      // If only one has a valid slot, it comes first
-      if (orderA >= 0) return -1;
-      if (orderB >= 0) return 1;
-      
-      // If neither has a slot assignment, maintain original order
-      return 0;
-    });
+  // Build organized starters array with empty slots
+  // This ensures both teams always show the same structure
+  const organizedStarters: Array<{ player: MatchupPlayer | null; slot: string; position: string }> = 
+    standardSlotOrder.map(({ slot, position }) => ({
+      player: slotToPlayerMap.get(slot) || null,
+      slot,
+      position
+    }));
 
-    return sorted;
-  };
-
-  // Order starters using slot assignments (no filtering - use exact lineup from roster)
-  const organizedStarters = orderStartersBySlots(starters);
   const finalBench = bench;
 
-  const renderMobilePlayerRow = (player: MatchupPlayer, isBench: boolean = false) => {
-    const posStyles = getPositionStyles(player.position, isBench);
+  const renderMobilePlayerRow = (player: MatchupPlayer, isBench: boolean = false, overridePosition?: string) => {
+    // Use override position if provided (for UTIL slot), otherwise use player's position
+    const displayPos = overridePosition || player.position;
+    const posStyles = getPositionStyles(displayPos, isBench);
     return (
     <div 
       key={player.id} 
@@ -143,7 +149,7 @@ export const TeamCard = ({ title, starters, bench, gradientClass, slotAssignment
                )}
              </div>
              <div className="text-[11px] text-muted-foreground leading-none mt-0.5 flex items-center gap-1">
-               <span className={`font-medium ${posStyles.text ? `${posStyles.text} font-bold` : ''}`}>{player.position}</span>
+               <span className={`font-medium ${posStyles.text ? `${posStyles.text} font-bold` : ''}`}>{formatPositionForDisplay(displayPos)}</span>
                <span>•</span>
                {player.gameInfo ? (
                  <span className={`${player.status === 'In Game' ? 'text-primary font-medium' : ''}`}>
@@ -200,104 +206,201 @@ export const TeamCard = ({ title, starters, bench, gradientClass, slotAssignment
         
         {/* Mobile View */}
         <div className="md:hidden">
-           {organizedStarters.map(p => renderMobilePlayerRow(p, false))}
+           {organizedStarters.map(({ player, position, slot }, index) => {
+             // For UTIL slot, always display "Util" regardless of player's actual position
+             const displayPosition = slot === 'slot-UTIL' ? 'Util' : (player ? formatPositionForDisplay(player.position) : formatPositionForDisplay(position));
+             
+             if (player) {
+               // For UTIL slot, pass the slot position instead of player position to renderMobilePlayerRow
+               // We'll handle the display in the render function
+               return <div key={player.id}>{renderMobilePlayerRow(player, false, slot === 'slot-UTIL' ? 'Util' : undefined)}</div>;
+             } else {
+               // Empty slot
+               const posStyles = getPositionStyles(position, false);
+               return (
+                 <div 
+                   key={`empty-${index}`}
+                   className={`p-3 border-b border-border/40 ${posStyles.bg} ${posStyles.border} opacity-50`}
+                 >
+                   <div className="flex justify-between items-center">
+                     <div className="flex items-center gap-3">
+                       <div className="w-8 h-8 rounded-full bg-muted/50 flex items-center justify-center text-[10px] font-bold text-muted-foreground/50 border border-border/30">
+                         —
+                       </div>
+                       <div>
+                         <div className="font-medium text-sm text-muted-foreground/60">
+                           Empty {displayPosition} Slot
+                         </div>
+                         <div className="text-[11px] text-muted-foreground/40">
+                           No player assigned
+                         </div>
+                       </div>
+                     </div>
+                     <div className="text-right">
+                       <div className="text-base font-medium text-muted-foreground/30">—</div>
+                     </div>
+                   </div>
+                 </div>
+               );
+             }
+           })}
         </div>
 
         {/* Desktop View */}
-        <div className="hidden md:block">
-          <Table>
-            <TableHeader>
-              <TableRow className="hover:bg-transparent border-b border-border/50">
-                <TableHead className="w-12 text-xs font-semibold text-muted-foreground h-9">Pos</TableHead>
-                <TableHead className="text-xs font-semibold text-muted-foreground h-9">Player</TableHead>
-                <TableHead className="w-8 text-center text-[10px] font-bold text-muted-foreground h-9 p-0">G</TableHead>
-                <TableHead className="w-8 text-center text-[10px] font-bold text-muted-foreground h-9 p-0">A</TableHead>
-                <TableHead className="w-10 text-center text-[10px] font-bold text-muted-foreground h-9 p-0">SOG</TableHead>
-                <TableHead className="w-10 text-center text-[10px] font-bold text-muted-foreground h-9 p-0">BLK</TableHead>
-                <TableHead className="w-16 text-right text-xs font-semibold text-muted-foreground h-9">Pts</TableHead>
-                <TableHead className="w-24 text-right text-xs font-semibold text-muted-foreground h-9">Status</TableHead>
-              </TableRow>
-            </TableHeader>
+        <div className="hidden md:block overflow-x-auto">
+          <div className="min-w-full">
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent border-b border-border/50">
+                  <TableHead className="w-12 text-xs font-semibold text-muted-foreground h-9 whitespace-nowrap">Pos</TableHead>
+                  <TableHead className="text-xs font-semibold text-muted-foreground h-9 min-w-[200px]">Player</TableHead>
+                  <TableHead className="w-8 text-center text-[10px] font-bold text-muted-foreground h-9 p-0 whitespace-nowrap">G</TableHead>
+                  <TableHead className="w-8 text-center text-[10px] font-bold text-muted-foreground h-9 p-0 whitespace-nowrap">A</TableHead>
+                  <TableHead className="w-10 text-center text-[10px] font-bold text-muted-foreground h-9 p-0 whitespace-nowrap">SOG</TableHead>
+                  <TableHead className="w-10 text-center text-[10px] font-bold text-muted-foreground h-9 p-0 whitespace-nowrap">BLK</TableHead>
+                  <TableHead className="w-16 text-right text-xs font-semibold text-muted-foreground h-9 whitespace-nowrap">Pts</TableHead>
+                  <TableHead className="w-24 text-right text-xs font-semibold text-muted-foreground h-9 whitespace-nowrap">Status</TableHead>
+                </TableRow>
+              </TableHeader>
             <TableBody>
-              {organizedStarters.map(player => {
-                const posStyles = getPositionStyles(player.position, false);
-                return (
-                <TableRow 
-                  key={player.id} 
-                  className={`hover:bg-muted/10 border-b border-border/40 ${player.isToday ? 'bg-primary/5' : ''} ${posStyles.bg} ${posStyles.border} cursor-pointer`}
-                  onClick={() => onPlayerClick?.(player)}
-                >
-                  <TableCell className={`w-12 font-medium text-xs border-r border-border/20 py-3 ${posStyles.text ? `${posStyles.text} font-bold` : 'text-muted-foreground'}`}>{player.position}</TableCell>
-                  <TableCell className="py-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold text-muted-foreground overflow-hidden border border-border/50 shadow-sm">
-                        {player.team}
-                      </div>
-                      <div className="flex flex-col justify-center">
-                        <div className="font-semibold text-sm flex items-center gap-2 leading-none mb-1 text-foreground/90 hover:text-primary transition-colors">
-                          {player.name}
+              {organizedStarters.map(({ player, position, slot }, index) => {
+                const posStyles = getPositionStyles(position, false);
+                // For UTIL slot, always display "Util" regardless of player's actual position
+                const displayPosition = slot === 'slot-UTIL' ? 'Util' : (player ? formatPositionForDisplay(player.position) : formatPositionForDisplay(position));
+                
+                if (player) {
+                  // Player exists in this slot
+                  return (
+                    <TableRow 
+                      key={player.id} 
+                      className={`hover:bg-muted/10 border-b border-border/40 ${player.isToday ? 'bg-primary/5' : ''} ${posStyles.bg} ${posStyles.border} cursor-pointer min-h-[60px]`}
+                      onClick={() => onPlayerClick?.(player)}
+                    >
+                      <TableCell className={`w-12 font-medium text-xs border-r border-border/20 py-3 min-h-[60px] align-middle ${posStyles.text ? `${posStyles.text} font-bold` : 'text-muted-foreground'}`}>{displayPosition}</TableCell>
+                      <TableCell className="py-3 min-h-[60px] align-middle">
+                        <div className="flex items-center gap-3 min-h-[44px]">
+                          <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold text-muted-foreground overflow-hidden border border-border/50 shadow-sm flex-shrink-0">
+                            {player.team}
+                          </div>
+                          <div className="flex flex-col justify-center min-h-[36px] flex-1">
+                            <div className="font-semibold text-sm flex items-center gap-2 leading-tight mb-0.5 text-foreground/90 hover:text-primary transition-colors">
+                              {player.name}
+                              {player.isToday && (
+                                <span className="inline-flex items-center rounded-md bg-primary/10 px-1.5 py-0.5 text-[9px] font-bold text-primary ring-1 ring-inset ring-primary/20 whitespace-nowrap">
+                                  TODAY
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-[11px] text-muted-foreground leading-tight">
+                              {player.gameInfo ? (
+                                 <span className="flex items-center gap-1 flex-wrap">
+                                   <span className="font-medium text-foreground/80">{player.gameInfo.opponent}</span>
+                                   {player.gameInfo.time && <span>• {player.gameInfo.time}</span>}
+                                   {player.gameInfo.score && <span>• {player.gameInfo.score}</span>}
+                                   {player.gameInfo.period && <span className="text-primary font-medium">• {player.gameInfo.period}</span>}
+                                 </span>
+                               ) : (
+                                 <span className="break-words">{player.team} • {player.gamesRemaining} Gms Left</span>
+                               )}
+                            </div>
+                          </div>
+                        </div>
+                      </TableCell>
+                      
+                      {/* Stats Columns */}
+                      <TableCell className="w-8 text-center p-0 min-h-[60px] align-middle">
+                        <span className={`text-xs ${player.stats?.goals > 0 ? 'font-bold text-foreground' : 'text-muted-foreground/30'}`}>
+                          {player.stats?.goals || 0}
+                        </span>
+                      </TableCell>
+                      <TableCell className="w-8 text-center p-0 min-h-[60px] align-middle">
+                        <span className={`text-xs ${player.stats?.assists > 0 ? 'font-bold text-foreground' : 'text-muted-foreground/30'}`}>
+                          {player.stats?.assists || 0}
+                        </span>
+                      </TableCell>
+                      <TableCell className="w-10 text-center p-0 min-h-[60px] align-middle">
+                        <span className="text-xs text-muted-foreground/70">
+                          {player.stats?.sog || 0}
+                        </span>
+                      </TableCell>
+                      <TableCell className="w-10 text-center p-0 min-h-[60px] align-middle">
+                        <span className="text-xs text-muted-foreground/70">
+                          {player.stats?.blk || 0}
+                        </span>
+                      </TableCell>
+
+                      <TableCell className="text-right font-bold w-16 border-l border-border/20 bg-muted/5 py-3 min-h-[60px] align-middle">
+                        <div className="flex flex-col items-end justify-center min-h-[44px] leading-tight">
+                          <span className="text-sm">{player.points}</span>
                           {player.isToday && (
-                            <span className="inline-flex items-center rounded-md bg-primary/10 px-1.5 py-0.5 text-[9px] font-bold text-primary ring-1 ring-inset ring-primary/20">
-                              TODAY
-                            </span>
+                            <span className="text-[10px] text-primary font-medium">+{getDailyPoints(player.stats)}</span>
                           )}
                         </div>
-                        <div className="text-[11px] text-muted-foreground leading-none mt-0.5">
-                          {player.gameInfo ? (
-                             <span className="flex items-center gap-1">
-                               <span className="font-medium text-foreground/80">{player.gameInfo.opponent}</span>
-                               {player.gameInfo.time && <span>• {player.gameInfo.time}</span>}
-                               {player.gameInfo.score && <span>• {player.gameInfo.score}</span>}
-                               {player.gameInfo.period && <span className="text-primary font-medium">• {player.gameInfo.period}</span>}
-                             </span>
-                           ) : (
-                             <span>{player.team} • {player.gamesRemaining} Gms Left</span>
-                           )}
+                      </TableCell>
+                      <TableCell className="text-right w-24 py-3 min-h-[60px] align-middle">
+                        <div className={`text-xs font-medium ${player.status === 'In Game' ? 'text-primary animate-pulse font-bold' : 'text-muted-foreground'} break-words`}>
+                          {player.status}
                         </div>
-                      </div>
-                    </div>
-                  </TableCell>
-                  
-                  {/* Stats Columns */}
-                  <TableCell className="w-8 text-center p-0">
-                    <span className={`text-xs ${player.stats?.goals > 0 ? 'font-bold text-foreground' : 'text-muted-foreground/30'}`}>
-                      {player.stats?.goals || 0}
-                    </span>
-                  </TableCell>
-                  <TableCell className="w-8 text-center p-0">
-                    <span className={`text-xs ${player.stats?.assists > 0 ? 'font-bold text-foreground' : 'text-muted-foreground/30'}`}>
-                      {player.stats?.assists || 0}
-                    </span>
-                  </TableCell>
-                  <TableCell className="w-10 text-center p-0">
-                    <span className="text-xs text-muted-foreground/70">
-                      {player.stats?.sog || 0}
-                    </span>
-                  </TableCell>
-                  <TableCell className="w-10 text-center p-0">
-                    <span className="text-xs text-muted-foreground/70">
-                      {player.stats?.blk || 0}
-                    </span>
-                  </TableCell>
+                      </TableCell>
+                    </TableRow>
+                  );
+                } else {
+                  // Empty slot - match structure of filled slots for consistent sizing
+                  // For UTIL slot, always display "Util"
+                  const displayPosition = slot === 'slot-UTIL' ? 'Util' : formatPositionForDisplay(position);
+                  return (
+                    <TableRow 
+                      key={`empty-${slot}-${index}`}
+                      className={`border-b border-border/40 ${posStyles.bg} ${posStyles.border} opacity-50 min-h-[60px]`}
+                    >
+                      <TableCell className={`w-12 font-medium text-xs border-r border-border/20 py-3 min-h-[60px] align-middle ${posStyles.text ? `${posStyles.text} font-bold` : 'text-muted-foreground'}`}>
+                        {displayPosition}
+                      </TableCell>
+                      <TableCell className="py-3 min-h-[60px] align-middle">
+                        <div className="flex items-center gap-3 min-h-[44px]">
+                          <div className="w-8 h-8 rounded-full bg-muted/50 flex items-center justify-center text-[10px] font-bold text-muted-foreground/50 border border-border/30 flex-shrink-0">
+                            —
+                          </div>
+                          <div className="flex flex-col justify-center min-h-[36px] flex-1">
+                            <div className="font-medium text-sm text-muted-foreground/60 leading-tight mb-0.5">
+                              Empty Slot
+                            </div>
+                            <div className="text-[11px] text-muted-foreground/40 leading-tight">
+                              No player assigned
+                            </div>
+                          </div>
+                        </div>
+                      </TableCell>
+                      
+                      {/* Stats Columns - Empty */}
+                      <TableCell className="w-8 text-center p-0 min-h-[60px] align-middle">
+                        <span className="text-xs text-muted-foreground/20">—</span>
+                      </TableCell>
+                      <TableCell className="w-8 text-center p-0 min-h-[60px] align-middle">
+                        <span className="text-xs text-muted-foreground/20">—</span>
+                      </TableCell>
+                      <TableCell className="w-10 text-center p-0 min-h-[60px] align-middle">
+                        <span className="text-xs text-muted-foreground/20">—</span>
+                      </TableCell>
+                      <TableCell className="w-10 text-center p-0 min-h-[60px] align-middle">
+                        <span className="text-xs text-muted-foreground/20">—</span>
+                      </TableCell>
 
-                  <TableCell className="text-right font-bold w-16 border-l border-border/20 bg-muted/5 py-3">
-                    <div className="flex flex-col items-end justify-center h-full leading-tight">
-                      <span className="text-sm">{player.points}</span>
-                      {player.isToday && (
-                        <span className="text-[10px] text-primary font-medium">+{getDailyPoints(player.stats)}</span>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-right w-24 py-3">
-                    <div className={`text-xs font-medium ${player.status === 'In Game' ? 'text-primary animate-pulse font-bold' : 'text-muted-foreground'}`}>
-                      {player.status}
-                    </div>
-                  </TableCell>
-                </TableRow>
-              );
+                      <TableCell className="text-right font-medium w-16 border-l border-border/20 bg-muted/5 py-3 min-h-[60px] align-middle">
+                        <div className="flex flex-col items-end justify-center min-h-[44px] leading-tight">
+                          <span className="text-sm text-muted-foreground/30">—</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right w-24 py-3 min-h-[60px] align-middle">
+                        <div className="text-xs text-muted-foreground/40 break-words">—</div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                }
               })}
             </TableBody>
           </Table>
+          </div>
         </div>
         
         {/* BENCH SECTION */}

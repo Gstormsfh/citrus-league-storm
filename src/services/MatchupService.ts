@@ -580,5 +580,78 @@ export const MatchupService = {
       console.error('Error getting team record:', error);
       return { wins: 0, losses: 0 };
     }
+  },
+
+  /**
+   * Get matchup history between two teams
+   */
+  async getMatchupHistory(
+    leagueId: string,
+    team1Id: string,
+    team2Id: string | null
+  ): Promise<{ 
+    matchups: Array<{ 
+      week: number; 
+      team1Id: string; 
+      team2Id: string | null; 
+      team1Score: number; 
+      team2Score: number; 
+      weekStart: Date 
+    }>; 
+    error: any 
+  }> {
+    try {
+      if (!team2Id) {
+        return { matchups: [], error: null };
+      }
+
+      // Query for matchups where team1 is team1Id and team2 is team2Id, OR vice versa
+      // Use two separate queries and combine results
+      const { data: data1, error: error1 } = await supabase
+        .from('matchups')
+        .select('*')
+        .eq('league_id', leagueId)
+        .eq('status', 'completed')
+        .eq('team1_id', team1Id)
+        .eq('team2_id', team2Id);
+
+      if (error1) throw error1;
+
+      const { data: data2, error: error2 } = await supabase
+        .from('matchups')
+        .select('*')
+        .eq('league_id', leagueId)
+        .eq('status', 'completed')
+        .eq('team1_id', team2Id)
+        .eq('team2_id', team1Id);
+
+      if (error2) throw error2;
+
+      // Combine and deduplicate results
+      const allMatchups = [...(data1 || []), ...(data2 || [])];
+      const uniqueMatchups = allMatchups.filter((m, index, self) => 
+        index === self.findIndex(t => t.id === m.id)
+      );
+
+      // Sort by week number descending
+      const data = uniqueMatchups.sort((a, b) => b.week_number - a.week_number);
+      const error = null;
+
+      if (error) throw error;
+
+      const matchups = (data || []).map(m => ({
+        week: m.week_number,
+        team1Id: m.team1_id,
+        team2Id: m.team2_id,
+        team1Score: parseFloat(m.team1_score) || 0,
+        team2Score: parseFloat(m.team2_score) || 0,
+        weekStart: new Date(m.week_start_date)
+      }));
+
+      return { matchups, error: null };
+    } catch (error) {
+      console.error('Error getting matchup history:', error);
+      return { matchups: [], error };
+    }
   }
 };

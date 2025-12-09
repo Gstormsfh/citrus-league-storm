@@ -5,9 +5,30 @@ interface DailyPointsChartProps {
   dayLabels: string[];
   myDailyPoints: number[];
   opponentDailyPoints: number[];
+  hasData?: boolean;
 }
 
-export const DailyPointsChart = ({ dayLabels, myDailyPoints, opponentDailyPoints }: DailyPointsChartProps) => {
+export const DailyPointsChart = ({ dayLabels, myDailyPoints, opponentDailyPoints, hasData = true }: DailyPointsChartProps) => {
+  // Check if we have any data
+  const hasAnyPoints = myDailyPoints.some(p => p > 0) || opponentDailyPoints.some(p => p > 0);
+  const shouldShowData = hasData && hasAnyPoints;
+
+  if (!shouldShowData) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Daily Points Breakdown</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-center py-12 text-muted-foreground">
+            <p className="text-lg mb-2">Matchup hasn't started yet</p>
+            <p className="text-sm">Daily points will appear here once the matchup begins</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -24,19 +45,19 @@ export const DailyPointsChart = ({ dayLabels, myDailyPoints, opponentDailyPoints
                 <div className="h-[100px] bg-fantasy-primary/20 relative">
                   <div 
                     className="absolute bottom-0 left-0 right-0 bg-fantasy-primary"
-                    style={{ height: `${(myDailyPoints[index] / 50) * 100}%` }}
+                    style={{ height: `${Math.min((myDailyPoints[index] / 50) * 100, 100)}%` }}
                   ></div>
                   <div className="absolute bottom-1 left-0 right-0 text-xs text-white font-bold">
-                    {myDailyPoints[index]}
+                    {myDailyPoints[index].toFixed(1)}
                   </div>
                 </div>
                 <div className="h-[100px] bg-fantasy-muted/20 relative">
                   <div 
                     className="absolute bottom-0 left-0 right-0 bg-fantasy-muted"
-                    style={{ height: `${(opponentDailyPoints[index] / 50) * 100}%` }}
+                    style={{ height: `${Math.min((opponentDailyPoints[index] / 50) * 100, 100)}%` }}
                   ></div>
                   <div className="absolute bottom-1 left-0 right-0 text-xs text-white font-bold">
-                    {opponentDailyPoints[index]}
+                    {opponentDailyPoints[index].toFixed(1)}
                   </div>
                 </div>
               </div>

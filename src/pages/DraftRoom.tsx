@@ -17,6 +17,7 @@ import { DraftControls } from '@/components/draft/DraftControls';
 import { DraftHistory } from '@/components/draft/DraftHistory';
 import { DraftQueue } from '@/components/draft/DraftQueue';
 import { RosterDepthChart } from '@/components/draft/RosterDepthChart';
+import { DraftSnapshotView } from '@/components/draft/DraftSnapshotView';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -24,7 +25,7 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Users, Clock, Trophy, History, CheckCircle, Loader2, Zap, Play, Pause } from 'lucide-react';
+import { Users, Clock, Trophy, History, CheckCircle, Loader2, Zap, Play, Pause, Camera } from 'lucide-react';
 import PlayerStatsModal from '@/components/PlayerStatsModal';
 import { HockeyPlayer } from '@/components/roster/HockeyPlayerCard';
 
@@ -81,6 +82,10 @@ const DraftRoom = () => {
   const [draftTimerStarted, setDraftTimerStarted] = useState(false);
   const [selectedPlayerForStats, setSelectedPlayerForStats] = useState<HockeyPlayer | null>(null);
   const [isPlayerDialogOpen, setIsPlayerDialogOpen] = useState(false);
+  const [isSnapshotModalOpen, setIsSnapshotModalOpen] = useState(false);
+  const [snapshotData, setSnapshotData] = useState<any>(null);
+  const [snapshotCreatedAt, setSnapshotCreatedAt] = useState<string | undefined>(undefined);
+  const [savingSnapshot, setSavingSnapshot] = useState(false);
 
   // Memoize loadUserLeague to prevent infinite loops
   const loadUserLeague = useCallback(async () => {
@@ -1540,6 +1545,93 @@ const DraftRoom = () => {
     }
   };
 
+  // Handle saving/viewing draft snapshot
+  const handleViewDraftSnapshot = async () => {
+    if (!leagueId) {
+      logger.error('Missing league ID for snapshot');
+      return;
+    }
+
+    try {
+      setSavingSnapshot(true);
+
+      // Get session ID from draftState or from draft picks
+      let sessionId = draftState?.sessionId;
+      if (!sessionId && draftHistory.length > 0) {
+        sessionId = draftHistory[0].draft_session_id || undefined;
+      }
+      
+      // If still no session ID, try to get active session
+      if (!sessionId) {
+        const { sessionId: activeSessionId } = await DraftService.getActiveDraftSession(leagueId);
+        sessionId = activeSessionId;
+      }
+
+      if (!sessionId) {
+        logger.error('Could not determine draft session ID');
+        alert('Unable to save draft snapshot. Draft session not found.');
+        setSavingSnapshot(false);
+        return;
+      }
+
+      // Check if snapshot already exists
+      const { snapshot } = await DraftService.getDraftSnapshot(leagueId);
+      
+      if (snapshot) {
+        // Use existing snapshot
+        setSnapshotData(snapshot.snapshot_data);
+        setSnapshotCreatedAt(snapshot.created_at);
+        setIsSnapshotModalOpen(true);
+        setSavingSnapshot(false);
+        return;
+      }
+
+      // Prepare teams data for snapshot
+      const teamsForSnapshot = (orderedTeamsForBoard.length > 0 ? orderedTeamsForBoard : teams).map(t => ({
+        id: t.id,
+        name: t.team_name,
+        owner: t.owner_id ? 'Owner' : 'AI',
+        color: '#7CB518',
+      }));
+
+      // Save new snapshot
+      const { snapshotId, error } = await DraftService.saveDraftSnapshot(
+        leagueId,
+        sessionId,
+        teamsForSnapshot,
+        transformedDraftHistory,
+        {
+          rounds: league?.draft_rounds || draftSettings.rounds || 21,
+          draftOrder: draftSettings.draftOrder,
+          completedAt: new Date().toISOString(),
+        }
+      );
+
+      if (error) {
+        logger.error('Error saving snapshot:', error);
+        alert('Failed to save draft snapshot. Please try again.');
+        setSavingSnapshot(false);
+        return;
+      }
+
+      // Fetch the saved snapshot to get full data including created_at
+      if (snapshotId) {
+        const { snapshot: savedSnapshot } = await DraftService.getDraftSnapshot(leagueId);
+        if (savedSnapshot) {
+          setSnapshotData(savedSnapshot.snapshot_data);
+          setSnapshotCreatedAt(savedSnapshot.created_at);
+          setIsSnapshotModalOpen(true);
+        }
+      }
+
+      setSavingSnapshot(false);
+    } catch (error) {
+      logger.error('Error handling draft snapshot:', error);
+      alert('Failed to save draft snapshot. Please try again.');
+      setSavingSnapshot(false);
+    }
+  };
+
   // Get user's drafted players
   const userDraftedPlayers = useMemo(() => {
     if (!userTeam) return [];
@@ -2089,74 +2181,46 @@ const DraftRoom = () => {
               <p className="text-xl text-muted-foreground mb-6">
                 The draft is complete! Your rosters are now locked and ready for the season.
               </p>
-              <div className="flex gap-4 justify-center">
+              <div className="flex gap-4 justify-center flex-wrap">
                 <Button onClick={() => navigate(`/roster?league=${leagueId}`)}>
                   View My Roster
                 </Button>
                 <Button variant="outline" onClick={() => navigate(`/standings?league=${leagueId}`)}>
                   View Standings
                 </Button>
+                <Button 
+                  variant="default" 
+                  onClick={handleViewDraftSnapshot}
+                  disabled={savingSnapshot}
+                  className="bg-fantasy-primary hover:bg-fantasy-primary/90"
+                >
+                  <Camera className="h-4 w-4 mr-2" />
+                  {savingSnapshot ? 'Saving...' : 'View Draft Results'}
+                </Button>
               </div>
             </Card>
 
-            <div className="grid grid-cols-1 gap-8">
-               <Card className="card-citrus border-none shadow-lg">
-                  <CardHeader className="border-b bg-muted/20">
-                     <CardTitle className="flex items-center justify-between">
-                        <span>Your Roster (Citrus Crushers)</span>
-                        <Button variant="outline" size="sm">Download Roster</Button>
-                     </CardTitle>
-                  </CardHeader>
-                  <CardContent className="p-6">
-                     {/* Reuse TeamRosters but filter for user or show summary */}
-                     <TeamRosters 
-                        teams={teams.map(t => ({
-                          id: t.id,
-                          name: t.team_name,
-                          owner: t.owner_id ? 'Owner' : 'AI',
-                          color: '#7CB518',
-                          picks: teamPicksMap.get(t.id) || []
-                        }))}
-                        draftHistory={transformedDraftHistory}
-                        userTeamId={userTeam?.id || null}
-                        onPlayerClick={handlePlayerClick}
-                     />
-                  </CardContent>
-               </Card>
-
-               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                  <Card className="card-citrus border-none shadow-md">
-                     <CardHeader>
-                        <CardTitle>Draft Board Results</CardTitle>
-                     </CardHeader>
-                     <CardContent>
-                        <DraftBoard 
-                           teams={(orderedTeamsForBoard.length > 0 ? orderedTeamsForBoard : teams).map(t => ({
-                             id: t.id,
-                             name: t.team_name,
-                             owner: t.owner_id ? 'Owner' : 'AI',
-                             color: '#7CB518',
-                             picks: teamPicksMap.get(t.id) || []
-                           }))}
-                           draftHistory={transformedDraftHistory}
-                           currentPick={draftState?.currentPick || 1}
-                           currentRound={draftState?.currentRound || 1}
-                           totalRounds={league?.draft_rounds || draftSettings.rounds || 21}
-                           onPlayerClick={handlePlayerClick}
-                        />
-                     </CardContent>
-                  </Card>
-                  
-                  <Card className="card-citrus border-none shadow-md">
-                     <CardHeader>
-                        <CardTitle>Draft History</CardTitle>
-                     </CardHeader>
-                     <CardContent>
-                        <DraftHistory draftHistory={transformedDraftHistory} />
-                     </CardContent>
-                  </Card>
-               </div>
-            </div>
+            <Card className="card-citrus border-none shadow-md">
+               <CardHeader>
+                  <CardTitle>Draft Board Results</CardTitle>
+               </CardHeader>
+               <CardContent>
+                  <DraftBoard 
+                     teams={(orderedTeamsForBoard.length > 0 ? orderedTeamsForBoard : teams).map(t => ({
+                       id: t.id,
+                       name: t.team_name,
+                       owner: t.owner_id ? 'Owner' : 'AI',
+                       color: '#7CB518',
+                       picks: teamPicksMap.get(t.id) || []
+                     }))}
+                     draftHistory={transformedDraftHistory}
+                     currentPick={draftState?.currentPick || 1}
+                     currentRound={draftState?.currentRound || 1}
+                     totalRounds={league?.draft_rounds || draftSettings.rounds || 21}
+                     onPlayerClick={handlePlayerClick}
+                  />
+               </CardContent>
+            </Card>
             
             {isCommissioner && (
                <div className="fixed bottom-4 left-4">
@@ -2200,6 +2264,14 @@ const DraftRoom = () => {
         player={selectedPlayerForStats}
         isOpen={isPlayerDialogOpen}
         onClose={() => setIsPlayerDialogOpen(false)}
+      />
+      
+      {/* Draft Snapshot View Modal */}
+      <DraftSnapshotView
+        isOpen={isSnapshotModalOpen}
+        onClose={() => setIsSnapshotModalOpen(false)}
+        snapshotData={snapshotData}
+        createdAt={snapshotCreatedAt}
       />
       
       {/* ABSOLUTE FALLBACK - Only render if LOBBY condition matched but data is missing */}

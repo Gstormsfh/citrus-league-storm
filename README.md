@@ -1,40 +1,65 @@
-# Welcome to your Lovable project
+# Citrus Fantasy Sports
 
-## Project info
+A modern fantasy hockey platform built with React, TypeScript, and Supabase.
 
-**URL**: https://lovable.dev/projects/d4a55fc7-d8d4-4eef-8d39-9d8631931692
+## Features
 
-## How can I edit this code?
+- **Draft Room**: Real-time draft experience with drag-and-drop functionality
+- **Roster Management**: Add/drop players, manage lineups, and track transactions
+- **Matchups**: View weekly matchups with live scoring and player stats
+- **Free Agency**: Browse and add available players to your roster
+- **League Management**: Create and manage fantasy hockey leagues
 
-There are several ways of editing your application.
+## Tech Stack
 
-**Use Lovable**
+- **Frontend**: React 18, TypeScript, Vite
+- **UI**: Tailwind CSS, Radix UI, shadcn/ui
+- **Backend**: Supabase (PostgreSQL, Auth, RLS)
+- **Hosting**: Firebase Hosting
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/d4a55fc7-d8d4-4eef-8d39-9d8631931692) and start prompting.
+## Getting Started
 
-Changes made via Lovable will be committed automatically to this repo.
+### Prerequisites
 
-**Use your preferred IDE**
+- Node.js 18+ and npm
+- Supabase account and project
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+### Installation
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+```bash
+# Install dependencies
+npm install
 
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# Start development server
 npm run dev
+```
 
-ddddd
+### Environment Setup
 
-test 2.0
+Ensure your Supabase credentials are configured in `src/integrations/supabase/client.ts`.
+
+## Deployment
+
+The app is deployed to Firebase Hosting:
+
+```bash
+# Build and deploy
+npm run deploy
+```
+
+Live URL: https://citrus-fantasy-sports.web.app
+
+## Project Structure
+
+```
+src/
+  ├── components/     # Reusable UI components
+  ├── pages/         # Page components
+  ├── services/      # API and business logic
+  ├── integrations/ # Supabase client and types
+  └── utils/         # Utility functions
+```
+
+## License
+
+Private project - All rights reserved

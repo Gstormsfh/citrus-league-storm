@@ -18,10 +18,12 @@ import {
 } from "@/components/ui/navigation-menu";
 import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { LeagueService, Transaction } from '@/services/LeagueService';
 
 const Navbar = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [notifications, setNotifications] = useState<Transaction[]>([]);
   const location = useLocation();
   const navigate = useNavigate();
   const { user, profile, signOut } = useAuth();
@@ -41,6 +43,21 @@ const Navbar = () => {
       window.removeEventListener('scroll', handleScroll);
     };
   }, []);
+
+  // Fetch real notifications from transactions
+  useEffect(() => {
+    const loadNotifications = async () => {
+      if (user?.id) {
+        const recentTransactions = await LeagueService.fetchRecentTransactionsForNotifications(user.id);
+        setNotifications(recentTransactions);
+      }
+    };
+
+    loadNotifications();
+    // Refresh notifications every 30 seconds
+    const interval = setInterval(loadNotifications, 30000);
+    return () => clearInterval(interval);
+  }, [user?.id]);
 
   const closeMobileMenu = () => {
     setMobileMenuOpen(false);
@@ -402,17 +419,24 @@ const Navbar = () => {
                     <div className="bg-primary/5 p-3 rounded-md mb-4">
                       <div className="flex items-center gap-3 mb-2">
                         <Bell className="h-4 w-4 text-primary" />
-                        <span className="text-sm font-medium">Recent Notifications</span>
+                        <span className="text-sm font-medium">Recent Activity</span>
                       </div>
                       <div className="space-y-2 mt-2">
-                        <div className="bg-background rounded-md p-2 text-xs">
-                          <p className="font-medium">Trade offer received</p>
-                          <p className="text-muted-foreground text-[10px] mt-0.5">2 mins ago</p>
-                        </div>
-                        <div className="bg-background rounded-md p-2 text-xs">
-                          <p className="font-medium">New player available</p>
-                          <p className="text-muted-foreground text-[10px] mt-0.5">1 hour ago</p>
-                        </div>
+                        {notifications.length === 0 ? (
+                          <div className="bg-background rounded-md p-2 text-xs text-center text-muted-foreground">
+                            No recent activity
+                          </div>
+                        ) : (
+                          notifications.slice(0, 3).map((tx) => (
+                            <div key={tx.id} className="bg-background rounded-md p-2 text-xs">
+                              <p className="font-medium">
+                                {tx.type === 'drop' ? 'Player dropped' : tx.type === 'claim' ? 'Player added' : 'Transaction'}
+                                {tx.playerName && `: ${tx.playerName}`}
+                              </p>
+                              <p className="text-muted-foreground text-[10px] mt-0.5">{tx.date}</p>
+                            </div>
+                          ))
+                        )}
                       </div>
                     </div>
                   </div>

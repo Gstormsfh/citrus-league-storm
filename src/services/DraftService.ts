@@ -726,5 +726,104 @@ export const DraftService = {
       return { error };
     }
   },
+
+  /**
+   * Save a draft snapshot for a completed draft
+   * Stores the draft board grid data (teams and picks) for later viewing
+   */
+  async saveDraftSnapshot(
+    leagueId: string,
+    draftSessionId: string,
+    teams: Array<{ id: string; name: string; owner: string; color: string }>,
+    draftHistory: Array<{
+      id: string;
+      teamId: string;
+      teamName: string;
+      playerId: string;
+      playerName: string;
+      position: string;
+      round: number;
+      pick: number;
+      timestamp: number;
+    }>,
+    leagueSettings: {
+      rounds: number;
+      draftOrder: string;
+      completedAt: string;
+    }
+  ): Promise<{ snapshotId: string | null; error: any }> {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        return { snapshotId: null, error: 'User not authenticated' };
+      }
+
+      // Check if snapshot already exists for this session
+      const { data: existing } = await supabase
+        .from('draft_snapshots')
+        .select('id')
+        .eq('league_id', leagueId)
+        .eq('draft_session_id', draftSessionId)
+        .maybeSingle();
+
+      if (existing) {
+        logger.log('Snapshot already exists for this draft session');
+        return { snapshotId: existing.id, error: null };
+      }
+
+      // Prepare snapshot data
+      const snapshotData = {
+        teams,
+        picks: draftHistory,
+        leagueSettings,
+      };
+
+      // Insert snapshot
+      const { data, error } = await supabase
+        .from('draft_snapshots')
+        .insert({
+          league_id: leagueId,
+          draft_session_id: draftSessionId,
+          snapshot_data: snapshotData,
+          created_by: user.id,
+        })
+        .select('id')
+        .single();
+
+      if (error) throw error;
+
+      logger.log('Draft snapshot saved successfully:', data.id);
+      return { snapshotId: data.id, error: null };
+    } catch (error) {
+      logger.error('Error saving draft snapshot:', error);
+      return { snapshotId: null, error };
+    }
+  },
+
+  /**
+   * Get the most recent draft snapshot for a league
+   */
+  async getDraftSnapshot(leagueId: string): Promise<{ snapshot: any | null; error: any }> {
+    try {
+      const { data, error } = await supabase
+        .from('draft_snapshots')
+        .select('*')
+        .eq('league_id', leagueId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (error) throw error;
+
+      if (!data) {
+        return { snapshot: null, error: null };
+      }
+
+      return { snapshot: data, error: null };
+    } catch (error) {
+      logger.error('Error getting draft snapshot:', error);
+      return { snapshot: null, error };
+    }
+  },
 };
 

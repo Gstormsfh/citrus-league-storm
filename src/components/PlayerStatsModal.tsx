@@ -2,21 +2,81 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { TrendingUp, TrendingDown, Target, Shield, Zap, Star, AlertCircle, Clock, User, Ruler, Weight, Calendar, Award, Activity, BarChart3, Users, Timer, Crosshair } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { TrendingUp, TrendingDown, Target, Shield, Zap, Star, AlertCircle, Clock, User, Ruler, Weight, Calendar, Award, Activity, BarChart3, Users, Timer, Crosshair, Trash2 } from 'lucide-react';
 import { HockeyPlayer } from '@/components/roster/HockeyPlayerCard';
 import { cn } from '@/lib/utils';
+import { LeagueService } from '@/services/LeagueService';
+import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
+import { useState } from 'react';
 
 interface PlayerStatsModalProps {
   player: HockeyPlayer | null;
   isOpen: boolean;
   onClose: () => void;
+  leagueId?: string | null;
+  isOnRoster?: boolean; // Whether this player is on the user's roster
+  onPlayerDropped?: () => void; // Callback to refresh roster after drop
 }
 
-const PlayerStatsModal = ({ player, isOpen, onClose }: PlayerStatsModalProps) => {
+const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = false, onPlayerDropped }: PlayerStatsModalProps) => {
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const [isDropping, setIsDropping] = useState(false);
+
   if (!player) return null;
 
   const isGoalie = player.position === 'Goalie' || player.position === 'G';
   const stats = player.stats || {};
+
+  const handleDropPlayer = async () => {
+    if (!user || !leagueId || !player?.id) {
+      toast({
+        title: "Error",
+        description: "Unable to drop player. Missing required information.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!confirm(`Are you sure you want to drop ${player.name}? This action cannot be undone.`)) {
+      return;
+    }
+
+    setIsDropping(true);
+    try {
+      const { success, error } = await LeagueService.dropPlayer(
+        leagueId,
+        user.id,
+        String(player.id),
+        'Roster Tab'
+      );
+
+      if (success) {
+        toast({
+          title: "Player Dropped",
+          description: `${player.name} has been dropped from your roster.`,
+        });
+        onPlayerDropped?.();
+        onClose();
+      } else {
+        toast({
+          title: "Error",
+          description: error?.message || "Failed to drop player. Please try again.",
+          variant: "destructive"
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error?.message || "Failed to drop player. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsDropping(false);
+    }
+  };
 
   // Get status badge info
   const getStatusInfo = () => {
@@ -62,6 +122,18 @@ const PlayerStatsModal = ({ player, isOpen, onClose }: PlayerStatsModalProps) =>
                 )}
               </div>
             </div>
+            {leagueId && user && isOnRoster && (
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={handleDropPlayer}
+                disabled={isDropping}
+                className="ml-auto"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                {isDropping ? 'Dropping...' : 'Drop Player'}
+              </Button>
+            )}
           </DialogTitle>
         </DialogHeader>
 

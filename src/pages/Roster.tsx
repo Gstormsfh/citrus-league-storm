@@ -281,12 +281,15 @@ const Roster = () => {
     const loadRoster = async () => {
       setLoading(true);
       try {
+        // Reset roster state in case of previous errors
+        setRoster({ starters: [], bench: [], ir: [], slotAssignments: {} });
         // Get all players from staging files (staging_2025_skaters & staging_2025_goalies)
         // PlayerService.getAllPlayers() is the ONLY source for player data
         const allPlayers = await PlayerService.getAllPlayers();
         
-        let dbPlayers: Player[];
-        let teamId: number | null = null;
+        let dbPlayers: Player[] = [];
+        let teamId: string | number | null = null;
+        let userTeamData: { id: string; league_id: string; team_name: string } | null = null;
 
         if (!user) {
           // Non-logged-in users see demo team (Team 3) from database
@@ -295,13 +298,13 @@ const Roster = () => {
           setUserTeamId(3);
         } else {
           // Logged-in users: Get their actual team from Supabase
-          const { data: userTeamData, error: teamError } = await supabase
+          const { data: teamData, error: teamError } = await supabase
             .from('teams')
             .select('id, league_id, team_name')
             .eq('owner_id', user.id)
             .maybeSingle();
 
-          if (teamError || !userTeamData) {
+          if (teamError || !teamData) {
             // User doesn't have a team yet - show empty roster
             setRoster({ starters: [], bench: [], ir: [], slotAssignments: {} });
             setUserTeamId(null);
@@ -309,6 +312,8 @@ const Roster = () => {
             setLoading(false);
             return;
           }
+
+          userTeamData = teamData;
 
           // Check if draft is completed before loading roster
           const { league: leagueData, error: leagueError } = await LeagueService.getLeague(userTeamData.league_id);
@@ -325,15 +330,45 @@ const Roster = () => {
           setUserTeamId(teamId);
           setUserTeam(userTeamData);
           // Draft is completed - get roster from draft picks
-          // getTeamRoster is only for demo teams (numeric IDs)
-          const { picks: draftPicks } = await DraftService.getDraftPicks(userTeamData.league_id);
-          const teamPicks = draftPicks.filter(p => p.team_id === userTeamData.id);
-          // Map draft picks to players
-          const playerIds = teamPicks.map(p => p.player_id);
-          dbPlayers = allPlayers.filter(p => playerIds.includes(p.id));
+          // Get ALL draft picks for this team (including post-draft adds with round 999)
+          // Don't filter by session to include players added via free agency
+          const { data: allDraftPicks, error: picksError } = await supabase
+            .from('draft_picks')
+            .select('*')
+            .eq('league_id', userTeamData.league_id)
+            .eq('team_id', userTeamData.id)
+            .is('deleted_at', null)
+            .order('pick_number', { ascending: true });
+          
+          if (picksError) {
+            console.error('Error fetching draft picks directly:', picksError);
+            // Fallback: try using DraftService.getDraftPicks as before
+            console.log('Falling back to DraftService.getDraftPicks...');
+            const { picks: draftPicks, error: fallbackError } = await DraftService.getDraftPicks(userTeamData.league_id);
+            
+            if (fallbackError || !draftPicks) {
+              console.error('Fallback draft picks loading also failed:', fallbackError);
+              // Last resort: empty roster
+              dbPlayers = [];
+            } else {
+              const teamPicks = draftPicks.filter(p => p.team_id === userTeamData.id);
+              const playerIds = teamPicks.map(p => p.player_id);
+              dbPlayers = allPlayers.filter(p => playerIds.includes(p.id));
+            }
+          } else {
+            // Map draft picks to players
+            const playerIds = (allDraftPicks || []).map(p => p.player_id);
+            dbPlayers = allPlayers.filter(p => playerIds.includes(p.id));
+          }
         }
         
-        setTransactions(LeagueService.getTransactions());
+        // Load real transactions if user has a team
+        if (userTeamData?.league_id) {
+          const { transactions: realTransactions } = await LeagueService.fetchTransactions(userTeamData.league_id);
+          setTransactions(realTransactions);
+        } else {
+          setTransactions([]);
+        }
         
         // Transform players from staging files to HockeyPlayer format
         // All data (names, stats, positions, teams) comes from staging files via PlayerService
@@ -499,9 +534,18 @@ const Roster = () => {
             });
           }
         }
-      } catch (e) {
+      } catch (e: any) {
         console.error("Failed to load roster", e);
-        toast({ title: "Error", description: "Could not load roster.", variant: "destructive" });
+        console.error("Error details:", {
+          message: e?.message,
+          stack: e?.stack,
+          name: e?.name
+        });
+        toast({ 
+          title: "Error", 
+          description: `Could not load roster. ${e?.message || 'Unknown error'}`,
+          variant: "destructive" 
+        });
       } finally {
         setLoading(false);
       }
@@ -1467,6 +1511,87 @@ const Roster = () => {
           player={selectedPlayer}
           isOpen={isPlayerDialogOpen}
           onClose={() => setIsPlayerDialogOpen(false)}
+          leagueId={userTeam?.league_id || null}
+          isOnRoster={selectedPlayer ? [...roster.starters, ...roster.bench, ...roster.ir].some(p => p.id === selectedPlayer.id) : false}
+          onPlayerDropped={async () => {
+            // Refresh roster and transactions without page reload
+            if (userTeam?.league_id) {
+              // Reload transactions immediately
+              const { transactions: newTransactions } = await LeagueService.fetchTransactions(userTeam.league_id);
+              setTransactions(newTransactions);
+              
+              // Trigger roster reload by calling loadRoster
+              // We'll extract loadRoster to be callable
+              const allPlayers = await PlayerService.getAllPlayers();
+              const { picks: draftPicks } = await DraftService.getDraftPicks(userTeam.league_id);
+              const teamPicks = draftPicks.filter(p => p.team_id === userTeam.id);
+              const playerIds = teamPicks.map(p => p.player_id);
+              const dbPlayers = allPlayers.filter(p => playerIds.includes(p.id));
+              
+              // Get lineup from database
+              const { data: lineupData } = await supabase
+                .from('team_lineups')
+                .select('starters, bench, ir, slot_assignments')
+                .eq('team_id', userTeam.id)
+                .single();
+
+              // Transform players to HockeyPlayer format (same logic as in loadRoster)
+              const transformedPlayers: HockeyPlayer[] = dbPlayers.map((p) => ({
+                id: p.id,
+                name: p.full_name,
+                position: p.position,
+                number: parseInt(p.jersey_number || '0'),
+                starter: false,
+                stats: {
+                  gamesPlayed: p.games_played || 0,
+                  goals: p.goals || 0,
+                  assists: p.assists || 0,
+                  points: p.points || 0,
+                  plusMinus: p.plus_minus || 0,
+                  shots: p.shots || 0,
+                  hits: p.hits || 0,
+                  blockedShots: p.blocks || 0,
+                  xGoals: p.xGoals || 0,
+                  corsi: p.corsi || 0,
+                  fenwick: p.fenwick || 0,
+                  wins: p.wins || 0,
+                  losses: p.losses || 0,
+                  otl: p.ot_losses || 0,
+                  gaa: p.goals_against_average || 0,
+                  savePct: p.save_percentage || 0,
+                  shutouts: 0
+                },
+                team: p.team,
+                teamAbbreviation: p.team,
+                status: p.status === 'injured' ? 'IR' : (p.status === 'active' ? null : 'WVR'),
+                image: p.headshot_url || undefined,
+                nextGame: undefined,
+                projectedPoints: (p.points || 0) / 20
+              }));
+
+              const playerMap = new Map(transformedPlayers.map(p => [String(p.id), p]));
+              
+              const starters = (lineupData?.starters || [])
+                .map((id: string) => playerMap.get(id))
+                .filter((p): p is HockeyPlayer => !!p)
+                .map(p => ({ ...p, starter: true }));
+              
+              const bench = (lineupData?.bench || [])
+                .map((id: string) => playerMap.get(id))
+                .filter((p): p is HockeyPlayer => !!p);
+              
+              const ir = (lineupData?.ir || [])
+                .map((id: string) => playerMap.get(id))
+                .filter((p): p is HockeyPlayer => !!p);
+
+              setRoster({
+                starters,
+                bench,
+                ir,
+                slotAssignments: lineupData?.slot_assignments || {}
+              });
+            }
+          }}
         />
       </main>
       

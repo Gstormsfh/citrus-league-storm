@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import { Button } from '@/components/ui/button';
@@ -17,6 +19,7 @@ import { HockeyPlayer } from '@/components/roster/HockeyPlayerCard';
 
 const FreeAgents = () => {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [searchParams] = useSearchParams();
   const [searchQuery, setSearchQuery] = useState('');
   const [positionFilter, setPositionFilter] = useState('ALL');
@@ -25,6 +28,7 @@ const FreeAgents = () => {
   const [players, setPlayers] = useState<Player[]>([]);
   const [watchlist, setWatchlist] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
+  const [leagueId, setLeagueId] = useState<string | null>(null);
 
   // Player Stats Modal State
   const [selectedPlayer, setSelectedPlayer] = useState<HockeyPlayer | null>(null);
@@ -42,11 +46,29 @@ const FreeAgents = () => {
   const fetchPlayers = async () => {
     try {
       setLoading(true);
+      
+      // Get user's league ID if logged in
+      let currentLeagueId: string | undefined = undefined;
+      if (user) {
+        const { data: userTeamData } = await supabase
+          .from('teams')
+          .select('league_id')
+          .eq('owner_id', user.id)
+          .maybeSingle();
+        
+        if (userTeamData) {
+          currentLeagueId = userTeamData.league_id;
+          setLeagueId(currentLeagueId);
+        }
+      }
+      
       // Get all players from staging files (staging_2025_skaters & staging_2025_goalies)
       // PlayerService.getAllPlayers() is the ONLY source for player data
       const allPlayers = await PlayerService.getAllPlayers();
-      // LeagueService determines free agents, but uses staging file data
-      const freeAgents = await LeagueService.getFreeAgents(allPlayers);
+      
+      // LeagueService determines free agents - uses real database if leagueId provided
+      // Dropped players (with deleted_at) will be included as free agents
+      const freeAgents = await LeagueService.getFreeAgents(allPlayers, currentLeagueId);
       setPlayers(freeAgents);
     } catch (error) {
       console.error('Error fetching players:', error);
@@ -60,22 +82,45 @@ const FreeAgents = () => {
     }
   };
 
-  const handleAddPlayer = (player: Player) => {
-    toast({
-      title: "Waiver Claim Submitted",
-      description: `Claim for ${player.full_name} has been submitted successfully.`,
-      variant: "default"
-    });
-    // Add transaction record (mock)
-    LeagueService.addTransaction({
-      id: Math.random().toString(),
-      type: 'claim',
-      playerId: player.id,
-      playerName: player.full_name,
-      playerTeam: player.team,
-      date: new Date().toISOString().split('T')[0],
-      status: 'pending'
-    });
+  const handleAddPlayer = async (player: Player) => {
+    if (!user || !leagueId) {
+      toast({
+        title: "Error",
+        description: "You must be logged in and have a team to add players.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      const { success, error } = await LeagueService.addPlayer(
+        leagueId,
+        user.id,
+        player.id,
+        'Free Agents Page'
+      );
+
+      if (success) {
+        toast({
+          title: "Player Added",
+          description: `${player.full_name} has been added to your roster.`,
+        });
+        // Refresh the free agents list to remove the added player
+        await fetchPlayers();
+      } else {
+        toast({
+          title: "Error",
+          description: error?.message || "Failed to add player. Please try again.",
+          variant: "destructive"
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error?.message || "Failed to add player. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
 
   const toggleWatchlist = (player: Player) => {
