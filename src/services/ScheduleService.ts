@@ -1,5 +1,27 @@
 import { supabase } from '@/integrations/supabase/client';
 
+// Test mode: Set to December 8, 2025 for testing
+// Set this to true to use December 8, 2025 as "today" for testing
+const TEST_MODE = true;
+const TEST_DATE = '2025-12-08';
+
+// Helper to get "today" - uses test date if in test mode
+function getTodayString(): string {
+  if (TEST_MODE) {
+    return TEST_DATE;
+  }
+  return new Date().toISOString().split('T')[0];
+}
+
+// Helper to get "today" as Date object
+function getTodayDate(): Date {
+  if (TEST_MODE) {
+    const date = new Date(TEST_DATE + 'T00:00:00');
+    return date;
+  }
+  return new Date();
+}
+
 export interface NHLGame {
   id: string;
   game_id: number;
@@ -104,7 +126,7 @@ export const ScheduleService = {
    */
   async getNextGameForTeam(teamAbbrev: string): Promise<{ game: NHLGame | null; error: any }> {
     try {
-      const todayStr = new Date().toISOString().split('T')[0];
+      const todayStr = getTodayString();
 
       const { data, error } = await supabase
         .from('nhl_games')
@@ -144,8 +166,11 @@ export const ScheduleService = {
 
   /**
    * Get game info formatted for display
+   * @param game - The NHL game object
+   * @param playerTeam - The player's team abbreviation
+   * @param timezone - User's timezone (e.g., 'America/Denver' for Mountain Time). Defaults to 'America/Denver'
    */
-  getGameInfo(game: NHLGame | null, playerTeam: string): GameInfo | undefined {
+  getGameInfo(game: NHLGame | null, playerTeam: string, timezone: string = 'America/Denver'): GameInfo | undefined {
     if (!game) return undefined;
 
     const isHome = game.home_team === playerTeam;
@@ -158,7 +183,7 @@ export const ScheduleService = {
     };
 
     // Check if game is today
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = getTodayString();
     const isToday = game.game_date === todayStr;
 
     // Always try to add time if game_time exists (for scheduled or upcoming games)
@@ -167,10 +192,12 @@ export const ScheduleService = {
         const gameTime = new Date(game.game_time);
         // Only show time for scheduled games or today's games that aren't final
         if (game.status === 'scheduled' || (isToday && game.status !== 'final')) {
+          // Convert to user's timezone
           gameInfo.time = gameTime.toLocaleTimeString('en-US', {
             hour: 'numeric',
             minute: '2-digit',
-            hour12: true
+            hour12: true,
+            timeZone: timezone
           });
         }
       } catch (e) {
@@ -192,15 +219,16 @@ export const ScheduleService = {
       }
     }
 
-    // For scheduled games, ensure we at least have opponent info
-    if (game.status === 'scheduled' && !gameInfo.time && game.game_time) {
+    // For scheduled games today, ensure we show the time
+    if (isToday && game.status === 'scheduled' && !gameInfo.time && game.game_time) {
       // Try again to parse time
       try {
         const gameTime = new Date(game.game_time);
         gameInfo.time = gameTime.toLocaleTimeString('en-US', {
           hour: 'numeric',
           minute: '2-digit',
-          hour12: true
+          hour12: true,
+          timeZone: timezone
         });
       } catch (e) {
         // If time parsing fails, at least we have opponent
@@ -215,9 +243,8 @@ export const ScheduleService = {
    */
   async hasGameToday(teamAbbrev: string): Promise<boolean> {
     try {
-      // Get today's date in YYYY-MM-DD format (local timezone)
-      const today = new Date();
-      const todayStr = today.toISOString().split('T')[0];
+      // Get today's date in YYYY-MM-DD format (uses test date if in test mode)
+      const todayStr = getTodayString();
       
       // Query for games on today's date
       const { data: games, error } = await supabase
@@ -253,7 +280,7 @@ export const ScheduleService = {
     weekEnd: Date
   ): Promise<number> {
     const { games } = await this.getGamesForTeamInWeek(teamAbbrev, weekStart, weekEnd);
-    const today = new Date();
+    const today = getTodayDate();
     today.setHours(0, 0, 0, 0);
 
     return games.filter(g => {
@@ -261,6 +288,38 @@ export const ScheduleService = {
       gameDate.setHours(0, 0, 0, 0);
       return gameDate >= today && (g.status === 'scheduled' || g.status === 'live');
     }).length;
+  },
+
+  /**
+   * Get total number of games for a team in a week (including completed games)
+   */
+  async getTotalGamesInWeek(
+    teamAbbrev: string,
+    weekStart: Date,
+    weekEnd: Date
+  ): Promise<number> {
+    const { games } = await this.getGamesForTeamInWeek(teamAbbrev, weekStart, weekEnd);
+    return games.length;
+  },
+
+  /**
+   * Get games for a team in the current week (Monday-Sunday)
+   */
+  async getGamesThisWeek(teamAbbrev: string): Promise<{ games: NHLGame[]; count: number }> {
+    const today = new Date();
+    const dayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, etc.
+    const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // Convert to Monday = 0
+    
+    const weekStart = new Date(today);
+    weekStart.setDate(today.getDate() - daysFromMonday);
+    weekStart.setHours(0, 0, 0, 0);
+    
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 6);
+    weekEnd.setHours(23, 59, 59, 999);
+    
+    const { games } = await this.getGamesForTeamInWeek(teamAbbrev, weekStart, weekEnd);
+    return { games, count: games.length };
   },
 
   /**

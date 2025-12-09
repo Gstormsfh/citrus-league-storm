@@ -1,5 +1,5 @@
 
-export type MatchupPlayerStatus = "In Game" | "Final" | "Yet to Play";
+export type MatchupPlayerStatus = "In Game" | "Final" | null;
 
 export type MatchupPlayer = {
   id: number;

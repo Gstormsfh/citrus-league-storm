@@ -1,3 +1,6 @@
+import { useState, useEffect } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -6,6 +9,9 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { TrendingUp, TrendingDown, AlertCircle, Calendar, ChevronRight, ShieldCheck } from 'lucide-react';
 import { Narwhal } from '@/components/icons/Narwhal';
+import { PlayerService, Player } from '@/services/PlayerService';
+import { LeagueService } from '@/services/LeagueService';
+import { ScheduleService } from '@/services/ScheduleService';
 
 interface PositionStats {
   position: string;
@@ -31,6 +37,70 @@ interface FreeAgentRec {
 }
 
 const TeamAnalytics = () => {
+  const { user } = useAuth();
+  const [freeAgentTargets, setFreeAgentTargets] = useState<FreeAgentRec[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadScheduleMaximizers();
+  }, [user]);
+
+  const loadScheduleMaximizers = async () => {
+    try {
+      setLoading(true);
+      
+      // Get user's league ID if logged in
+      let currentLeagueId: string | undefined = undefined;
+      if (user) {
+        const { data: userTeamData } = await supabase
+          .from('teams')
+          .select('league_id')
+          .eq('owner_id', user.id)
+          .maybeSingle();
+        
+        if (userTeamData) {
+          currentLeagueId = userTeamData.league_id;
+        }
+      }
+      
+      // Get free agents
+      const allPlayers = await PlayerService.getAllPlayers();
+      const freeAgents = await LeagueService.getFreeAgents(allPlayers, currentLeagueId);
+      
+      // Calculate games this week for each free agent
+      const maximizers: FreeAgentRec[] = [];
+      for (const player of freeAgents.slice(0, 10)) { // Top 10 for preview
+        const { count } = await ScheduleService.getGamesThisWeek(player.team);
+        
+        maximizers.push({
+          id: parseInt(player.id) || 0,
+          name: player.full_name,
+          position: player.position,
+          team: player.team,
+          pointsPerGame: (player.points || 0) / Math.max(1, player.games_played || 1),
+          gamesThisWeek: count,
+          scheduleAdvantage: count >= 4,
+          rostered: 0 // Would need to calculate from league data
+        });
+      }
+      
+      // Sort by games this week (descending), then by points per game
+      maximizers.sort((a, b) => {
+        if (b.gamesThisWeek !== a.gamesThisWeek) {
+          return b.gamesThisWeek - a.gamesThisWeek;
+        }
+        return b.pointsPerGame - a.pointsPerGame;
+      });
+      
+      setFreeAgentTargets(maximizers);
+    } catch (error) {
+      console.error('Error loading schedule maximizers:', error);
+      setFreeAgentTargets([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Mock Analysis Data
   const positionalAnalysis: PositionStats[] = [
     {
@@ -79,11 +149,6 @@ const TeamAnalytics = () => {
     }
   ];
 
-  const freeAgentTargets: FreeAgentRec[] = [
-    { id: 1, name: "Joey Daccord", position: "G", team: "SEA", pointsPerGame: 5.8, gamesThisWeek: 4, scheduleAdvantage: true, rostered: 42 },
-    { id: 2, name: "Charlie Coyle", position: "C/RW", team: "BOS", pointsPerGame: 6.2, gamesThisWeek: 4, scheduleAdvantage: true, rostered: 55 },
-    { id: 3, name: "Gustav Forsling", position: "D", team: "FLA", pointsPerGame: 5.1, gamesThisWeek: 3, scheduleAdvantage: false, rostered: 38 },
-  ];
 
   const getGradeColor = (grade: string) => {
     if (grade.startsWith('A')) return "text-green-500 bg-green-500/10 border-green-500/20";
@@ -219,31 +284,38 @@ const TeamAnalytics = () => {
                      <CardDescription>Free agents with favorable schedules this week</CardDescription>
                    </CardHeader>
                    <CardContent className="space-y-3">
-                      {freeAgentTargets.filter(p => p.position !== 'G').map(player => (
-                        <div key={player.id} className="flex items-center justify-between p-2 rounded-md hover:bg-muted/50 transition-colors group cursor-pointer border">
-                           <div className="flex items-center gap-3">
-                             <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center font-bold text-xs">
-                               {player.team.substring(0,2)}
-                             </div>
-                             <div>
-                               <div className="font-medium text-sm">{player.name}</div>
-                               <div className="text-xs text-muted-foreground flex items-center gap-1">
-                                  <Badge variant="outline" className="h-4 px-1 text-[9px]">{player.position}</Badge>
-                                  <span>{player.rostered}% Rostered</span>
+                      {loading ? (
+                        <div className="text-center py-4 text-sm text-muted-foreground">Loading schedule data...</div>
+                      ) : freeAgentTargets.filter(p => p.position !== 'G' && p.gamesThisWeek >= 3).length === 0 ? (
+                        <div className="text-center py-4 text-sm text-muted-foreground">No schedule maximizers found this week.</div>
+                      ) : (
+                        <>
+                          {freeAgentTargets.filter(p => p.position !== 'G' && p.gamesThisWeek >= 3).slice(0, 5).map(player => (
+                            <div key={player.id} className="flex items-center justify-between p-2 rounded-md hover:bg-muted/50 transition-colors group cursor-pointer border">
+                               <div className="flex items-center gap-3">
+                                 <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center font-bold text-xs">
+                                   {player.team.substring(0,2)}
+                                 </div>
+                                 <div>
+                                   <div className="font-medium text-sm">{player.name}</div>
+                                   <div className="text-xs text-muted-foreground flex items-center gap-1">
+                                      <Badge variant="outline" className="h-4 px-1 text-[9px]">{player.position}</Badge>
+                                   </div>
+                                 </div>
                                </div>
-                             </div>
-                           </div>
-                           <div className="text-right">
-                             <div className="text-xs font-bold flex items-center justify-end gap-1 text-green-600">
-                               <Calendar className="h-3 w-3" /> {player.gamesThisWeek} Gms
-                             </div>
-                             <div className="text-[10px] text-muted-foreground">vs Avg Repl</div>
-                           </div>
-                        </div>
-                      ))}
-                      <Button variant="ghost" className="w-full text-xs text-primary mt-2" onClick={() => window.location.href = '/free-agents?tab=schedule'}>
-                        View All Schedule Trends <ChevronRight className="h-3 w-3 ml-1" />
-                      </Button>
+                               <div className="text-right">
+                                 <div className={`text-xs font-bold flex items-center justify-end gap-1 ${player.gamesThisWeek >= 4 ? 'text-green-600' : 'text-muted-foreground'}`}>
+                                   <Calendar className="h-3 w-3" /> {player.gamesThisWeek} Gms
+                                 </div>
+                                 <div className="text-[10px] text-muted-foreground">{player.pointsPerGame.toFixed(1)} Pts/Gm</div>
+                               </div>
+                            </div>
+                          ))}
+                          <Button variant="ghost" className="w-full text-xs text-primary mt-2" onClick={() => window.location.href = '/free-agents?tab=schedule'}>
+                            View All Schedule Trends <ChevronRight className="h-3 w-3 ml-1" />
+                          </Button>
+                        </>
+                      )}
                    </CardContent>
                 </Card>
               </div>

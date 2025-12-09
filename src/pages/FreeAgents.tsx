@@ -12,6 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Calendar, TrendingUp, Filter, List, Grid, Star, Info } from 'lucide-react';
 import { PlayerService, Player } from '@/services/PlayerService';
 import { LeagueService } from '@/services/LeagueService';
+import { ScheduleService } from '@/services/ScheduleService';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import PlayerStatsModal from '@/components/PlayerStatsModal';
@@ -29,6 +30,7 @@ const FreeAgents = () => {
   const [watchlist, setWatchlist] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [leagueId, setLeagueId] = useState<string | null>(null);
+  const [scheduleMaximizers, setScheduleMaximizers] = useState<Array<Player & { gamesThisWeek: number; gameDays: string[] }>>([]);
 
   // Player Stats Modal State
   const [selectedPlayer, setSelectedPlayer] = useState<HockeyPlayer | null>(null);
@@ -70,6 +72,9 @@ const FreeAgents = () => {
       // Dropped players (with deleted_at) will be included as free agents
       const freeAgents = await LeagueService.getFreeAgents(allPlayers, currentLeagueId);
       setPlayers(freeAgents);
+      
+      // Calculate schedule maximizers (players with 4+ games this week)
+      await calculateScheduleMaximizers(freeAgents);
     } catch (error) {
       console.error('Error fetching players:', error);
       toast({
@@ -79,6 +84,46 @@ const FreeAgents = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const calculateScheduleMaximizers = async (freeAgents: Player[]) => {
+    try {
+      const maximizers: Array<Player & { gamesThisWeek: number; gameDays: string[] }> = [];
+      
+      // Calculate games this week for each player
+      for (const player of freeAgents) {
+        const { games, count } = await ScheduleService.getGamesThisWeek(player.team);
+        
+        // Only include players with 4+ games this week
+        if (count >= 4) {
+          // Get day abbreviations for each game
+          const gameDays = games.map(game => {
+            const gameDate = new Date(game.game_date);
+            const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+            return dayNames[gameDate.getDay()];
+          });
+          
+          maximizers.push({
+            ...player,
+            gamesThisWeek: count,
+            gameDays: [...new Set(gameDays)] // Remove duplicates
+          });
+        }
+      }
+      
+      // Sort by games count (descending), then by points
+      maximizers.sort((a, b) => {
+        if (b.gamesThisWeek !== a.gamesThisWeek) {
+          return b.gamesThisWeek - a.gamesThisWeek;
+        }
+        return (b.points || 0) - (a.points || 0);
+      });
+      
+      setScheduleMaximizers(maximizers.slice(0, 20)); // Top 20
+    } catch (error) {
+      console.error('Error calculating schedule maximizers:', error);
+      setScheduleMaximizers([]);
     }
   };
 
@@ -509,56 +554,70 @@ const FreeAgents = () => {
                 </div>
              </div>
 
-             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-               {[...filteredPlayers, 
-                 { id: '101', full_name: "Joey Daccord", position: "G", team: "SEA", opponent: "4 Games", projectedPoints: 5.8, wins: 12, goals_against_average: 2.3, save_percentage: .920, trend: "up", games: 4, rostered: 42 },
-                 { id: '102', full_name: "Charlie Coyle", position: "C", team: "BOS", opponent: "4 Games", projectedPoints: 6.2, goals: 18, assists: 22, trend: "up", games: 4, rostered: 55 }
-               ].filter(p => (p as any).games === 4 || Math.random() > 0.8).slice(0, 6).map((player: any) => (
-                 <Card key={player.id} className="overflow-hidden hover:border-blue-500/50 transition-colors border-blue-500/20">
-                  <CardContent className="p-0">
-                    <div className="flex items-center p-4">
-                      <div className="h-12 w-12 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-700 dark:text-blue-400 font-bold text-lg mr-4 relative">
-                        {player.team}
-                        <span className="absolute -top-1 -right-1 bg-green-500 text-white text-[10px] w-5 h-5 flex items-center justify-center rounded-full border-2 border-background">4</span>
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <h3 className="font-bold text-lg">{player.full_name}</h3>
-                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                               <span>{player.position}</span>
-                               <span>•</span>
-                               <span className="text-green-600 font-medium flex items-center gap-1"><TrendingUp className="h-3 w-3" /> High Volume Week</span>
+             {loading ? (
+               <div className="text-center py-12 text-muted-foreground">Loading schedule data...</div>
+             ) : scheduleMaximizers.length === 0 ? (
+               <div className="text-center py-12 text-muted-foreground">
+                 <Calendar className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                 <p>No players with 4+ games this week found.</p>
+               </div>
+             ) : (
+               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                 {scheduleMaximizers.map((player) => (
+                   <Card key={player.id} className="overflow-hidden hover:border-blue-500/50 transition-colors border-blue-500/20">
+                    <CardContent className="p-0">
+                      <div className="flex items-center p-4">
+                        <div className="h-12 w-12 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-700 dark:text-blue-400 font-bold text-lg mr-4 relative">
+                          {player.team}
+                          <span className="absolute -top-1 -right-1 bg-green-500 text-white text-[10px] w-5 h-5 flex items-center justify-center rounded-full border-2 border-background">
+                            {player.gamesThisWeek}
+                          </span>
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <h3 className="font-bold text-lg">{player.full_name}</h3>
+                              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                 <span>{player.position}</span>
+                                 <span>•</span>
+                                 <span className="text-green-600 font-medium flex items-center gap-1">
+                                   <TrendingUp className="h-3 w-3" /> High Volume Week
+                                 </span>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <div className="font-bold text-lg text-primary">
+                                {((player.points || 0) / 82).toFixed(1)}
+                              </div>
+                              <p className="text-xs text-muted-foreground">Pts/Gm</p>
                             </div>
                           </div>
-                          <div className="text-right">
-                            <div className="font-bold text-lg text-primary">{player.projectedPoints || ((player.points || 0) / 15).toFixed(1)}</div>
-                            <p className="text-xs text-muted-foreground">Proj Pts</p>
+                          
+                          <div className="mt-3 flex gap-2 text-sm overflow-x-auto pb-1">
+                             {player.gameDays.map(day => (
+                               <div key={day} className="px-2 py-1 bg-muted rounded text-xs font-medium text-muted-foreground">
+                                 {day}
+                               </div>
+                             ))}
                           </div>
                         </div>
-                        
-                        <div className="mt-3 flex gap-2 text-sm overflow-x-auto pb-1">
-                           {['Mon', 'Wed', 'Fri', 'Sun'].map(day => (
-                             <div key={day} className="px-2 py-1 bg-muted rounded text-xs font-medium text-muted-foreground">{day}</div>
-                           ))}
+                        <div className="ml-4 flex flex-col gap-2">
+                          <Button 
+                            size="sm" 
+                            variant="ghost" 
+                            className={`${watchlist.has(player.id) ? 'text-yellow-500' : 'text-muted-foreground'}`}
+                            onClick={() => toggleWatchlist(player)}
+                          >
+                            <Star className={`h-4 w-4 ${watchlist.has(player.id) ? 'fill-current' : ''}`} />
+                          </Button>
+                          <Button size="sm" onClick={() => handleAddPlayer(player)}>+</Button>
                         </div>
                       </div>
-                      <div className="ml-4 flex flex-col gap-2">
-                        <Button 
-                          size="sm" 
-                          variant="ghost" 
-                          className={`${watchlist.has(player.id) ? 'text-yellow-500' : 'text-muted-foreground'}`}
-                          onClick={() => toggleWatchlist(player)}
-                        >
-                          <Star className={`h-4 w-4 ${watchlist.has(player.id) ? 'fill-current' : ''}`} />
-                        </Button>
-                        <Button size="sm" onClick={() => handleAddPlayer(player)}>+</Button>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-               ))}
-             </div>
+                    </CardContent>
+                  </Card>
+                 ))}
+               </div>
+             )}
           </TabsContent>
           
           <TabsContent value="watch">

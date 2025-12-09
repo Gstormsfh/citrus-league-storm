@@ -260,7 +260,8 @@ export const MatchupService = {
     player: HockeyPlayer,
     isStarter: boolean,
     weekStart: Date,
-    weekEnd: Date
+    weekEnd: Date,
+    timezone: string = 'America/Denver'
   ): Promise<MatchupPlayer> {
     const teamAbbrev = player.teamAbbreviation || player.team || '';
     
@@ -273,8 +274,22 @@ export const MatchupService = {
       }
       
       // Calculate games remaining (scheduled or live games from today onwards)
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
+      // Use test date if in test mode (December 8, 2025)
+      const TEST_MODE = true;
+      const TEST_DATE = '2025-12-08';
+      const getTodayString = () => TEST_MODE ? TEST_DATE : new Date().toISOString().split('T')[0];
+      const getTodayDate = () => {
+        if (TEST_MODE) {
+          const date = new Date(TEST_DATE + 'T00:00:00');
+          date.setHours(0, 0, 0, 0);
+          return date;
+        }
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        return today;
+      };
+      
+      const today = getTodayDate();
       const gamesRemaining = games.filter(g => {
         const gameDate = new Date(g.game_date);
         gameDate.setHours(0, 0, 0, 0);
@@ -282,81 +297,37 @@ export const MatchupService = {
       }).length;
 
       // Check if team has a game today
-      const todayStr = new Date().toISOString().split('T')[0];
+      const todayStr = getTodayString();
       const todayGames = games.filter(g => g.game_date === todayStr);
       const hasGameToday = todayGames.length > 0;
       
       // Determine status based on today's games
-      let gameStatus: 'Yet to Play' | 'In Game' | 'Final' = 'Yet to Play';
+      // Only show status for games that are actually today (December 8, 2025)
+      // Remove "Yet to Play" - it's redundant with the TODAY badge
+      let gameStatus: 'In Game' | 'Final' | null = null;
       if (hasGameToday && todayGames.length > 0) {
         const todayGame = todayGames[0];
         if (todayGame.status === 'live') {
           gameStatus = 'In Game';
         } else if (todayGame.status === 'final') {
           gameStatus = 'Final';
-        } else if (todayGame.status === 'scheduled') {
-          gameStatus = 'Yet to Play';
         }
+        // Don't set status for 'scheduled' - just show the game info
       }
       
-      // Get game for info display - prioritize: today's game > next game in week > next game overall
-      let gameForInfo: NHLGame | null = null;
-      
-      // First, try today's game
-      if (todayGames.length > 0) {
-        gameForInfo = todayGames[0];
-      } else {
-        // Look for next game in the matchup week
-        const upcomingGames = games.filter(g => {
-          const gameDate = new Date(g.game_date);
-          gameDate.setHours(0, 0, 0, 0);
-          return gameDate >= today && (g.status === 'scheduled' || g.status === 'live');
-        });
-        
-        if (upcomingGames.length > 0) {
-          // Sort by date and take the earliest
-          upcomingGames.sort((a, b) => {
-            const dateA = new Date(a.game_date).getTime();
-            const dateB = new Date(b.game_date).getTime();
-            if (dateA !== dateB) return dateA - dateB;
-            // If same date, prefer earlier time
-            const timeA = a.game_time ? new Date(a.game_time).getTime() : 0;
-            const timeB = b.game_time ? new Date(b.game_time).getTime() : 0;
-            return timeA - timeB;
-          });
-          gameForInfo = upcomingGames[0];
-        } else {
-          // Fallback to next game overall (outside week)
-          const { game: nextGame } = await ScheduleService.getNextGameForTeam(teamAbbrev);
-          gameForInfo = nextGame;
-        }
-      }
-      
-      // Get game info for display - always try to get info if game exists
+      // ONLY show game info for games that are actually TODAY (December 8, 2025)
+      // Don't show future games - only show today's games
       let gameInfo: GameInfo | undefined = undefined;
-      if (gameForInfo) {
-        gameInfo = ScheduleService.getGameInfo(gameForInfo, teamAbbrev);
-      }
       
-      // If still no gameInfo but we have games, try to create basic info from first game
-      if (!gameInfo && games.length > 0) {
-        const firstGame = games[0];
-        const isHome = firstGame.home_team === teamAbbrev;
-        const opponent = isHome ? firstGame.away_team : firstGame.home_team;
-        gameInfo = {
-          opponent: `${isHome ? 'vs' : '@'} ${opponent}`,
-          date: firstGame.game_date
-        };
-        if (firstGame.game_time) {
-          const gameTime = new Date(firstGame.game_time);
-          gameInfo.time = gameTime.toLocaleTimeString('en-US', {
-            hour: 'numeric',
-            minute: '2-digit',
-            hour12: true
-          });
-        }
+      // Only set gameInfo if there's a game TODAY
+      if (hasGameToday && todayGames.length > 0) {
+        const todayGame = todayGames[0];
+        gameInfo = ScheduleService.getGameInfo(todayGame, teamAbbrev, timezone);
       }
 
+      // Only mark as "today" if there's actually a game scheduled for today (December 8, 2025)
+      // hasGameToday is already correctly set based on todayStr comparison
+      
       return {
         id: typeof player.id === 'string' ? parseInt(player.id) || 0 : player.id || 0,
         name: player.name,
@@ -364,7 +335,7 @@ export const MatchupService = {
         team: teamAbbrev,
         points: 0, // Matchup points start at 0 (will be calculated from week's games when available)
         gamesRemaining,
-        status: gameStatus,
+        status: gameStatus, // Will be null for scheduled games, 'In Game' or 'Final' for active/completed
         isStarter,
         stats: {
           goals: player.stats.goals || 0,
@@ -373,8 +344,8 @@ export const MatchupService = {
           blk: player.stats.blockedShots || 0,
           gamesPlayed: player.stats.gamesPlayed || 0
         },
-        isToday: hasGameToday,
-        gameInfo
+        isToday: hasGameToday, // Only true if game_date === todayStr (December 8, 2025)
+        gameInfo // Only set if there's a game (today's game or next game in week)
       };
     } catch (error) {
       console.error(`Error transforming player ${player.name} to matchup player:`, error);
@@ -386,7 +357,7 @@ export const MatchupService = {
         team: teamAbbrev,
         points: 0, // Matchup points start at 0
         gamesRemaining: 0,
-        status: 'Yet to Play',
+        status: null,
         isStarter,
         stats: {
           goals: player.stats.goals || 0,
@@ -406,7 +377,8 @@ export const MatchupService = {
    */
   async getMatchupRosters(
     matchup: Matchup,
-    allPlayers: Player[]
+    allPlayers: Player[],
+    timezone: string = 'America/Denver'
   ): Promise<{ 
     team1Roster: MatchupPlayer[]; 
     team2Roster: MatchupPlayer[]; 
@@ -509,13 +481,13 @@ export const MatchupService = {
 
       const team1MatchupPlayers = await Promise.all(
         team1Roster.map(p =>
-          this.transformToMatchupPlayer(p, team1Starters.has(String(p.id)), weekStart, weekEnd)
+          this.transformToMatchupPlayer(p, team1Starters.has(String(p.id)), weekStart, weekEnd, timezone)
         )
       );
 
       const team2MatchupPlayers = await Promise.all(
         team2Roster.map(p =>
-          this.transformToMatchupPlayer(p, team2Starters.has(String(p.id)), weekStart, weekEnd)
+          this.transformToMatchupPlayer(p, team2Starters.has(String(p.id)), weekStart, weekEnd, timezone)
         )
       );
 

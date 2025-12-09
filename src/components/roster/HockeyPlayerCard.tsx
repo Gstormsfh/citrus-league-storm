@@ -57,6 +57,7 @@ export interface HockeyPlayer {
   nextGame?: {
     opponent: string; // e.g. "vs BOS", "@ NYR"
     isToday: boolean;
+    gameTime?: string; // e.g. "7:30 PM"
   };
   projectedPoints?: number;
   
@@ -376,12 +377,17 @@ const HockeyPlayerCardContent = ({
       <div className="px-1.5 pb-1.5 pt-1 bg-muted/20 flex flex-col justify-center gap-1 border-t border-border/30 min-h-[28px]">
         <div className="flex items-center justify-between h-3">
           <div className="flex items-center gap-1">
-            {hasGameToday ? (
+            {hasGameToday && player.nextGame ? (
               <>
                 <CalendarDays className="w-2 h-2 text-green-600" />
                 <span className="text-[8px] font-bold text-green-700 truncate max-w-[50px]">
-                   {player.nextGame?.opponent}
+                   {player.nextGame.opponent}
                 </span>
+                {player.nextGame.gameTime && (
+                  <span className="text-[7px] text-green-600/80 font-medium">
+                    {player.nextGame.gameTime}
+                  </span>
+                )}
               </>
             ) : (
                <span className="text-[8px] text-muted-foreground/50">No Game</span>

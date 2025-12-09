@@ -19,7 +19,7 @@ import { getDraftCompletionDate, getFirstWeekStartDate, getCurrentWeekNumber, ge
 import { Loader2 } from 'lucide-react';
 
 const Matchup = () => {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [activeTab, setActiveTab] = useState("lineup");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -312,13 +312,15 @@ const Matchup = () => {
       const allPlayers = await PlayerService.getAllPlayers();
 
       // Get rosters for both teams with slot assignments
+      // Get user timezone from profile (default to Mountain Time)
+      const userTimezone = profile?.timezone || 'America/Denver';
       const { 
         team1Roster, 
         team2Roster, 
         team1SlotAssignments, 
         team2SlotAssignments, 
         error: rostersError 
-      } = await MatchupService.getMatchupRosters(matchup, allPlayers);
+      } = await MatchupService.getMatchupRosters(matchup, allPlayers, userTimezone);
       
       if (rostersError) {
         // Provide helpful error message

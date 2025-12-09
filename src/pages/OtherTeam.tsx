@@ -12,6 +12,7 @@ import { PlayerService } from '@/services/PlayerService';
 import { LeagueService, Team } from '@/services/LeagueService';
 import { DraftService } from '@/services/DraftService';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import PlayerStatsModal from '@/components/PlayerStatsModal';
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -167,10 +168,12 @@ const OtherTeam = () => {
 
         // Load real NHL schedule data for each player
         const { ScheduleService } = await import('@/services/ScheduleService');
+        // Get user timezone from profile (default to Mountain Time)
+        const userTimezone = profile?.timezone || 'America/Denver';
         for (const player of transformedPlayers) {
           const { game: nextGame } = await ScheduleService.getNextGameForTeam(player.teamAbbreviation || player.team || '');
           const hasGameToday = await ScheduleService.hasGameToday(player.teamAbbreviation || player.team || '');
-          const gameInfo = ScheduleService.getGameInfo(nextGame, player.teamAbbreviation || player.team || '');
+          const gameInfo = ScheduleService.getGameInfo(nextGame, player.teamAbbreviation || player.team || '', userTimezone);
           
           if (gameInfo) {
             player.nextGame = {

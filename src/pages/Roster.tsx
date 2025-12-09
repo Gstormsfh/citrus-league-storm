@@ -407,19 +407,25 @@ const Roster = () => {
 
         // Load real NHL schedule data for each player
         const { ScheduleService } = await import('@/services/ScheduleService');
+        // Get user timezone from profile (default to Mountain Time)
+        const userTimezone = profile?.timezone || 'America/Denver';
         for (const player of transformedPlayers) {
-          const { game: nextGame } = await ScheduleService.getNextGameForTeam(player.teamAbbreviation || player.team || '');
           const hasGameToday = await ScheduleService.hasGameToday(player.teamAbbreviation || player.team || '');
-          const gameInfo = ScheduleService.getGameInfo(nextGame, player.teamAbbreviation || player.team || '');
           
-          if (gameInfo) {
-            player.nextGame = {
-              opponent: gameInfo.opponent,
-              isToday: hasGameToday
-            };
-          } else {
-            player.nextGame = { opponent: 'No upcoming game', isToday: false };
+          // Only show game info if player has a game today
+          if (hasGameToday) {
+            const { game: nextGame } = await ScheduleService.getNextGameForTeam(player.teamAbbreviation || player.team || '');
+            const gameInfo = ScheduleService.getGameInfo(nextGame, player.teamAbbreviation || player.team || '', userTimezone);
+            
+            if (gameInfo) {
+              player.nextGame = {
+                opponent: gameInfo.opponent,
+                isToday: true,
+                gameTime: gameInfo.time
+              };
+            }
           }
+          // If no game today, don't set nextGame (will show "No Game" in the card)
         }
 
         // Sort players consistently by ID for deterministic auto-assignment

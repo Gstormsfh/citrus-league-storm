@@ -151,13 +151,11 @@ export const TeamCard = ({ title, starters, bench, gradientClass, slotAssignment
              <div className="text-[11px] text-muted-foreground leading-none mt-0.5 flex items-center gap-1">
                <span className={`font-medium ${posStyles.text ? `${posStyles.text} font-bold` : ''}`}>{formatPositionForDisplay(displayPos)}</span>
                <span>•</span>
-               {player.gameInfo ? (
-                 <span className={`${player.status === 'In Game' ? 'text-primary font-medium' : ''}`}>
-                   {player.gameInfo.opponent} {player.gameInfo.score ? `(${player.gameInfo.score})` : ''} {player.gameInfo.time ? `• ${player.gameInfo.time}` : ''}
-                 </span>
-               ) : (
-                 <span>{player.status}</span>
-               )}
+              {player.gameInfo ? (
+                <span className={`${player.status === 'In Game' ? 'text-primary font-medium' : ''}`}>
+                  {player.gameInfo.opponent} {player.gameInfo.score ? `(${player.gameInfo.score})` : ''} {player.gameInfo.time ? `• ${player.gameInfo.time}` : ''}
+                </span>
+              ) : null}
              </div>
           </div>
         </div>
@@ -338,9 +336,11 @@ export const TeamCard = ({ title, starters, bench, gradientClass, slotAssignment
                         </div>
                       </TableCell>
                       <TableCell className="text-right w-24 py-3 min-h-[60px] align-middle">
-                        <div className={`text-xs font-medium ${player.status === 'In Game' ? 'text-primary animate-pulse font-bold' : 'text-muted-foreground'} break-words`}>
-                          {player.status}
-                        </div>
+                        {player.status && (
+                          <div className={`text-xs font-medium ${player.status === 'In Game' ? 'text-primary animate-pulse font-bold' : 'text-muted-foreground'} break-words`}>
+                            {player.status}
+                          </div>
+                        )}
                       </TableCell>
                     </TableRow>
                   );
@@ -498,7 +498,9 @@ export const TeamCard = ({ title, starters, bench, gradientClass, slotAssignment
                         </div>
                       </TableCell>
                       <TableCell className="text-right w-24 py-3">
-                          <div className="text-xs text-muted-foreground">{player.status}</div>
+                          {player.status && (
+                            <div className="text-xs text-muted-foreground">{player.status}</div>
+                          )}
                       </TableCell>
                     </TableRow>
                   ))}

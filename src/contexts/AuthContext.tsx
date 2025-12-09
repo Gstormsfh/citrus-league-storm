@@ -11,6 +11,7 @@ interface Profile {
   location: string | null;
   bio: string | null;
   default_team_name: string | null;
+  timezone: string | null;
   created_at: string;
   updated_at: string;
 }
