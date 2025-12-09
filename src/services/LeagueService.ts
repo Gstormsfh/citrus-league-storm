@@ -1,6 +1,7 @@
 import { Player } from "@/services/PlayerService";
 import { supabase } from "@/integrations/supabase/client";
 import { DraftService } from "./DraftService";
+import { MatchupService } from "./MatchupService";
 
 export interface League {
   id: string;
@@ -1118,7 +1119,7 @@ export const LeagueService = {
 
     try {
       // Try Supabase first (shared database, with league_id for isolation)
-      const { error } = await supabase
+      const { error, data } = await supabase
         .from('team_lineups')
         .upsert({
           league_id: leagueId,
@@ -1130,18 +1131,42 @@ export const LeagueService = {
           updated_at: new Date().toISOString()
         }, {
           onConflict: 'league_id,team_id'
-        });
+        })
+        .select()
+        .single();
       
       if (error) {
-        console.warn('Supabase save failed, using localStorage fallback:', error);
+        console.warn('[saveLineup] Supabase save failed, using localStorage fallback:', error);
         throw error; // Fall through to localStorage
       }
+      
+      // Verify the save was successful
+      if (data) {
+        console.log('[saveLineup] Lineup saved successfully to Supabase:', {
+          teamId,
+          leagueId,
+          starters: data.starters?.length || 0,
+          bench: data.bench?.length || 0,
+          ir: data.ir?.length || 0
+        });
+      }
+      
+      // Supabase save succeeded - clear any stale localStorage data to prevent conflicts
+      const key = `lineup_team_${teamId}`;
+      localStorage.removeItem(key);
+      console.log('[saveLineup] Cleared stale localStorage');
+      
+      // Clear roster cache when lineup is saved so matchup page shows updated lineup
+      MatchupService.clearRosterCache(String(teamId), leagueId);
     } catch (error) {
       // Fallback to localStorage if Supabase fails (offline mode, errors, etc.)
       try {
         const key = `lineup_team_${teamId}`;
         localStorage.setItem(key, JSON.stringify(lineupToSave));
-        console.log('Saved to localStorage as fallback');
+        console.log('[saveLineup] Saved to localStorage as fallback (Supabase unavailable)');
+        
+        // Still clear cache even if using localStorage fallback
+        MatchupService.clearRosterCache(String(teamId), leagueId);
       } catch (localError) {
         console.error('Failed to save lineup to both Supabase and localStorage:', localError);
       }
@@ -1184,13 +1209,28 @@ export const LeagueService = {
       if (error) {
         // PGRST116 is "not found", which is OK - no lineup exists yet
         if (error.code === 'PGRST116') {
+          // No lineup in Supabase - clear any stale localStorage data
+          const key = `lineup_team_${teamId}`;
+          localStorage.removeItem(key);
+          console.log('[getLineup] No lineup in Supabase, cleared stale localStorage');
           return null;
         }
-        console.warn('Supabase load failed, trying localStorage fallback:', error);
-        throw error; // Fall through to localStorage
+        // Actual error (network, permission, etc.) - fall back to localStorage
+        console.warn('[getLineup] Supabase query error, trying localStorage fallback:', error);
+        const key = `lineup_team_${teamId}`;
+        const saved = localStorage.getItem(key);
+        if (saved) {
+          console.log('[getLineup] Loaded from localStorage fallback (Supabase error)');
+          return JSON.parse(saved);
+        }
+        return null;
       }
       
       if (data) {
+        // Supabase data found - clear any stale localStorage data to prevent conflicts
+        const key = `lineup_team_${teamId}`;
+        localStorage.removeItem(key);
+        console.log('[getLineup] Loaded from Supabase, cleared stale localStorage');
         return {
           starters: (data.starters || []) as string[],
           bench: (data.bench || []) as string[],
@@ -1199,19 +1239,24 @@ export const LeagueService = {
         };
       }
       
-      // No data found in Supabase, try localStorage fallback
+      // No data found in Supabase (null result, not an error) - clear localStorage and return null
+      // Don't fall back to localStorage when Supabase returns null, as that indicates no lineup exists
+      const key = `lineup_team_${teamId}`;
+      localStorage.removeItem(key);
+      console.log('[getLineup] No lineup in Supabase (null result), cleared stale localStorage');
       return null;
     } catch (error) {
-      // Fallback to localStorage if Supabase fails
+      // Only fallback to localStorage on actual exceptions (network failures, etc.)
+      console.warn('[getLineup] Exception occurred, trying localStorage fallback:', error);
       try {
         const key = `lineup_team_${teamId}`;
         const saved = localStorage.getItem(key);
         if (saved) {
-          console.log('Loaded from localStorage fallback');
+          console.log('[getLineup] Loaded from localStorage fallback (exception)');
           return JSON.parse(saved);
         }
       } catch (localError) {
-        console.error('Failed to load lineup from both Supabase and localStorage:', localError);
+        console.error('[getLineup] Failed to load lineup from both Supabase and localStorage:', localError);
       }
       return null;
     }
@@ -1493,7 +1538,6 @@ export const LeagueService = {
         .maybeSingle();
       
       if (teamData) {
-        const { MatchupService } = await import('./MatchupService');
         MatchupService.clearRosterCache(teamData.id, leagueId);
       }
 
@@ -1531,16 +1575,47 @@ export const LeagueService = {
         return { success: false, error: new Error('Team not found') };
       }
 
-      const { data: lineupData } = await supabase
+      // Get lineup data (use maybeSingle to handle case where no lineup exists yet)
+      const { data: lineupData, error: lineupError } = await supabase
         .from('team_lineups')
         .select('starters, bench, ir')
         .eq('team_id', teamData.id)
-        .single();
+        .eq('league_id', leagueId)
+        .maybeSingle();
 
-      const currentRosterSize = 
-        (lineupData?.starters?.length || 0) +
-        (lineupData?.bench?.length || 0) +
-        (lineupData?.ir?.length || 0);
+      // Check for query errors (not just "no rows found")
+      if (lineupError && lineupError.code !== 'PGRST116') {
+        // PGRST116 = no rows found (expected when no lineup exists yet)
+        // Any other error is a real database error
+        console.error('Error fetching lineup data:', lineupError);
+        return { success: false, error: new Error('Could not load lineup information') };
+      }
+
+      // Calculate current roster size
+      // If lineup exists, use it; otherwise count draft picks
+      let currentRosterSize = 0;
+      if (lineupData) {
+        // Lineup exists - use lineup data
+        currentRosterSize = 
+          (lineupData.starters?.length || 0) +
+          (lineupData.bench?.length || 0) +
+          (lineupData.ir?.length || 0);
+      } else {
+        // No lineup exists yet - count draft picks instead
+        const { count: draftPicksCount, error: picksError } = await supabase
+          .from('draft_picks')
+          .select('*', { count: 'exact', head: true })
+          .eq('team_id', teamData.id)
+          .eq('league_id', leagueId)
+          .is('deleted_at', null);
+        
+        if (picksError) {
+          console.error('Error counting draft picks:', picksError);
+          return { success: false, error: new Error('Could not load draft picks for roster size check') };
+        } else {
+          currentRosterSize = draftPicksCount || 0;
+        }
+      }
 
       const maxRosterSize = league.roster_size + 3; // roster_size + 3 IR slots
 

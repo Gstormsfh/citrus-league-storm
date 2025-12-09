@@ -174,6 +174,8 @@ const Matchup = () => {
     }
 
     const loadMatchupData = async () => {
+      // Clear roster cache to ensure fresh data when navigating from roster page
+      MatchupService.clearRosterCache();
       try {
         setLoading(true);
         setError(null);
@@ -246,6 +248,25 @@ const Matchup = () => {
 
     loadMatchupData();
   }, [user]);
+
+  // Refresh matchup when page becomes visible (e.g., navigating back from roster page)
+  useEffect(() => {
+    if (!user || !league || !firstWeekStart || !userTeam) return;
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        // Page became visible - refresh matchup to get latest lineup changes
+        console.log('[Matchup] Page visible, refreshing matchup data...');
+        MatchupService.clearRosterCache(userTeam.id, league.id);
+        loadMatchupForWeek(league.id, user.id, selectedWeek, firstWeekStart, userTeam).catch(err => {
+          console.error('Error refreshing matchup:', err);
+        });
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [user, league, firstWeekStart, userTeam, selectedWeek]);
 
   const loadMatchupForWeek = async (leagueId: string, userId: string, weekNumber: number, firstWeekStart: Date, userTeamData?: Team) => {
     try {
@@ -400,7 +421,19 @@ const Matchup = () => {
   const handleWeekChange = async (weekNumber: number) => {
     if (!league || !user || !firstWeekStart) return;
     setSelectedWeek(weekNumber);
+    // Clear cache before loading to ensure fresh lineup data
+    if (userTeam) {
+      MatchupService.clearRosterCache(userTeam.id, league.id);
+    }
     await loadMatchupForWeek(league.id, user.id, weekNumber, firstWeekStart, userTeam);
+  };
+  
+  // Refresh matchup data (useful after making lineup changes on roster page)
+  const refreshMatchup = async () => {
+    if (!league || !user || !firstWeekStart || !userTeam) return;
+    // Clear all caches to force fresh data
+    MatchupService.clearRosterCache();
+    await loadMatchupForWeek(league.id, user.id, selectedWeek, firstWeekStart, userTeam);
   };
 
   return (

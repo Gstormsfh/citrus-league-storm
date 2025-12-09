@@ -136,9 +136,9 @@ const FreeAgents = () => {
       const uniqueTeams = [...new Set(topPlayers.map(p => p.team))];
       
       // Calculate matchup week dates (same logic as Matchup tab)
-      // Use test mode date if in test mode (December 8, 2025)
-      const TEST_MODE = true;
-      const TEST_DATE = '2025-12-08';
+      // Test mode controlled via VITE_TEST_MODE environment variable (defaults to false)
+      const TEST_MODE = import.meta.env.VITE_TEST_MODE === 'true';
+      const TEST_DATE = import.meta.env.VITE_TEST_DATE || '2025-12-08';
       const getTodayDate = () => {
         if (TEST_MODE) {
           const date = new Date(TEST_DATE + 'T00:00:00');
@@ -286,17 +286,57 @@ const FreeAgents = () => {
         return;
       }
 
-      const { data: lineupData } = await supabase
+      // Get lineup data (use maybeSingle to handle case where no lineup exists yet)
+      const { data: lineupData, error: lineupError } = await supabase
         .from('team_lineups')
         .select('starters, bench, ir')
         .eq('team_id', teamData.id)
         .eq('league_id', leagueId)
-        .single();
+        .maybeSingle();
 
-      const currentRosterSize = 
-        (lineupData?.starters?.length || 0) +
-        (lineupData?.bench?.length || 0) +
-        (lineupData?.ir?.length || 0);
+      // Check for query errors (not just "no rows found")
+      if (lineupError && lineupError.code !== 'PGRST116') {
+        // PGRST116 = no rows found (expected when no lineup exists yet)
+        // Any other error is a real database error
+        console.error('Error fetching lineup data:', lineupError);
+        toast({
+          title: "Error",
+          description: "Could not load lineup information.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Calculate current roster size
+      // If lineup exists, use it; otherwise count draft picks
+      let currentRosterSize = 0;
+      if (lineupData) {
+        // Lineup exists - use lineup data
+        currentRosterSize = 
+          (lineupData.starters?.length || 0) +
+          (lineupData.bench?.length || 0) +
+          (lineupData.ir?.length || 0);
+      } else {
+        // No lineup exists yet - count draft picks instead
+        const { count: draftPicksCount, error: picksError } = await supabase
+          .from('draft_picks')
+          .select('*', { count: 'exact', head: true })
+          .eq('team_id', teamData.id)
+          .eq('league_id', leagueId)
+          .is('deleted_at', null);
+        
+        if (picksError) {
+          console.error('Error counting draft picks:', picksError);
+          toast({
+            title: "Error",
+            description: "Could not load draft picks for roster size check.",
+            variant: "destructive"
+          });
+          return;
+        } else {
+          currentRosterSize = draftPicksCount || 0;
+        }
+      }
 
       const maxRosterSize = league.roster_size + 3; // roster_size + 3 IR slots
 

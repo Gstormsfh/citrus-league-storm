@@ -11,6 +11,7 @@ import { useState, useEffect } from 'react';
 import { PlayerService } from '@/services/PlayerService';
 import { LeagueService, Team } from '@/services/LeagueService';
 import { DraftService } from '@/services/DraftService';
+import { ScheduleService } from '@/services/ScheduleService';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import PlayerStatsModal from '@/components/PlayerStatsModal';
@@ -167,7 +168,6 @@ const OtherTeam = () => {
         }));
 
         // Load real NHL schedule data for each player
-        const { ScheduleService } = await import('@/services/ScheduleService');
         // Get user timezone from profile (default to Mountain Time)
         const userTimezone = profile?.timezone || 'America/Denver';
         for (const player of transformedPlayers) {

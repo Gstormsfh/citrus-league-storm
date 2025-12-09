@@ -24,6 +24,7 @@ import { PlayerService } from '@/services/PlayerService';
 import { LeagueService, Transaction } from '@/services/LeagueService';
 import { DraftService } from '@/services/DraftService';
 import { CitrusPuckService } from '@/services/CitrusPuckService';
+import { ScheduleService } from '@/services/ScheduleService';
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { supabase } from '@/integrations/supabase/client';
 
@@ -429,7 +430,6 @@ const Roster = () => {
         }));
 
         // Load real NHL schedule data for all players (batch query for performance)
-        const { ScheduleService } = await import('@/services/ScheduleService');
         // Get user timezone from profile (default to Mountain Time)
         const userTimezone = profile?.timezone || 'America/Denver';
         
@@ -1217,12 +1217,27 @@ const Roster = () => {
         
         // Save lineup to Supabase (only for logged-in users)
         if (userTeamId && user && userTeam?.league_id) {
-          LeagueService.saveLineup(userTeamId, userTeam.league_id, {
+          const lineupToSave = {
             starters: newStarters.map(p => p.id),
             bench: newBench.map(p => p.id),
             ir: newIR.map(p => p.id),
             slotAssignments: newAssignments
-          }).catch(err => console.error('Failed to save lineup:', err));
+          };
+          console.log('[Roster] Saving lineup:', {
+            teamId: userTeamId,
+            leagueId: userTeam.league_id,
+            starters: lineupToSave.starters.length,
+            bench: lineupToSave.bench.length,
+            ir: lineupToSave.ir.length,
+            starterIds: lineupToSave.starters
+          });
+          LeagueService.saveLineup(userTeamId, userTeam.league_id, lineupToSave)
+            .then(() => {
+              console.log('[Roster] Lineup saved successfully');
+            })
+            .catch(err => {
+              console.error('[Roster] Failed to save lineup:', err);
+            });
         }
         
         return updatedRoster;

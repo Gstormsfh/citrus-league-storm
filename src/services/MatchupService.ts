@@ -509,6 +509,12 @@ export const MatchupService = {
       const weekEnd = new Date(matchup.week_end_date);
 
       // Parallelize: Get rosters and lineups for both teams simultaneously
+      // Note: Clear cache first to ensure we get fresh lineup data
+      this.clearRosterCache(matchup.team1_id, matchup.league_id);
+      if (matchup.team2_id) {
+        this.clearRosterCache(matchup.team2_id, matchup.league_id);
+      }
+      
       const [team1Roster, team2Roster, team1LineupResult, team2LineupResult] = await Promise.all([
         this.getTeamRoster(matchup.team1_id, matchup.league_id, allPlayers),
         matchup.team2_id
@@ -522,56 +528,46 @@ export const MatchupService = {
 
       let team1Lineup = team1LineupResult;
       let team2Lineup = team2LineupResult;
-
-      // If lineup doesn't exist, try to initialize it first
-      if (!team1Lineup || !team1Lineup.starters || team1Lineup.starters.length === 0) {
-        console.warn(`Team ${matchup.team1_id} has no saved lineup. Attempting to initialize...`);
-        const { lineup: initializedLineup, error: initError } = await LeagueService.initializeTeamLineup(
-          matchup.team1_id,
-          matchup.league_id,
-          allPlayers
-        );
-        
-        if (initError || !initializedLineup) {
-          const error = new Error(`Team ${matchup.team1_id} has no lineup and initialization failed. Please ensure rosters are initialized after draft completion.`);
-          console.error('Lineup initialization failed:', error);
-          return {
-            team1Roster: [],
-            team2Roster: [],
-            team1SlotAssignments: {},
-            team2SlotAssignments: {},
-            error
-          };
-        }
-        
-        team1Lineup = initializedLineup;
-        console.log(`Successfully initialized lineup for team ${matchup.team1_id}`);
+      
+      // Debug logging to help diagnose lineup sync issues
+      if (team1Lineup) {
+        console.log(`[MatchupService] Team1 lineup loaded: ${team1Lineup.starters.length} starters, ${team1Lineup.bench.length} bench, ${team1Lineup.ir.length} IR`);
+        console.log(`[MatchupService] Team1 starter IDs:`, team1Lineup.starters);
+      } else {
+        console.warn(`[MatchupService] Team1 (${matchup.team1_id}) has no saved lineup. Lineup should be set via Roster page.`);
+      }
+      if (team2Lineup) {
+        console.log(`[MatchupService] Team2 lineup loaded: ${team2Lineup.starters.length} starters, ${team2Lineup.bench.length} bench, ${team2Lineup.ir.length} IR`);
+        console.log(`[MatchupService] Team2 starter IDs:`, team2Lineup.starters);
+      } else if (matchup.team2_id) {
+        console.warn(`[MatchupService] Team2 (${matchup.team2_id}) has no saved lineup. Lineup should be set via Roster page.`);
       }
 
-      if (matchup.team2_id) {
-        if (!team2Lineup || !team2Lineup.starters || team2Lineup.starters.length === 0) {
-          console.warn(`Team ${matchup.team2_id} has no saved lineup. Attempting to initialize...`);
-          const { lineup: initializedLineup, error: initError } = await LeagueService.initializeTeamLineup(
-            matchup.team2_id,
-            matchup.league_id,
-            allPlayers
-          );
-          
-          if (initError || !initializedLineup) {
-            const error = new Error(`Team ${matchup.team2_id} has no lineup and initialization failed. Please ensure rosters are initialized after draft completion.`);
-            console.error('Lineup initialization failed:', error);
-            return {
-              team1Roster: [],
-              team2Roster: [],
-              team1SlotAssignments: {},
-              team2SlotAssignments: {},
-              error
-            };
-          }
-          
-          team2Lineup = initializedLineup;
-          console.log(`Successfully initialized lineup for team ${matchup.team2_id}`);
-        }
+      // CRITICAL: Do NOT auto-initialize lineups here - this can overwrite user's manual lineup changes
+      // If no lineup exists, return an error directing user to set lineup on Roster page
+      // The roster page handles initial lineup creation when needed
+      if (!team1Lineup) {
+        const error = new Error(`Team ${matchup.team1_id} has no saved lineup. Please set your lineup on the Roster page first.`);
+        console.error('[MatchupService] No lineup found for team1:', error);
+        return {
+          team1Roster: [],
+          team2Roster: [],
+          team1SlotAssignments: {},
+          team2SlotAssignments: {},
+          error
+        };
+      }
+
+      if (matchup.team2_id && !team2Lineup) {
+        const error = new Error(`Opponent team ${matchup.team2_id} has no saved lineup.`);
+        console.error('[MatchupService] No lineup found for team2:', error);
+        return {
+          team1Roster: [],
+          team2Roster: [],
+          team1SlotAssignments: {},
+          team2SlotAssignments: {},
+          error
+        };
       }
 
       // Use saved lineups (strict - no auto-assignment fallback)
