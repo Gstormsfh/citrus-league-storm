@@ -350,9 +350,9 @@ export const MatchupService = {
     try {
       
       // Calculate games remaining (scheduled or live games from today onwards)
-      // Use test date if in test mode (December 8, 2025)
-      const TEST_MODE = true;
-      const TEST_DATE = '2025-12-08';
+      // Test mode controlled via VITE_TEST_MODE environment variable (defaults to false)
+      const TEST_MODE = import.meta.env.VITE_TEST_MODE === 'true';
+      const TEST_DATE = import.meta.env.VITE_TEST_DATE || '2025-12-08';
       const getTodayString = () => TEST_MODE ? TEST_DATE : new Date().toISOString().split('T')[0];
       const getTodayDate = () => {
         if (TEST_MODE) {

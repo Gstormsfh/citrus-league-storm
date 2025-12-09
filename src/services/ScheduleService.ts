@@ -1,9 +1,10 @@
 import { supabase } from '@/integrations/supabase/client';
 
-// Test mode: Set to December 8, 2025 for testing
-// Set this to true to use December 8, 2025 as "today" for testing
-const TEST_MODE = true;
-const TEST_DATE = '2025-12-08';
+// Test mode: Controlled via VITE_TEST_MODE environment variable
+// Set VITE_TEST_MODE=true in .env to use test date for development
+// Defaults to false (uses actual current date) for production
+const TEST_MODE = import.meta.env.VITE_TEST_MODE === 'true';
+const TEST_DATE = import.meta.env.VITE_TEST_DATE || '2025-12-08';
 
 // Helper to get "today" - uses test date if in test mode
 function getTodayString(): string {
