@@ -21,13 +21,24 @@ try:
         MODEL_FEATURES = joblib.load('model_features.joblib')
     except FileNotFoundError:
         # Fallback to default if feature list not found
-        MODEL_FEATURES = ['distance', 'angle', 'is_rebound', 'shot_type_encoded', 'is_power_play', 'score_differential']
+        MODEL_FEATURES = ['distance', 'angle', 'is_rebound', 'shot_type_encoded', 'is_power_play', 'score_differential',
+                         'has_pass_before_shot', 'pass_lateral_distance', 'pass_to_net_distance']
     # Load the shot type encoder
     try:
         SHOT_TYPE_ENCODER = joblib.load('shot_type_encoder.joblib')
     except FileNotFoundError:
         print("WARNING: shot_type_encoder.joblib not found. Shot type encoding may fail.")
         SHOT_TYPE_ENCODER = None
+    
+    # Load the xA (Expected Assists) model
+    try:
+        XA_MODEL = joblib.load('xa_model.joblib')
+        XA_MODEL_FEATURES = joblib.load('xa_model_features.joblib')
+        print("xA model loaded successfully.")
+    except FileNotFoundError:
+        print("WARNING: xa_model.joblib not found. Expected Assists calculation will be skipped.")
+        XA_MODEL = None
+        XA_MODEL_FEATURES = None
 except FileNotFoundError:
     print("ERROR: xg_model.joblib not found. Please run model_trainer.py first!")
     exit()
@@ -98,6 +109,84 @@ def calculate_time_difference(prev_play, current_play, max_period=3):
     
     return time_diff
 
+def find_pass_before_shot(play, previous_plays, current_team_id):
+    """
+    Find a pass/play by the same team within 2-3 seconds before a shot.
+    
+    Args:
+        play: Current shot play
+        previous_plays: List of previous plays (last 15 plays)
+        current_team_id: Team ID of the shooting team
+    
+    Returns:
+        dict with keys:
+            - 'pass_play': The pass event if found, None otherwise
+            - 'passer_id': The playerId of the passer, None if not found
+    """
+    if not previous_plays or not current_team_id:
+        return None
+    
+    current_period = play.get('periodDescriptor', {}).get('number', 0)
+    current_time = parse_time_to_seconds(play.get('timeInPeriod', ''))
+    
+    if current_time is None:
+        return None
+    
+    # Excluded event types (not passes):
+    # 502 = faceoff, 503 = hit (optional - may want to include), 
+    # penalties, stoppages, period-end, game-end
+    excluded_types = [502]  # Faceoffs are definitely not passes
+    # Note: We'll include hits (503) as they could be passes, but prioritize other events
+    
+    # Look back through previous plays (most recent first)
+    for prev_play in reversed(previous_plays[-15:]):  # Check last 15 plays
+        prev_type_code = prev_play.get('typeCode')
+        prev_details = prev_play.get('details', {})
+        prev_team_id = prev_details.get('eventOwnerTeamId')
+        
+        # Skip excluded types
+        if prev_type_code in excluded_types:
+            continue
+        
+        # Must be same team
+        if not prev_team_id or prev_team_id != current_team_id:
+            continue
+        
+        # Must be same period
+        prev_period = prev_play.get('periodDescriptor', {}).get('number', 0)
+        if prev_period != current_period:
+            continue
+        
+        # Must have coordinates (passes need location data)
+        prev_x = prev_details.get('xCoord', 0)
+        prev_y = prev_details.get('yCoord', 0)
+        if prev_x == 0 and prev_y == 0:
+            continue
+        
+        # Calculate time difference
+        prev_time = parse_time_to_seconds(prev_play.get('timeInPeriod', ''))
+        if prev_time is None:
+            continue
+        
+        time_diff = current_time - prev_time
+        
+        # Must be within 3 seconds (same as rebound detection)
+        if 0 < time_diff <= 3.0:
+            # Extract passer ID from pass event
+            # Try playerId first, fallback to eventOwnerTeamId (team-level, less accurate)
+            passer_id = prev_details.get('playerId')
+            if not passer_id:
+                # Fallback: use eventOwnerTeamId (but this is team-level, not player-level)
+                # This is less ideal but better than nothing
+                passer_id = prev_team_id
+            
+            return {
+                'pass_play': prev_play,
+                'passer_id': passer_id
+            }
+    
+    return {'pass_play': None, 'passer_id': None}
+
 def get_finished_game_ids(date_str=None):
     """Fetches list of finished games for a given date."""
     date_to_check = date_str if date_str else datetime.date.today().strftime('%Y-%m-%d')
@@ -148,6 +237,7 @@ def scrape_pbp_and_process():
             # typeCode values: 505 = goal, 506 = shot-on-goal, 507 = missed-shot
             # Plays are already sorted by sortOrder, so we can track previous plays for rebound detection
             previous_play = None  # Track previous play for rebound detection
+            previous_plays = []  # Track last 15 plays for pass detection (need more history than rebounds)
             
             for play in raw_data.get('plays', []):
                 type_code = play.get('typeCode')
@@ -180,7 +270,7 @@ def scrape_pbp_and_process():
                     shot_coord_y = -shot_coord_y
                 
                 # ============================================================
-                # FEATURE ENGINEERING: Calculate all 6 model inputs
+                # FEATURE ENGINEERING: Calculate all 9 model inputs
                 # ============================================================
                 
                 # FEATURE 1: DISTANCE (Continuous, 0-100+ feet)
@@ -235,8 +325,69 @@ def scrape_pbp_and_process():
                             if time_diff is not None and time_diff < 3.0:  # Within 3 seconds
                                 is_rebound = 1
                 
+                # FEATURE 7-9: PASS BEFORE SHOT FEATURES
+                # What: Detect if there was a pass/play by the same team right before the shot
+                # Why: One-timers and backdoor passes are significantly more dangerous (expected 10-15% importance)
+                # Features:
+                #   - has_pass_before_shot: Binary (0 or 1) - whether a pass was detected
+                #   - pass_lateral_distance: Continuous (0-100+ ft) - how far across ice the pass traveled
+                #   - pass_to_net_distance: Continuous (0-100+ ft) - how close the pass was to the net
+                has_pass_before_shot = 0
+                pass_lateral_distance = 0.0
+                pass_to_net_distance = 0.0
+                
+                current_team_id = details.get('eventOwnerTeamId')
+                pass_result = find_pass_before_shot(play, previous_plays, current_team_id)
+                pass_play = pass_result.get('pass_play') if pass_result else None
+                passer_id = pass_result.get('passer_id') if pass_result else None
+                
+                if pass_play:
+                    has_pass_before_shot = 1
+                    pass_details = pass_play.get('details', {})
+                    pass_x = pass_details.get('xCoord', 0)
+                    pass_y = pass_details.get('yCoord', 0)
+                    
+                    # Flip coordinates if needed (same as shot coordinates)
+                    if pass_x < 0:
+                        pass_x = -pass_x
+                        pass_y = -pass_y
+                    
+                    # Calculate lateral distance (y-axis difference between pass and shot)
+                    # This measures how far across the ice the pass traveled
+                    pass_lateral_distance = abs(shot_coord_y - pass_y)
+                    
+                    # Calculate distance from pass location to net
+                    # This measures how close the pass was to the net
+                    pass_to_net_distance = math.sqrt((NET_X - pass_x)**2 + (NET_Y - pass_y)**2)
+                    
+                    # Calculate time before shot (for xA model)
+                    time_before_shot = calculate_time_difference(pass_play, play)
+                    if time_before_shot is None:
+                        time_before_shot = 0.0
+                    
+                    # Calculate pass angle (for xA model) - angle from net center to pass location
+                    pass_dx = abs(NET_X - pass_x)  # Horizontal distance from net
+                    pass_dy = abs(pass_y - NET_Y)  # Vertical distance from center
+                    
+                    if pass_dx == 0:
+                        pass_angle = 90.0  # Directly to the side
+                    else:
+                        pass_angle = math.degrees(math.atan2(pass_dy, pass_dx))
+                    
+                    # Ensure pass angle is in valid range (0-90 degrees)
+                    pass_angle = max(0.0, min(90.0, pass_angle))
+                else:
+                    passer_id = None
+                    time_before_shot = 0.0
+                    pass_angle = 0.0
+                
                 # Update previous_play for next iteration (only track shot-related plays)
                 previous_play = play
+                
+                # Update previous_plays list (track all plays for pass detection)
+                previous_plays.append(play)
+                if len(previous_plays) > 15:  # Keep last 15 plays
+                    previous_plays.pop(0)
                 
                 # FEATURE 4: SHOT_TYPE_ENCODED (Categorical, encoded as integer)
                 # What: Type of shot taken (wrist, snap, slap, etc.)
@@ -319,8 +470,8 @@ def scrape_pbp_and_process():
                     score_differential = away_score_at_event - home_score_at_event
 
                 # Append the features required by the model
-                all_shot_data.append({
-                    'playerId': player_id,
+                shot_record = {
+                    'playerId': player_id,  # Shooter
                     'game_id': game_id,
                     # THESE ARE THE FEATURES YOUR MODEL USES:
                     'distance': distance,
@@ -329,7 +480,18 @@ def scrape_pbp_and_process():
                     'shot_type_encoded': shot_type_encoded,
                     'is_power_play': is_power_play,
                     'score_differential': score_differential,
-                })
+                    # NEW PASS FEATURES (for xG model):
+                    'has_pass_before_shot': has_pass_before_shot,
+                    'pass_lateral_distance': pass_lateral_distance,
+                    'pass_to_net_distance': pass_to_net_distance,
+                    # xA FEATURES (for Expected Assists model):
+                    'passer_id': passer_id,  # Passer (None if no pass)
+                    'pass_distance_to_net': pass_to_net_distance,  # Same as pass_to_net_distance, but named for xA
+                    'pass_angle': pass_angle,
+                    'time_before_shot': time_before_shot,
+                    'shot_result': 1 if type_code == 505 else 0,  # 1 = goal, 0 = no goal (for xA training)
+                }
+                all_shot_data.append(shot_record)
             
         except Exception as e:
             print(f"Could not process Game ID {game_id}: {e}")
@@ -373,17 +535,97 @@ def scrape_pbp_and_process():
     SCALE_FACTOR = 0.17  # Brings 1.165 avg down to ~0.2
     df_shots['xG_Value'] = df_shots['xG_Value'] * SCALE_FACTOR 
 
-    # 3. Aggregate xG per player for the final stats table
+    # --- EXPECTED ASSISTS (xA) PREDICTION ---
+    # Only calculate xA for shots that have passes before them
+    df_shots['xA_Value'] = 0.0  # Initialize xA column
+    
+    if XA_MODEL and XA_MODEL_FEATURES:
+        # Filter to only shots with passes
+        passes_mask = df_shots['has_pass_before_shot'] == 1
+        df_passes = df_shots[passes_mask].copy()
+        
+        if len(df_passes) > 0:
+            # Select xA model features
+            X_xa_predict = df_passes[XA_MODEL_FEATURES]
+            
+            # Predict xA probability
+            # XA_MODEL.predict_proba returns [[Prob of No Goal, Prob of Goal]]
+            # We take the second column [:, 1] because that's the probability of a GOAL (the xA value)
+            raw_xa = XA_MODEL.predict_proba(X_xa_predict)[:, 1]
+            
+            # Calibrate xA values (similar to xG calibration)
+            # xA values should be similar to xG but from pass perspective
+            CALIBRATION_FACTOR_XA = 3.5  # Same as xG
+            df_passes['xA_Value'] = np.power(raw_xa, CALIBRATION_FACTOR_XA)
+            
+            # Cap xA values (similar to xG)
+            df_passes['xA_Value'] = df_passes['xA_Value'].clip(upper=0.50)
+            
+            # Scale down to match realistic xA ranges
+            # xA should be slightly lower than xG on average (passes are less direct than shots)
+            SCALE_FACTOR_XA = 0.15  # Slightly lower than xG scale factor
+            df_passes['xA_Value'] = df_passes['xA_Value'] * SCALE_FACTOR_XA
+            
+            # Update xA values in main dataframe
+            df_shots.loc[passes_mask, 'xA_Value'] = df_passes['xA_Value'].values
+            
+            print(f"Calculated xA for {len(df_passes)} passes that led to shots.")
+        else:
+            print("No passes found before shots. Skipping xA calculation.")
+    else:
+        print("xA model not loaded. Skipping Expected Assists calculation.")
+
+    # 3. Aggregate xG per player (shooter) for the final stats table
     # This groups all the calculated xG values and sums them up per player and per game.
-    final_stats_df = df_shots.groupby(['playerId', 'game_id']).agg(
+    final_stats_df_xg = df_shots.groupby(['playerId', 'game_id']).agg(
         # I_F_xGoals (Individual For Expected Goals) is the sum of all xG values for the player's shots
         I_F_xGoals=('xG_Value', 'sum')
         # NOTE: This is where you would add the complex logic for GSAx, OnIce_xGoalsPercentage, etc.
         # Removed total_shots as it's not in the database schema
     ).reset_index()
 
-    print(f"Calculated xG for {len(final_stats_df)} unique player/game combinations.")
-    return final_stats_df
+    print(f"Calculated xG for {len(final_stats_df_xg)} unique player/game combinations.")
+    
+    # 4. Aggregate xA per passer for the final stats table
+    # Only aggregate for passes that led to shots (passer_id is not None)
+    if XA_MODEL and XA_MODEL_FEATURES:
+        passes_with_xa = df_shots[df_shots['passer_id'].notna() & (df_shots['xA_Value'] > 0)].copy()
+        
+        if len(passes_with_xa) > 0:
+            final_stats_df_xa = passes_with_xa.groupby(['passer_id', 'game_id']).agg(
+                # I_F_xAssists (Individual For Expected Assists) is the sum of all xA values for the player's passes
+                I_F_xAssists=('xA_Value', 'sum')
+            ).reset_index()
+            
+            # Rename passer_id to playerId for consistency with database schema
+            final_stats_df_xa = final_stats_df_xa.rename(columns={'passer_id': 'playerId'})
+            
+            print(f"Calculated xA for {len(final_stats_df_xa)} unique passer/game combinations.")
+            
+            # Merge xG and xA dataframes
+            # Some players may have both xG (as shooters) and xA (as passers)
+            final_stats_df = final_stats_df_xg.merge(
+                final_stats_df_xa,
+                on=['playerId', 'game_id'],
+                how='outer',
+                suffixes=('', '_xa')
+            )
+            
+            # Fill NaN values with 0 (players who only shot or only passed)
+            final_stats_df['I_F_xGoals'] = final_stats_df['I_F_xGoals'].fillna(0.0)
+            final_stats_df['I_F_xAssists'] = final_stats_df['I_F_xAssists'].fillna(0.0)
+            
+            return final_stats_df
+        else:
+            print("No passes with xA values found. Returning only xG data.")
+            # Add I_F_xAssists column with 0 values for consistency
+            final_stats_df_xg['I_F_xAssists'] = 0.0
+            return final_stats_df_xg
+    else:
+        # No xA model, return only xG data
+        # Add I_F_xAssists column with 0 values for consistency
+        final_stats_df_xg['I_F_xAssists'] = 0.0
+        return final_stats_df_xg
 
 
 

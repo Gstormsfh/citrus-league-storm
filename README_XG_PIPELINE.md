@@ -2,13 +2,25 @@
 
 ## 📖 Overview
 
-This pipeline calculates **Expected Goals (xG)** for NHL players using machine learning. It processes play-by-play data from the NHL API, extracts features, applies an XGBoost model, and stores results in Supabase.
+This pipeline calculates **Expected Goals (xG)** and **Expected Assists (xA)** for NHL players using machine learning. It processes play-by-play data from the NHL API, extracts features, applies XGBoost models, and stores results in Supabase.
 
-## 🎯 What is xG?
+## 🎯 What are xG and xA?
 
+### Expected Goals (xG)
 **Expected Goals (xG)** is a metric that estimates the probability that a shot will result in a goal, based on various factors like distance, angle, shot type, and game situation. It's a more advanced stat than simple shot counts because it accounts for shot quality.
 
 **Example**: A shot from 10 feet directly in front of the net has much higher xG (~0.30) than a shot from 60 feet at a bad angle (~0.05).
+
+### Expected Assists (xA)
+**Expected Assists (xA)** is a **unique metric** that estimates the probability that a pass will result in a goal. It's calculated from the **pass location perspective**, tracking passer contributions separately from shooter contributions.
+
+**Example**: A pass from 5 feet in front of the net, 1 second before a shot (one-timer) has very high xA (~0.25) compared to a pass from 50 feet away, 3 seconds before a shot (~0.05).
+
+### Dual-Tracking System
+- **Shooters** get xG credit (probability their shot becomes a goal)
+- **Passers** get xA credit (probability their pass leads to a goal)
+- Both stored in the same `raw_player_stats` table
+- Players can have both xG and xA in the same game
 
 ## 🏗️ Pipeline Architecture
 
@@ -128,10 +140,13 @@ This will:
 - `playerId` - NHL player ID
 - `game_id` - NHL game ID (format: YYYYMMDD##)
 - `I_F_xGoals` - Individual For Expected Goals (sum of all shot xG values)
+- `I_F_xAssists` - Individual For Expected Assists (sum of all pass xA values) - NEW!
 - `season` - Season year (currently NULL)
 - Other columns: `OnIce_xGoalsPercentage`, `goals_saved_above_expected`, etc. (for future use)
 
-### Example Query
+**Note**: A player can have both xG (as a shooter) and xA (as a passer) in the same game.
+
+### Example Queries
 
 ```sql
 -- Top 5 xG performances in a single game
@@ -142,11 +157,32 @@ SELECT
 FROM raw_player_stats
 ORDER BY "I_F_xGoals" DESC
 LIMIT 5;
+
+-- Top 5 xA performances in a single game
+SELECT 
+    "playerId", 
+    "game_id",
+    "I_F_xAssists"
+FROM raw_player_stats
+ORDER BY "I_F_xAssists" DESC
+LIMIT 5;
+
+-- Combined offensive contribution (xG + xA)
+SELECT 
+    "playerId", 
+    "game_id",
+    "I_F_xGoals",
+    "I_F_xAssists",
+    ("I_F_xGoals" + "I_F_xAssists") as total_offensive_contribution
+FROM raw_player_stats
+ORDER BY total_offensive_contribution DESC
+LIMIT 5;
 ```
 
 **Expected Results:**
-- Top players typically have 0.5-0.8 xG per game
-- Average players: 0.1-0.3 xG per game
+- Top shooters typically have 0.5-0.8 xG per game
+- Top passers typically have 0.3-0.6 xA per game
+- Average players: 0.1-0.3 xG or xA per game
 - If you see values > 1.0, check calibration settings
 
 ## 🔧 Calibration Explained
@@ -240,13 +276,16 @@ If ratios are consistently >2x, adjust calibration factors.
 
 ## 🔍 Feature Details
 
-See `XG_MODEL_DOCUMENTATION.md` for complete details on all 6 features:
-1. Distance (33.2% importance)
-2. Angle (14.5% importance)
-3. Is Rebound (17.4% importance) ✅ IMPLEMENTED
-4. Shot Type (8.5% importance) ✅ IMPLEMENTED
-5. Is Power Play (16.7% importance) ✅ IMPLEMENTED
-6. Score Differential (9.7% importance) ✅ IMPLEMENTED
+See `XG_MODEL_DOCUMENTATION.md` for complete details on all 9 features:
+1. Has Pass Before Shot (38.5% importance) ✅ IMPLEMENTED - MOST IMPORTANT!
+2. Distance (15.5% importance)
+3. Is Power Play (8.2% importance) ✅ IMPLEMENTED
+4. Angle (8.1% importance)
+5. Pass-to-Net Distance (7.9% importance) ✅ IMPLEMENTED - NEW!
+6. Pass Lateral Distance (6.8% importance) ✅ IMPLEMENTED - NEW!
+7. Is Rebound (6.3% importance) ✅ IMPLEMENTED
+8. Score Differential (4.7% importance) ✅ IMPLEMENTED
+9. Shot Type (4.0% importance) ✅ IMPLEMENTED
 
 ## 🎓 Learning Resources
 

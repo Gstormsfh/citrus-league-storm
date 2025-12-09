@@ -32,6 +32,28 @@ def create_dummy_xg_data(n_shots=1000):
     # Teams trailing are more aggressive, teams leading may be more conservative
     score_differential = np.random.choice(range(-5, 6), size=n_shots)
     
+    # PASS FEATURES (NEW):
+    # has_pass_before_shot: Binary feature (1=pass before shot, 0=no pass)
+    # ~30% of shots have a pass before them (one-timers, backdoor passes)
+    has_pass_before_shot = np.random.choice([0, 1], size=n_shots, p=[0.70, 0.30])
+    
+    # pass_lateral_distance: How far across the ice the pass traveled (0-50 feet)
+    # Only meaningful when has_pass_before_shot = 1
+    pass_lateral_distance = np.where(
+        has_pass_before_shot == 1,
+        np.random.uniform(low=0, high=50, size=n_shots),  # Pass exists: 0-50 ft lateral
+        0.0  # No pass: 0 ft
+    )
+    
+    # pass_to_net_distance: How close the pass was to the net (10-60 feet)
+    # Only meaningful when has_pass_before_shot = 1
+    # Lower values = passes closer to net = more dangerous
+    pass_to_net_distance = np.where(
+        has_pass_before_shot == 1,
+        np.random.uniform(low=10, high=60, size=n_shots),  # Pass exists: 10-60 ft from net
+        0.0  # No pass: 0 ft
+    )
+    
     # 2. TARGET (y): The actual outcome (Goal=1, No Goal=0)
     # Goal probability is based on all features
     # This is a highly simplified proxy for the real complex probability
@@ -41,6 +63,10 @@ def create_dummy_xg_data(n_shots=1000):
         (is_rebound * 0.15) +              # Rebound bonus
         (is_power_play * 0.10) +           # Power play bonus
         (np.abs(score_differential) * 0.02) +  # Trailing/leading teams more aggressive
+        # PASS FEATURE MODIFIERS (NEW):
+        (has_pass_before_shot * 0.12) +   # Pass bonus: passes significantly increase goal probability
+        (has_pass_before_shot * pass_lateral_distance / 200) +  # Lateral distance bonus: cross-ice passes more dangerous
+        (has_pass_before_shot * (60 - pass_to_net_distance) / 300) +  # Pass-to-net bonus: closer passes more dangerous
         (np.random.normal(0, 0.05, n_shots))  # Random noise
     )
     
@@ -70,6 +96,10 @@ def create_dummy_xg_data(n_shots=1000):
         'shot_type': shot_type,
         'is_power_play': is_power_play,
         'score_differential': score_differential,
+        # NEW PASS FEATURES:
+        'has_pass_before_shot': has_pass_before_shot,
+        'pass_lateral_distance': pass_lateral_distance,
+        'pass_to_net_distance': pass_to_net_distance,
         'is_goal': is_goal.astype(int) # 0 or 1
     })
     return df
@@ -91,8 +121,9 @@ joblib.dump(label_encoder, 'shot_type_encoder.joblib')
 print(f"Shot types: {list(label_encoder.classes_)}")
 
 # 3. Define Features (X) and Target (y)
-# Updated feature list with new features
-MODEL_FEATURES = ['distance', 'angle', 'is_rebound', 'shot_type_encoded', 'is_power_play', 'score_differential']
+# Updated feature list with new features (now includes pass features)
+MODEL_FEATURES = ['distance', 'angle', 'is_rebound', 'shot_type_encoded', 'is_power_play', 'score_differential',
+                 'has_pass_before_shot', 'pass_lateral_distance', 'pass_to_net_distance']
 X = df_shots[MODEL_FEATURES]
 y = df_shots['is_goal']
 
