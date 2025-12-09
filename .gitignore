@@ -58,6 +58,11 @@ git-diagnostic-output/
 .pub/
 /build/
 
+# Environment variables - NEVER commit .env files with secrets!
+.env
+.env.local
+.env.*.local
+
 # Firebase – this is necessary if you use Firebase since it could otherwise 
 # lead to leaking of private certificates to your repository, which is no bueno.
 .firebase/
