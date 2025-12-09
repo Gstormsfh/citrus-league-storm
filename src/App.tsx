@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { LeagueProvider } from "@/contexts/LeagueContext";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import Roster from "./pages/Roster";
@@ -55,6 +56,7 @@ const App = () => (
         <Toaster />
         <Sonner position="top-right" closeButton />
         <BrowserRouter>
+          <LeagueProvider>
           <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/auth" element={<Auth />} />
@@ -90,8 +92,9 @@ const App = () => (
           <Route path="*" element={<NotFound />} />
         </Routes>
         <StormyChatBubble />
-      </BrowserRouter>
-    </TooltipProvider>
+          </LeagueProvider>
+        </BrowserRouter>
+      </TooltipProvider>
     </AuthProvider>
   </QueryClientProvider>
 );

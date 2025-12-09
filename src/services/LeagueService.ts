@@ -770,8 +770,9 @@ export const LeagueService = {
       }
       
       // For demo league, ALWAYS check and ensure valid lineups
-      // Check if lineup exists and validate it
-      const existingLineup = await this.getLineup(teamIdNum);
+      // Check if lineup exists and validate it (with league_id for isolation)
+      // Note: demoLeagueId is passed to initializeDemoLeagueLineups
+      const existingLineup = demoLeagueId ? await this.getLineup(teamIdNum, demoLeagueId) : null;
       
       // Validate existing lineup: must have at least 10 starters (minimum for a valid lineup)
       // CRITICAL: If all players are on bench with no starters, lineup is invalid
@@ -861,9 +862,9 @@ export const LeagueService = {
       });
       
       // Only save if we have a valid lineup (at least 10 starters AND bench players)
-      if (starters.length >= 10 && bench.length > 0) {
+      if (starters.length >= 10 && bench.length > 0 && demoLeagueId) {
         try {
-          await this.saveLineup(teamIdNum, {
+          await this.saveLineup(teamIdNum, demoLeagueId, {
             starters,
             bench,
             ir,
@@ -876,9 +877,9 @@ export const LeagueService = {
       } else {
         console.error(`Team ${teamIdNum}: ❌ CRITICAL - Has insufficient players for a valid lineup (${starters.length} starters, ${bench.length} bench, ${players.length} total players). This should not happen in demo league!`);
         // Even if we can't fill all slots, save what we have to prevent empty lineups
-        if (starters.length > 0) {
+        if (starters.length > 0 && demoLeagueId) {
           try {
-            await this.saveLineup(teamIdNum, {
+            await this.saveLineup(teamIdNum, demoLeagueId, {
               starters,
               bench,
               ir,
@@ -1099,8 +1100,9 @@ export const LeagueService = {
   /**
    * Save lineup configuration to Supabase (with localStorage fallback)
    * Stores player IDs and their slot assignments in shared database
+   * @param leagueId - Required for league isolation
    */
-  async saveLineup(teamId: string | number, lineup: { 
+  async saveLineup(teamId: string | number, leagueId: string, lineup: { 
     starters: (string | number)[], 
     bench: (string | number)[], 
     ir: (string | number)[], 
@@ -1115,10 +1117,11 @@ export const LeagueService = {
     };
 
     try {
-      // Try Supabase first (shared database)
+      // Try Supabase first (shared database, with league_id for isolation)
       const { error } = await supabase
         .from('team_lineups')
         .upsert({
+          league_id: leagueId,
           team_id: teamId,
           starters: lineupToSave.starters,
           bench: lineupToSave.bench,
@@ -1126,7 +1129,7 @@ export const LeagueService = {
           slot_assignments: lineupToSave.slotAssignments,
           updated_at: new Date().toISOString()
         }, {
-          onConflict: 'team_id'
+          onConflict: 'league_id,team_id'
         });
       
       if (error) {
@@ -1148,19 +1151,21 @@ export const LeagueService = {
   /**
    * Load saved lineup configuration from Supabase (with localStorage fallback)
    * Returns lineup from shared database, or falls back to localStorage
+   * @param leagueId - Required for league isolation
    */
-  async getLineup(teamId: string | number): Promise<{ 
+  async getLineup(teamId: string | number, leagueId: string): Promise<{ 
     starters: string[], 
     bench: string[], 
     ir: string[], 
     slotAssignments: Record<string, string> 
   } | null> {
     try {
-      // Try Supabase first (shared database)
+      // Try Supabase first (shared database, with league_id for isolation)
       const { data, error } = await supabase
         .from('team_lineups')
         .select('starters, bench, ir, slot_assignments')
         .eq('team_id', teamId)
+        .eq('league_id', leagueId)
         .maybeSingle();
       
       if (error) {
@@ -1426,8 +1431,8 @@ export const LeagueService = {
         slotAssignments: allSlotAssignments
       };
 
-      // Save lineup to Supabase
-      await this.saveLineup(teamId, lineup);
+      // Save lineup to Supabase (with league_id for isolation)
+      await this.saveLineup(teamId, leagueId, lineup);
 
       console.log(`Initialized lineup for team ${teamId}: ${starters.length} starters, ${bench.length} bench, ${ir.length} IR`);
       

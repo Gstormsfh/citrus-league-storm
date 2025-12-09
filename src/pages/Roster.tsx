@@ -430,7 +430,12 @@ const Roster = () => {
         });
 
         // Check for saved lineup first (use teamId which could be demo team 3 or user's actual team)
-        const savedLineup = teamId ? await LeagueService.getLineup(teamId) : null;
+        // For real teams, use league_id from userTeam; for demo teams, skip league_id check (demo league)
+        const savedLineup = teamId && userTeam?.league_id 
+          ? await LeagueService.getLineup(teamId, userTeam.league_id) 
+          : teamId && typeof teamId === 'number' && teamId <= 10
+          ? await LeagueService.getLineup(teamId, 'demo-league-id') // Demo league fallback
+          : null;
         
         if (savedLineup) {
           // Restore saved lineup
@@ -525,8 +530,8 @@ const Roster = () => {
           setRoster(initialRoster);
           
           // Save initial lineup (only for logged-in users with actual teams)
-          if (userTeamId && user) {
-            await LeagueService.saveLineup(userTeamId, {
+          if (userTeamId && user && userTeam?.league_id) {
+            await LeagueService.saveLineup(userTeamId, userTeam.league_id, {
               starters: starters.map(p => p.id),
               bench: bench.map(p => p.id),
               ir: ir.map(p => p.id),
@@ -840,8 +845,8 @@ const Roster = () => {
       };
       
       // Save lineup to Supabase (only for logged-in users)
-      if (userTeamId && user) {
-        LeagueService.saveLineup(userTeamId, {
+      if (userTeamId && user && userTeam?.league_id) {
+        LeagueService.saveLineup(userTeamId, userTeam.league_id, {
           starters: newStarters.map(p => p.id),
           bench: newBench.map(p => p.id),
           ir: prev.ir.map(p => p.id),
@@ -964,8 +969,8 @@ const Roster = () => {
           const updatedRoster = { ...prev, bench: newBench };
           
           // Save lineup to Supabase (only for logged-in users)
-          if (userTeamId && user) {
-            LeagueService.saveLineup(userTeamId, {
+          if (userTeamId && user && userTeam?.league_id) {
+            LeagueService.saveLineup(userTeamId, userTeam.league_id, {
               starters: prev.starters.map(p => p.id),
               bench: newBench.map(p => p.id),
               ir: prev.ir.map(p => p.id),
@@ -1122,8 +1127,8 @@ const Roster = () => {
         const updatedRoster = { starters: newStarters, bench: newBench, ir: newIR, slotAssignments: newAssignments };
         
         // Save lineup to Supabase (only for logged-in users)
-        if (userTeamId && user) {
-          LeagueService.saveLineup(userTeamId, {
+        if (userTeamId && user && userTeam?.league_id) {
+          LeagueService.saveLineup(userTeamId, userTeam.league_id, {
             starters: newStarters.map(p => p.id),
             bench: newBench.map(p => p.id),
             ir: newIR.map(p => p.id),

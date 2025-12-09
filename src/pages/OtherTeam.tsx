@@ -189,8 +189,8 @@ const OtherTeam = () => {
           return idA - idB;
         });
 
-        // Check for saved lineup first (for this team - handles UUID)
-        const savedLineup = await LeagueService.getLineup(teamId);
+        // Check for saved lineup first (for this team - handles UUID, with league_id for isolation)
+        const savedLineup = await LeagueService.getLineup(teamId, teamData.league_id);
         
         // Validate lineup: must have at least 10 starters AND bench players to be considered valid
         // CRITICAL: If all players are on bench with no starters, lineup is invalid
@@ -309,7 +309,7 @@ const OtherTeam = () => {
           // This ensures the lineup is persisted even if initialization missed it
           if (starters.length >= 10 && bench.length > 0) {
             try {
-              await LeagueService.saveLineup(teamId, {
+              await LeagueService.saveLineup(teamId, teamData.league_id, {
                 starters: starters.map(p => String(p.id)),
                 bench: bench.map(p => String(p.id)),
                 ir: ir.map(p => String(p.id)),

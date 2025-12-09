@@ -440,9 +440,9 @@ export const MatchupService = {
 
       // Get lineups to determine starters using LeagueService (handles both UUID and integer)
       // STRICT: Only use saved lineups - if they don't exist, try to initialize them first
-      let team1Lineup = await LeagueService.getLineup(matchup.team1_id);
+      let team1Lineup = await LeagueService.getLineup(matchup.team1_id, matchup.league_id);
       let team2Lineup = matchup.team2_id 
-        ? await LeagueService.getLineup(matchup.team2_id)
+        ? await LeagueService.getLineup(matchup.team2_id, matchup.league_id)
         : null;
 
       // If lineup doesn't exist, try to initialize it first

@@ -150,11 +150,12 @@ begin
     where id = v_drop_pick_id;
     
     -- Remove player from team_lineups
-    -- Get current lineup (check if row exists)
+    -- Get current lineup (check if row exists, with league_id check for isolation)
     select starters, bench, ir, slot_assignments
     into v_starters, v_bench, v_ir, v_slot_assignments
     from public.team_lineups
-    where team_id = v_team_id;
+    where team_id = v_team_id
+      and league_id = p_league_id;
     
     -- If lineup exists, remove player from arrays and slot_assignments
     if v_starters is not null or v_bench is not null or v_ir is not null then
@@ -188,14 +189,15 @@ begin
         v_slot_assignments := '{}'::jsonb;
       end if;
       
-      -- Update team_lineups
+      -- Update team_lineups (with league_id check for isolation)
       update public.team_lineups
       set starters = v_starters,
           bench = v_bench,
           ir = v_ir,
           slot_assignments = v_slot_assignments,
           updated_at = now()
-      where team_id = v_team_id;
+      where team_id = v_team_id
+        and league_id = p_league_id;
     end if;
     
     -- Log the drop transaction
@@ -285,21 +287,24 @@ begin
     end if;
     
     -- Add player to team_lineups bench array
-    -- Get current lineup or create if doesn't exist
+    -- Get current lineup or create if doesn't exist (with league_id check for isolation)
     select starters, bench, ir, slot_assignments
     into v_starters, v_bench, v_ir, v_slot_assignments
     from public.team_lineups
-    where team_id = v_team_id;
+    where team_id = v_team_id
+      and league_id = p_league_id;
     
     if v_starters is null and v_bench is null and v_ir is null then
-      -- Create new lineup entry
+      -- Create new lineup entry (with league_id for isolation)
       insert into public.team_lineups (
+        league_id,
         team_id,
         starters,
         bench,
         ir,
         slot_assignments
       ) values (
+        p_league_id,
         v_team_id,
         '[]'::jsonb,
         jsonb_build_array(p_add_player_id),
@@ -320,21 +325,23 @@ begin
         v_bench := v_bench || jsonb_build_array(p_add_player_id);
       end if;
       
-      -- Update team_lineups (or insert if doesn't exist)
+      -- Update team_lineups (or insert if doesn't exist, with league_id for isolation)
       insert into public.team_lineups (
+        league_id,
         team_id,
         starters,
         bench,
         ir,
         slot_assignments
       ) values (
+        p_league_id,
         v_team_id,
         coalesce(v_starters, '[]'::jsonb),
         v_bench,
         coalesce(v_ir, '[]'::jsonb),
         coalesce(v_slot_assignments, '{}'::jsonb)
       )
-      on conflict (team_id) do update
+      on conflict (league_id, team_id) do update
       set starters = coalesce(v_starters, '[]'::jsonb),
           bench = v_bench,
           ir = coalesce(v_ir, '[]'::jsonb),
