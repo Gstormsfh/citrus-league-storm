@@ -24,7 +24,7 @@ Predicts the probability that a pass will result in a goal (from the pass perspe
 
 ## 📊 Model Features (Inputs)
 
-The model uses **9 features** to predict goal probability:
+The model uses **13 features** to predict goal probability:
 
 ### 1. **distance** (Continuous, 0-100+ feet)
 - **What it is**: Euclidean distance from shot location to center of net
@@ -120,13 +120,93 @@ The model uses **9 features** to predict goal probability:
 ### 8. **pass_lateral_distance** (Continuous, 0-50+ feet)
 - **What it is**: Lateral distance (y-axis difference) between pass location and shot location
 - **Range**: 0-50 feet typically (higher = cross-ice pass)
-- **Impact**: 6.8% importance
+- **Impact**: 24.7% importance (MOST IMPORTANT FEATURE!)
 - **Calculation**: `abs(shot_y - pass_y)` when pass exists, 0 otherwise
 - **Why it matters**: 
   - Cross-ice passes (high lateral distance) are more dangerous
   - Goalie must move laterally to cover the new angle
   - Creates more open net space
 - **Example**: A pass from left side to right side (30 ft lateral) is more dangerous than a short pass (5 ft lateral)
+
+### 9. **pass_to_net_distance** (Continuous, 0-100+ feet)
+- **What it is**: Distance from pass location to net center
+- **Range**: 0-100+ feet (lower = pass closer to net)
+- **Impact**: 3.5% importance
+- **Calculation**: `√((89 - pass_x)² + (0 - pass_y)²)` when pass exists, 0 otherwise
+- **Why it matters**: Passes closer to the net create more dangerous scoring opportunities
+
+### 10. **pass_zone_encoded** (Categorical, encoded as integer)
+- **What it is**: Zone classification of where the pass originated (distance + angle based)
+- **Possible Zones**:
+  - `crease`: Distance < 10ft from net (any angle) - **Highest danger**
+  - `slot_low_angle`: Distance 10-20ft AND angle < 30° - **Very high danger**
+  - `slot_high_angle`: Distance 10-20ft AND angle ≥ 30° - **High danger**
+  - `high_slot_low_angle`: Distance 20-35ft AND angle < 30° - **Medium-high danger**
+  - `high_slot_high_angle`: Distance 20-35ft AND angle ≥ 30° - **Medium danger**
+  - `blue_line_low_angle`: Distance 35-60ft AND angle < 45° - **Medium-low danger**
+  - `blue_line_high_angle`: Distance 35-60ft AND angle ≥ 45° - **Low danger**
+  - `deep`: Distance > 60ft (any angle) - **Very low danger**
+  - `no_pass`: No pass detected - **Default**
+- **Impact**: 2.9% importance
+- **Why it matters**: 
+  - Passes from the crease/slot are much more dangerous than passes from the blue line
+  - Distinguishes between a pass right before a shot from the slot vs. a pass from the blue line
+  - Captures the tactical advantage of passes in tight areas
+- **Status**: ✅ Fully implemented and working
+
+### 11. **pass_immediacy_score** (Continuous, 0-1)
+- **What it is**: How quickly the shot follows the pass (immediacy metric)
+- **Range**: 0.0-1.0 (higher = more immediate)
+- **Impact**: 8.3% importance
+- **Formula**: `max(0, 1 - (time_before_shot / 3.0))`
+- **Values**:
+  - 0 seconds = 1.0 (immediate one-timer)
+  - 1 second = 0.67 (quick shot)
+  - 2 seconds = 0.33 (delayed shot)
+  - 3+ seconds = 0.0 (not immediate)
+- **Why it matters**: 
+  - Shorter time between pass and shot = higher danger
+  - Goalie has less time to react and set up
+  - One-timers are significantly more dangerous than delayed shots
+- **Status**: ✅ Fully implemented and working
+
+### 12. **goalie_movement_score** (Continuous, 0-1)
+- **What it is**: Composite score measuring goalie movement requirement
+- **Range**: 0.0-1.0 (higher = more goalie movement required)
+- **Impact**: 13.8% importance (3rd most important!)
+- **Formula**: `(pass_lateral_distance / 50.0) * pass_immediacy_score`
+- **Why it matters**: 
+  - Cross-ice passes that lead to immediate shots force goalie to move quickly
+  - High lateral distance + immediate shot = high movement = high danger
+  - Low lateral distance (short pass) = low movement = lower danger
+  - Delayed shot (low immediacy) = low movement even with high lateral distance
+- **Example**: A cross-ice pass (40ft lateral) leading to an immediate one-timer (0.5s) = high movement score = very dangerous
+- **Status**: ✅ Fully implemented and working
+
+### 13. **pass_quality_score** (Continuous, 0-1)
+- **What it is**: Composite pass quality score combining all pass factors
+- **Range**: 0.0-1.0 (higher = better pass quality)
+- **Impact**: 2.8% importance
+- **Formula**: Weighted combination:
+  - Zone weight: 40% (where pass came from matters most)
+  - Immediacy: 30% (how quick the shot is)
+  - Goalie movement: 20% (cross-ice + immediate = dangerous)
+  - Distance: 10% (closer passes are better)
+- **Zone Weights**:
+  - `crease`: 1.0 (highest)
+  - `slot_low_angle`: 0.9
+  - `slot_high_angle`: 0.7
+  - `high_slot_low_angle`: 0.6
+  - `high_slot_high_angle`: 0.5
+  - `blue_line_low_angle`: 0.4
+  - `blue_line_high_angle`: 0.3
+  - `deep`: 0.2
+  - `no_pass`: 0.0
+- **Why it matters**: 
+  - Captures overall pass quality in a single metric
+  - Combines location, timing, and goalie movement factors
+  - Helps model understand pass context holistically
+- **Status**: ✅ Fully implemented and working
 
 ### 9. **pass_to_net_distance** (Continuous, 0-100+ feet)
 - **What it is**: Distance from pass location to center of net
@@ -141,33 +221,42 @@ The model uses **9 features** to predict goal probability:
 
 ## 🔢 Feature Importance Ranking
 
-Based on the trained model (with pass features):
+Based on the trained model (with enhanced pass context features):
 
-1. **has_pass_before_shot** (38.5%) - MOST IMPORTANT! Passes dramatically increase goal probability
-2. **distance** (15.5%) - Second most important
-3. **is_power_play** (8.2%) - Third most important
-4. **angle** (8.1%)
-5. **pass_to_net_distance** (7.9%) - How close the pass was to net
-6. **pass_lateral_distance** (6.8%) - How far across ice the pass traveled
-7. **is_rebound** (6.3%)
-8. **score_differential** (4.7%)
-9. **shot_type_encoded** (4.0%)
+1. **pass_lateral_distance** (24.7%) - MOST IMPORTANT! Cross-ice passes are extremely dangerous
+2. **goalie_movement_score** (13.8%) - Second most important! Goalie movement requirement
+3. **distance** (10.6%) - Third most important
+4. **has_pass_before_shot** (9.3%) - Pass detection still very important
+5. **pass_immediacy_score** (8.3%) - How immediate the shot is after pass
+6. **is_rebound** (7.3%) - Rebound shots catch goalies out of position
+7. **angle** (5.6%) - Shot angle from net center
+8. **is_power_play** (5.1%) - Power play advantage
+9. **pass_to_net_distance** (3.5%) - How close pass was to net
+10. **score_differential** (3.3%) - Score situation
+11. **pass_zone_encoded** (2.9%) - Zone where pass originated
+12. **shot_type_encoded** (2.8%) - Type of shot
+13. **pass_quality_score** (2.8%) - Composite pass quality
+
+**Key Insights:**
+- Pass context features (lateral distance, goalie movement, immediacy) are now the top features!
+- The model now distinguishes between different types of passes (blue line vs slot vs crease)
+- Goalie movement requirement is a critical factor in pass danger
 
 ## 📈 How the Model Works
 
 ### Training Process:
 1. **Data Generation**: Creates 5,000 synthetic shot records with realistic distributions
-2. **Feature Engineering**: Calculates all 9 features for each shot
-3. **Label Encoding**: Converts categorical shot types to numbers
+2. **Feature Engineering**: Calculates all 13 features for each shot (including new pass context features)
+3. **Label Encoding**: Converts categorical shot types and pass zones to numbers
 4. **XGBoost Training**: Trains gradient boosting model to predict goal probability
-5. **Model Saving**: Saves model and encoder to `.joblib` files
+5. **Model Saving**: Saves model and encoders (shot type, pass zone) to `.joblib` files
 
 ### Prediction Process:
 1. **Extract Features**: From NHL play-by-play data
-2. **Encode Shot Type**: Convert text to number using saved encoder
-3. **Calculate Features**: Distance, angle, rebound status, shot type, power play, score differential, pass features
+2. **Encode Categorical Features**: Convert shot type and pass zone text to numbers using saved encoders
+3. **Calculate Base Features**: Distance, angle, rebound status, shot type, power play, score differential
 4. **Detect Passes**: Look back through previous plays to find passes before shots
-5. **Calculate Pass Metrics**: Lateral distance and pass-to-net distance
+5. **Calculate Pass Metrics**: Lateral distance, pass-to-net distance, pass zone, immediacy, goalie movement, quality
 6. **Predict**: Model outputs raw probability (0-1)
 7. **Calibrate**: Apply calibration to bring values to realistic ranges (see Calibration section)
 8. **Aggregate**: Sum xG values per player per game
@@ -175,22 +264,35 @@ Based on the trained model (with pass features):
 
 ## 🎓 Example Calculation
 
-**Scenario**: Connor McDavid takes a wrist shot from 20 feet, directly in front of the net, during a power play, while his team is trailing by 1 goal.
+**Scenario**: Connor McDavid receives a cross-ice pass from Leon Draisaitl in the slot and immediately one-times it into the net. The pass came from 15 feet in front of the net, traveled 30 feet laterally, and the shot happened 0.5 seconds later. This occurred during a power play while trailing by 1 goal.
 
 **Features**:
-- `distance` = 20 feet
+- `distance` = 20 feet (shot location)
 - `angle` = 5 degrees (almost straight on)
 - `is_rebound` = 0 (not a rebound)
 - `shot_type_encoded` = 6 (wrist shot)
 - `is_power_play` = 1 (yes, power play)
 - `score_differential` = -1 (trailing by 1)
-- `has_pass_before_shot` = 1 (one-timer!)
-- `pass_lateral_distance` = 25 feet (cross-ice pass)
-- `pass_to_net_distance` = 18 feet (pass close to net)
+- `has_pass_before_shot` = 1 (pass detected!)
+- `pass_lateral_distance` = 30 feet (cross-ice pass)
+- `pass_to_net_distance` = 15 feet (pass close to net)
+- `pass_zone_encoded` = 1 (slot_low_angle - pass from slot)
+- `pass_immediacy_score` = 0.83 (0.5 seconds = very immediate)
+- `goalie_movement_score` = 0.50 (30ft lateral × 0.83 immediacy = high movement)
+- `pass_quality_score` = 0.85 (high zone + high immediacy + high movement + close distance)
 
-**Model Prediction**: ~0.45 xG (45% chance of goal)
+**Model Prediction**: ~0.48 xG (48% chance of goal)
 
-**Why**: Close distance, good angle, power play advantage, trailing team urgency, AND a cross-ice one-timer pass all contribute to very high xG. The pass feature alone adds significant value!
+**Why**: This is an extremely dangerous scoring chance! The combination of:
+- Close shot distance (20ft)
+- Excellent angle (5°)
+- Power play advantage
+- **Cross-ice pass (30ft lateral)** - forces goalie movement
+- **Immediate one-timer (0.5s)** - goalie has no time to react
+- **Pass from slot (high danger zone)** - not from blue line
+- **High goalie movement requirement** - goalie must move quickly
+
+All these factors combine to create a very high xG value. The new pass context features (zone, immediacy, goalie movement) help the model understand that this isn't just "a pass before a shot" - it's a **dangerous cross-ice one-timer from the slot**, which is much more valuable than a pass from the blue line!
 
 ## 📝 Shot Type Reference
 
@@ -348,10 +450,15 @@ The xA model predicts the probability that a pass will result in a goal. It's ca
 - ✅ **Pass detection** (looks back 15 plays, same team, <3 seconds)
 - ✅ **Pass lateral distance** (y-axis difference)
 - ✅ **Pass-to-net distance** (Euclidean distance from pass to net)
-- ✅ **Expected Assists (xA) model** - NEW!
-- ✅ **Passer identification** (extracts playerId from pass events) - NEW!
-- ✅ **xA feature calculation** (pass location features) - NEW!
-- ✅ **Dual-tracking system** (xG for shooters, xA for passers) - NEW!
+- ✅ **Pass zone classification** (distance + angle based zones) - NEW!
+- ✅ **Pass immediacy score** (time-based immediacy metric) - NEW!
+- ✅ **Goalie movement score** (lateral distance × immediacy) - NEW!
+- ✅ **Pass quality score** (composite pass quality metric) - NEW!
+- ✅ **Pass zone encoding** (LabelEncoder for zone categories) - NEW!
+- ✅ **Expected Assists (xA) model** - Separate model for passers
+- ✅ **Passer identification** (extracts playerId from pass events)
+- ✅ **xA feature calculation** (pass location features)
+- ✅ **Dual-tracking system** (xG for shooters, xA for passers)
 - ✅ Model calibration (two-stage: power function + scale factor)
 - ✅ Database validation (compared against staging_2025_skaters)
 
