@@ -130,6 +130,7 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
   // Load leagues on mount and when user changes
   useEffect(() => {
     loadUserLeagues();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   // Update active league when URL param changes

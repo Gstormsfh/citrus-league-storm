@@ -24,52 +24,20 @@ export default defineConfig(({ mode }) => ({
     rollupOptions: {
       output: {
         manualChunks: (id) => {
-          // Vendor chunk splitting for better caching
+          // Simplified chunk splitting - only split large vendors
           if (id.includes('node_modules')) {
-            // Extract package name from path
-            const match = id.match(/node_modules[\/\\](@[^\/\\]+[\/\\][^\/\\]+|[^\/\\]+)/);
-            if (match) {
-              const pkgName = match[1];
-              
-              // React core
-              if (pkgName === 'react' || pkgName === 'react-dom' || pkgName.startsWith('react-router')) {
-                return 'vendor-react';
-              }
-              // Radix UI components
-              if (pkgName.startsWith('@radix-ui/')) {
-                return 'vendor-ui';
-              }
-              // Charting library
-              if (pkgName === 'recharts') {
-                return 'vendor-charts';
-              }
-              // Drag and drop
-              if (pkgName.startsWith('@dnd-kit/')) {
-                return 'vendor-dnd';
-              }
-              // Utility libraries
-              if (pkgName === 'date-fns' || pkgName === 'zod' || pkgName === 'clsx' || pkgName === 'tailwind-merge') {
-                return 'vendor-utils';
-              }
-              // React Query
-              if (pkgName === '@tanstack/react-query') {
-                return 'vendor-query';
-              }
-              // Supabase
-              if (pkgName.startsWith('@supabase/')) {
-                return 'vendor-supabase';
-              }
+            // React and React DOM together
+            if (id.includes('react') || id.includes('react-dom') || id.includes('react-router')) {
+              return 'vendor-react';
             }
-            // Other node_modules - group remaining packages
-            return 'vendor-other';
+            // Supabase (important for auth)
+            if (id.includes('@supabase')) {
+              return 'vendor-supabase';
+            }
+            // All other node_modules in one chunk
+            return 'vendor';
           }
         },
-        chunkFileNames: 'assets/[name]-[hash].js',
-        entryFileNames: 'assets/[name]-[hash].js',
-        assetFileNames: 'assets/[name]-[hash].[ext]',
-      },
-      treeshake: {
-        moduleSideEffects: false,
       },
     },
   },

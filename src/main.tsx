@@ -9,6 +9,7 @@ console.log("🚀 Starting app initialization...");
 const rootElement = document.getElementById("root");
 if (!rootElement) {
   console.error("❌ Root element not found!");
+  document.body.innerHTML = '<div style="padding: 20px; font-family: sans-serif;"><h1 style="color: red;">Error: Root element not found!</h1></div>';
   throw new Error("Root element not found! Make sure index.html has <div id='root'></div>");
 }
 console.log("✅ Root element found");
