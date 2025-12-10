@@ -119,40 +119,119 @@ def load_and_prepare_training_data(matched_file='data/matched_shots_2025.csv'):
         if len(merged) == 0:
             return None, None, None, None
         
-        # Define features (same as MODEL_FEATURES in data_acquisition.py)
-        # Includes all MoneyPuck-aligned features
+        # Define features - MoneyPuck's Exact 15 Variables + Optimizations
+        # These are the core variables MoneyPuck uses in their xG model (built on 50,000 goals, 800,000 shots)
+        # Note: MoneyPuck does NOT use binary rush/rebound flags - they use speed variables instead
         MODEL_FEATURES = [
-            # Core shot features (MoneyPuck's top features)
-            'distance',  # shotDistance (41.0% importance)
-            'angle', 
-            'shot_angle_adjusted',  # shotAngleAdjusted (8.9% importance) - NEW
-            'is_rebound',  # shotRebound
-            'is_slot_shot',
-            'shot_type_encoded', 
-            # Situation features
+            # 1. Shot Distance From Net
+            'distance',
+            # 2. Time Since Last Game Event
+            'time_since_last_event',
+            # 3. Shot Type (Slap, Wrist, Backhand, etc)
+            'shot_type_encoded',
+            # 4. Speed From Previous Event (Distance / Time) - replaces binary rush flag
+            'speed_from_last_event',
+            # OPTIMIZATION: Add log-transformed speed (helps with skewed distribution)
+            'speed_from_last_event_log',  # New: log(1 + speed) for better distribution
+            # 5. Shot Angle
+            'angle',
+            # 6. East-West Location on Ice of Last Event Before the Shot
+            'east_west_location_of_last_event',
+            # 7. If Rebound, difference in shot angle divided by time since last shot
+            'shot_angle_plus_rebound_speed',
+            # 8. Last Event That Happened Before the Shot (Faceoff, Hit, etc)
+            'last_event_category_encoded',
+            # 9. Other team's # of skaters on ice
+            'defending_team_skaters_on_ice',
+            # 10. East-West Location on Ice of Shot
+            'east_west_location_of_shot',
+            # 11. Man Advantage Situation
             'is_power_play',
-            'score_differential',
-            'home_skaters_on_ice',  # homeSkatersOnIce (3.1% importance)
-            'away_skaters_on_ice',  # awaySkatersOnIce
-            'is_empty_net',  # shotOnEmptyNet (22.9% importance)
-            'home_empty_net',  # homeEmptyNet - NEW
-            'away_empty_net',  # awayEmptyNet - NEW
-            # Pass features
-            'has_pass_before_shot', 
-            'pass_lateral_distance', 
-            'pass_to_net_distance',
-            'pass_zone_encoded', 
-            'pass_immediacy_score', 
-            'goalie_movement_score', 
-            'pass_quality_score',
-            # Last event features (MoneyPuck uses these)
-            'time_since_last_event',  # timeSinceLastEvent (9.3% importance)
-            'distance_from_last_event',  # distanceFromLastEvent
-            'speed_from_last_event',  # speedFromLastEvent (2.9% importance)
-            'last_event_category',  # lastEventCategory
-            'last_event_shot_angle',  # lastEventShotAngle (1.7% importance)
-            'last_event_shot_distance',  # lastEventShotDistance (1.6% importance)
+            # 12. Time since current Powerplay started
+            'time_since_powerplay_started',
+            # 13. Distance From Previous Event
+            'distance_from_last_event',
+            # 14. North-South Location on Ice of Shot
+            'north_south_location_of_shot',
+            # 15. Shooting on Empty Net
+            'is_empty_net',
+            # OPTIMIZATION: Feature interactions (MoneyPuck likely uses these implicitly)
+            'distance_angle_interaction',  # New: distance × angle (important interaction)
         ]
+        
+        # OPTIMIZATION: Fix speed_from_last_event calculation (was showing 0 importance)
+        if 'speed_from_last_event' in merged.columns and 'distance_from_last_event' in merged.columns and 'time_since_last_event' in merged.columns:
+            # Recalculate speed if missing or zero (this was the issue!)
+            mask = (merged['speed_from_last_event'].isna()) | (merged['speed_from_last_event'] == 0)
+            if mask.sum() > 0:
+                merged.loc[mask, 'speed_from_last_event'] = (
+                    merged.loc[mask, 'distance_from_last_event'] / 
+                    merged.loc[mask, 'time_since_last_event'].replace(0, np.nan)
+                )
+            # Handle division by zero
+            merged['speed_from_last_event'] = merged['speed_from_last_event'].replace([np.inf, -np.inf], np.nan)
+            # Fill remaining NaN with 0
+            merged['speed_from_last_event'] = merged['speed_from_last_event'].fillna(0.0)
+        
+        # Create derived features from existing data (MoneyPuck Variables 6, 9, 10, 12, 14)
+        # These can be derived from existing columns if the new features don't exist
+        
+        # Variable 6: East-West Location of Last Event
+        if 'east_west_location_of_last_event' not in merged.columns and 'last_event_y' in merged.columns:
+            merged['east_west_location_of_last_event'] = merged['last_event_y']
+        
+        # Variable 9: Defending team's # of skaters on ice
+        if 'defending_team_skaters_on_ice' not in merged.columns:
+            if 'is_home_team' in merged.columns and 'home_skaters_on_ice' in merged.columns and 'away_skaters_on_ice' in merged.columns:
+                # If shooting team is home, defending team is away (use away_skaters_on_ice)
+                # If shooting team is away, defending team is home (use home_skaters_on_ice)
+                merged['defending_team_skaters_on_ice'] = merged.apply(
+                    lambda row: row['away_skaters_on_ice'] if row.get('is_home_team') == 1 
+                    else row['home_skaters_on_ice'] if row.get('is_home_team') == 0
+                    else 5,  # Default to 5 if unknown
+                    axis=1
+                )
+            elif 'home_skaters_on_ice' in merged.columns and 'away_skaters_on_ice' in merged.columns:
+                # Fallback: use average or default
+                merged['defending_team_skaters_on_ice'] = 5  # Default to 5 skaters
+            else:
+                merged['defending_team_skaters_on_ice'] = 5  # Default if no data
+        
+        # Variable 10: East-West Location of Shot
+        if 'east_west_location_of_shot' not in merged.columns and 'shot_y' in merged.columns:
+            merged['east_west_location_of_shot'] = merged['shot_y']
+        
+        # Variable 12: Time since powerplay started (set to 0 if not available - will be calculated in future processing)
+        if 'time_since_powerplay_started' not in merged.columns:
+            merged['time_since_powerplay_started'] = 0.0  # Default to 0 (not on powerplay or unknown)
+        
+        # Variable 14: North-South Location of Shot
+        if 'north_south_location_of_shot' not in merged.columns and 'shot_x' in merged.columns:
+            merged['north_south_location_of_shot'] = merged['shot_x']
+        
+        # Variable 7: Shot angle plus rebound speed (ensure it exists)
+        if 'shot_angle_plus_rebound_speed' not in merged.columns:
+            # Calculate from existing data if possible
+            if 'angle_change_from_last_event' in merged.columns and 'time_since_last_event' in merged.columns:
+                merged['shot_angle_plus_rebound_speed'] = merged.apply(
+                    lambda row: (row['angle_change_from_last_event'] / row['time_since_last_event']) 
+                    if pd.notna(row.get('angle_change_from_last_event')) and pd.notna(row.get('time_since_last_event')) and row.get('time_since_last_event', 0) > 0
+                    else 0.0,
+                    axis=1
+                )
+            else:
+                merged['shot_angle_plus_rebound_speed'] = 0.0
+        
+        # OPTIMIZATION: Add feature transformations for better model performance
+        # Log transform speed (helps with skewed distributions)
+        if 'speed_from_last_event' in merged.columns:
+            speed_positive = merged['speed_from_last_event'] > 0
+            if speed_positive.sum() > 0:
+                merged['speed_from_last_event_log'] = np.log1p(merged['speed_from_last_event'])
+        
+        # Distance × Angle interaction (important for shot quality)
+        if 'distance' in merged.columns and 'angle' in merged.columns:
+            merged['distance_angle_interaction'] = (merged['distance'] * merged['angle']) / 100  # Normalize
         
         # Check which features we have
         available_model_features = [f for f in MODEL_FEATURES if f in merged.columns]
@@ -179,20 +258,47 @@ def load_and_prepare_training_data(matched_file='data/matched_shots_2025.csv'):
                     available_model_features = [f if f != feature else feature + '_encoded' for f in available_model_features]
         
         # Fill missing values for features that might be None
+        # MoneyPuck standard: 999 for missing min TOI, 0 for missing max TOI
         for feature in available_model_features:
             if feature not in merged.columns:
                 continue
             if merged[feature].isna().any():
-                if feature in ['pass_lateral_distance', 'pass_to_net_distance', 'pass_immediacy_score', 
-                              'goalie_movement_score', 'pass_quality_score', 'pass_zone_encoded',
-                              'has_pass_before_shot', 'is_rebound', 'is_slot_shot', 'is_power_play',
-                              'is_empty_net', 'home_empty_net', 'away_empty_net']:
-                    # Binary/categorical features: fill with 0 if missing
+                if feature in ['is_power_play', 'is_empty_net']:
+                    # Binary features: fill with 0 if missing
                     merged[feature] = merged[feature].fillna(0)
                 elif feature in ['time_since_last_event', 'distance_from_last_event', 'speed_from_last_event',
-                                'last_event_shot_angle', 'last_event_shot_distance']:
-                    # Last event features: fill with 0 if no last event
+                                'speed_from_last_event_log', 'time_since_powerplay_started', 'shot_angle_plus_rebound_speed',
+                                'east_west_location_of_shot', 'east_west_location_of_last_event',
+                                'north_south_location_of_shot', 'distance', 'distance_angle_interaction']:
+                    # Continuous features: fill with 0 if no data
                     merged[feature] = merged[feature].fillna(0)
+                elif feature == 'defending_team_skaters_on_ice':
+                    # Defending team skaters: default to 5 (even strength)
+                    merged[feature] = merged[feature].fillna(5)
+                elif feature.endswith('_log'):
+                    # Log-transformed features: calculate if missing
+                    base_feature = feature.replace('_log', '')
+                    if base_feature in merged.columns:
+                        merged[feature] = merged[feature].fillna(np.log1p(merged[base_feature].fillna(0)))
+                    else:
+                        merged[feature] = merged[feature].fillna(0)
+                elif feature.endswith('_interaction'):
+                    # Interaction features: calculate if missing
+                    if 'distance' in merged.columns and 'angle' in merged.columns:
+                        merged[feature] = merged[feature].fillna((merged['distance'] * merged['angle'] / 100).fillna(0))
+                    else:
+                        merged[feature] = merged[feature].fillna(0)
+                elif feature.endswith('_min_time_on_ice') or feature.endswith('_min_time_on_ice_of_forwards') or \
+                     feature.endswith('_min_time_on_ice_of_defencemen'):
+                    # MoneyPuck standard: 999 for missing min TOI
+                    merged[feature] = merged[feature].fillna(999)
+                elif feature.endswith('_max_time_on_ice') or feature.endswith('_max_time_on_ice_of_forwards') or \
+                     feature.endswith('_max_time_on_ice_of_defencemen'):
+                    # MoneyPuck standard: 0 for missing max TOI
+                    merged[feature] = merged[feature].fillna(0)
+                elif 'time_on_ice' in feature or 'time_difference' in feature or 'rest_difference' in feature:
+                    # Other TOI features: fill with median (or could use 0)
+                    merged[feature] = merged[feature].fillna(merged[feature].median() if merged[feature].notna().any() else 0)
                 elif feature == 'shot_angle_adjusted':
                     # Calculate from angle if missing
                     if 'angle' in merged.columns:
@@ -202,9 +308,19 @@ def load_and_prepare_training_data(matched_file='data/matched_shots_2025.csv'):
                 elif feature.endswith('_encoded'):
                     # Encoded categorical features: fill with 0 (unknown category)
                     merged[feature] = merged[feature].fillna(0)
+                elif feature in ['shooting_team_forwards_on_ice', 'shooting_team_defencemen_on_ice',
+                                'defending_team_forwards_on_ice', 'defending_team_defencemen_on_ice']:
+                    # Team composition: fill with median (typically 3 forwards, 2 defencemen)
+                    merged[feature] = merged[feature].fillna(merged[feature].median() if merged[feature].notna().any() else 3)
+                elif feature == 'player_position':
+                    # Player position: would need encoding if categorical, for now fill with mode
+                    if merged[feature].notna().any():
+                        merged[feature] = merged[feature].fillna(merged[feature].mode()[0] if len(merged[feature].mode()) > 0 else 'C')
+                    else:
+                        merged[feature] = merged[feature].fillna('C')
                 else:
                     # Other features: fill with median
-                    merged[feature] = merged[feature].fillna(merged[feature].median())
+                    merged[feature] = merged[feature].fillna(merged[feature].median() if merged[feature].notna().any() else 0)
         
         # Filter to only numeric features (XGBoost requirement)
         numeric_features = []

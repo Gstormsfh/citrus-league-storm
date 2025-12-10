@@ -97,6 +97,69 @@ def prepare_features(df, feature_names, encoder):
     if len(merged) == 0:
         return None, None
     
+    # Derive missing MoneyPuck features from existing data (same logic as retrain script)
+    # Variable 6: East-West Location of Last Event
+    if 'east_west_location_of_last_event' not in merged.columns and 'last_event_y' in merged.columns:
+        merged['east_west_location_of_last_event'] = merged['last_event_y']
+    
+    # Variable 9: Defending team's # of skaters on ice
+    if 'defending_team_skaters_on_ice' not in merged.columns:
+        if 'is_home_team' in merged.columns and 'home_skaters_on_ice' in merged.columns and 'away_skaters_on_ice' in merged.columns:
+            merged['defending_team_skaters_on_ice'] = merged.apply(
+                lambda row: row['away_skaters_on_ice'] if row.get('is_home_team') == 1 
+                else row['home_skaters_on_ice'] if row.get('is_home_team') == 0
+                else 5,
+                axis=1
+            )
+        else:
+            merged['defending_team_skaters_on_ice'] = 5
+    
+    # Variable 10: East-West Location of Shot
+    if 'east_west_location_of_shot' not in merged.columns and 'shot_y' in merged.columns:
+        merged['east_west_location_of_shot'] = merged['shot_y']
+    
+    # Variable 12: Time since powerplay started
+    if 'time_since_powerplay_started' not in merged.columns:
+        merged['time_since_powerplay_started'] = 0.0
+    
+    # Variable 14: North-South Location of Shot
+    if 'north_south_location_of_shot' not in merged.columns and 'shot_x' in merged.columns:
+        merged['north_south_location_of_shot'] = merged['shot_x']
+    
+    # Variable 7: Shot angle plus rebound speed
+    if 'shot_angle_plus_rebound_speed' not in merged.columns:
+        if 'angle_change_from_last_event' in merged.columns and 'time_since_last_event' in merged.columns:
+            merged['shot_angle_plus_rebound_speed'] = merged.apply(
+                lambda row: (row['angle_change_from_last_event'] / row['time_since_last_event']) 
+                if pd.notna(row.get('angle_change_from_last_event')) and pd.notna(row.get('time_since_last_event')) and row.get('time_since_last_event', 0) > 0
+                else 0.0,
+                axis=1
+            )
+        else:
+            merged['shot_angle_plus_rebound_speed'] = 0.0
+    
+    # OPTIMIZATION: Add feature interactions (same as retrain script)
+    if 'distance_angle_interaction' not in merged.columns and 'distance' in merged.columns and 'angle' in merged.columns:
+        merged['distance_angle_interaction'] = (merged['distance'] * merged['angle']) / 100  # Normalize
+    
+    # OPTIMIZATION: Fix speed_from_last_event if needed
+    if 'speed_from_last_event' in merged.columns and 'distance_from_last_event' in merged.columns and 'time_since_last_event' in merged.columns:
+        mask = (merged['speed_from_last_event'].isna()) | (merged['speed_from_last_event'] == 0)
+        if mask.sum() > 0:
+            merged.loc[mask, 'speed_from_last_event'] = (
+                merged.loc[mask, 'distance_from_last_event'] / 
+                merged.loc[mask, 'time_since_last_event'].replace(0, np.nan)
+            )
+            merged['speed_from_last_event'] = merged['speed_from_last_event'].replace([np.inf, -np.inf], np.nan).fillna(0.0)
+    
+    # OPTIMIZATION: Add log-transformed speed
+    if 'speed_from_last_event' in merged.columns and 'speed_from_last_event_log' not in merged.columns:
+        speed_positive = merged['speed_from_last_event'] > 0
+        if speed_positive.sum() > 0:
+            merged['speed_from_last_event_log'] = np.log1p(merged['speed_from_last_event'])
+        else:
+            merged['speed_from_last_event_log'] = 0.0
+    
     # Handle last_event_category encoding
     if 'last_event_category_encoded' in feature_names and 'last_event_category' in merged.columns:
         if 'last_event_category_encoded' not in merged.columns:

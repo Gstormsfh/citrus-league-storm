@@ -22,7 +22,21 @@
   </head>
 
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <noscript>
+        <div style="padding: 20px; font-family: sans-serif; text-align: center;">
+          <h1>JavaScript Required</h1>
+          <p>Please enable JavaScript to use this application.</p>
+        </div>
+      </noscript>
+    </div>
+    <script>
+      // Immediate feedback that HTML loaded
+      console.log('HTML loaded successfully');
+      if (document.getElementById('root')) {
+        console.log('Root element found in HTML');
+      }
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

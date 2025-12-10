@@ -511,6 +511,346 @@ def get_finished_game_ids(date_str=None):
     
     return finished_game_ids
 
+# ============================================================================
+# PHASE 1: COMPREHENSIVE TIME-ON-ICE (TOI) TRACKING
+# ============================================================================
+
+class TOITracker:
+    """
+    Tracks time-on-ice for all players in a game.
+    Maintains shift start times and calculates TOI metrics on demand.
+    """
+    
+    def __init__(self):
+        # Track shift start time for each player: {player_id: {period: start_time_seconds}}
+        self.shift_starts = {}  # {player_id: {period: start_time}}
+        
+        # Track last faceoff time per period: {period: time_seconds}
+        self.last_faceoff_time = {}  # {period: time}
+        
+        # Track players on ice per team: {team_id: set(player_ids)}
+        self.players_on_ice = {}  # {team_id: set(player_ids)}
+        
+        # Track player positions: {player_id: position} where position is 'L', 'R', 'C', 'D', 'G'
+        self.player_positions = {}
+    
+    def reset_shift(self, player_id, period, current_time_seconds):
+        """Reset shift start time for a player (on line change, goal, penalty, period start)."""
+        if player_id not in self.shift_starts:
+            self.shift_starts[player_id] = {}
+        self.shift_starts[player_id][period] = current_time_seconds
+    
+    def reset_all_shifts(self, team_id, period, current_time_seconds):
+        """Reset all shifts for a team (on goal, period start)."""
+        if team_id in self.players_on_ice:
+            for player_id in self.players_on_ice[team_id]:
+                self.reset_shift(player_id, period, current_time_seconds)
+    
+    def record_faceoff(self, period, current_time_seconds):
+        """Record faceoff time (resets TOI_since_faceoff calculations)."""
+        self.last_faceoff_time[period] = current_time_seconds
+    
+    def calculate_player_toi(self, player_id, period, current_time_seconds):
+        """Calculate TOI for a single player."""
+        if player_id not in self.shift_starts or period not in self.shift_starts[player_id]:
+            return None  # Player not on ice or shift not tracked
+        
+        shift_start = self.shift_starts[player_id][period]
+        toi = current_time_seconds - shift_start
+        return max(0, toi)  # Ensure non-negative
+    
+    def calculate_player_toi_since_faceoff(self, player_id, period, current_time_seconds):
+        """Calculate TOI since last faceoff (min of TOI and time since faceoff)."""
+        toi = self.calculate_player_toi(player_id, period, current_time_seconds)
+        if toi is None:
+            return None
+        
+        faceoff_time = self.last_faceoff_time.get(period, 0)
+        time_since_faceoff = current_time_seconds - faceoff_time
+        
+        return min(toi, time_since_faceoff) if time_since_faceoff >= 0 else toi
+    
+    def calculate_team_toi_metrics(self, team_id, period, current_time_seconds, 
+                                   include_since_faceoff=False):
+        """
+        Calculate team TOI statistics (avg, max, min) for all players on ice.
+        
+        Returns:
+            dict with keys: average, max, min, average_forwards, max_forwards, min_forwards,
+                           average_defencemen, max_defencemen, min_defencemen
+            Plus _since_faceoff variants if include_since_faceoff=True
+        """
+        if team_id not in self.players_on_ice:
+            return self._empty_toi_metrics(include_since_faceoff)
+        
+        players = list(self.players_on_ice[team_id])
+        if not players:
+            return self._empty_toi_metrics(include_since_faceoff)
+        
+        # Calculate TOI for all players
+        toi_values = []
+        toi_forwards = []
+        toi_defencemen = []
+        
+        for player_id in players:
+            toi = self.calculate_player_toi(player_id, period, current_time_seconds)
+            if toi is not None:
+                toi_values.append(toi)
+                position = self.player_positions.get(player_id, 'U')
+                if position in ['L', 'R', 'C']:
+                    toi_forwards.append(toi)
+                elif position == 'D':
+                    toi_defencemen.append(toi)
+        
+        # Calculate statistics
+        metrics = {}
+        if toi_values:
+            metrics['average'] = np.mean(toi_values)
+            metrics['max'] = np.max(toi_values)
+            metrics['min'] = np.min(toi_values)
+        else:
+            metrics['average'] = None
+            metrics['max'] = 0  # MoneyPuck standard for missing max
+            metrics['min'] = 999  # MoneyPuck standard for missing min
+        
+        if toi_forwards:
+            metrics['average_forwards'] = np.mean(toi_forwards)
+            metrics['max_forwards'] = np.max(toi_forwards)
+            metrics['min_forwards'] = np.min(toi_forwards)
+        else:
+            metrics['average_forwards'] = None
+            metrics['max_forwards'] = 0
+            metrics['min_forwards'] = 999
+        
+        if toi_defencemen:
+            metrics['average_defencemen'] = np.mean(toi_defencemen)
+            metrics['max_defencemen'] = np.max(toi_defencemen)
+            metrics['min_defencemen'] = np.min(toi_defencemen)
+        else:
+            metrics['average_defencemen'] = None
+            metrics['max_defencemen'] = 0
+            metrics['min_defencemen'] = 999
+        
+        # Calculate _since_faceoff variants if requested
+        if include_since_faceoff:
+            toi_since_faceoff_values = []
+            toi_since_faceoff_forwards = []
+            toi_since_faceoff_defencemen = []
+            
+            for player_id in players:
+                toi_sf = self.calculate_player_toi_since_faceoff(player_id, period, current_time_seconds)
+                if toi_sf is not None:
+                    toi_since_faceoff_values.append(toi_sf)
+                    position = self.player_positions.get(player_id, 'U')
+                    if position in ['L', 'R', 'C']:
+                        toi_since_faceoff_forwards.append(toi_sf)
+                    elif position == 'D':
+                        toi_since_faceoff_defencemen.append(toi_sf)
+            
+            if toi_since_faceoff_values:
+                metrics['average_since_faceoff'] = np.mean(toi_since_faceoff_values)
+                metrics['max_since_faceoff'] = np.max(toi_since_faceoff_values)
+                metrics['min_since_faceoff'] = np.min(toi_since_faceoff_values)
+            else:
+                metrics['average_since_faceoff'] = None
+                metrics['max_since_faceoff'] = 0
+                metrics['min_since_faceoff'] = 999
+            
+            if toi_since_faceoff_forwards:
+                metrics['average_forwards_since_faceoff'] = np.mean(toi_since_faceoff_forwards)
+                metrics['max_forwards_since_faceoff'] = np.max(toi_since_faceoff_forwards)
+                metrics['min_forwards_since_faceoff'] = np.min(toi_since_faceoff_forwards)
+            else:
+                metrics['average_forwards_since_faceoff'] = None
+                metrics['max_forwards_since_faceoff'] = 0
+                metrics['min_forwards_since_faceoff'] = 999
+            
+            if toi_since_faceoff_defencemen:
+                metrics['average_defencemen_since_faceoff'] = np.mean(toi_since_faceoff_defencemen)
+                metrics['max_defencemen_since_faceoff'] = np.max(toi_since_faceoff_defencemen)
+                metrics['min_defencemen_since_faceoff'] = np.min(toi_since_faceoff_defencemen)
+            else:
+                metrics['average_defencemen_since_faceoff'] = None
+                metrics['max_defencemen_since_faceoff'] = 0
+                metrics['min_defencemen_since_faceoff'] = 999
+        
+        return metrics
+    
+    def _empty_toi_metrics(self, include_since_faceoff=False):
+        """Return empty TOI metrics (MoneyPuck standard: 999 for min, 0 for max)."""
+        metrics = {
+            'average': None,
+            'max': 0,
+            'min': 999,
+            'average_forwards': None,
+            'max_forwards': 0,
+            'min_forwards': 999,
+            'average_defencemen': None,
+            'max_defencemen': 0,
+            'min_defencemen': 999,
+        }
+        if include_since_faceoff:
+            metrics.update({
+                'average_since_faceoff': None,
+                'max_since_faceoff': 0,
+                'min_since_faceoff': 999,
+                'average_forwards_since_faceoff': None,
+                'max_forwards_since_faceoff': 0,
+                'min_forwards_since_faceoff': 999,
+                'average_defencemen_since_faceoff': None,
+                'max_defencemen_since_faceoff': 0,
+                'min_defencemen_since_faceoff': 999,
+            })
+        return metrics
+
+
+def calculate_toi_features_proxy(time_since_faceoff, time_since_last_event=None):
+    """
+    Calculate TOI features using proxy method (time since faceoff).
+    
+    This is a simplified approach that uses time_since_faceoff as a proxy for TOI.
+    Full implementation would require tracking all shifts, but this provides
+    a reasonable approximation for the model.
+    
+    Args:
+        time_since_faceoff: Time in seconds since last faceoff
+        time_since_last_event: Time in seconds since last event (optional)
+    
+    Returns:
+        dict with TOI features (using proxy values)
+    """
+    # Use time_since_faceoff as proxy for TOI
+    # For missing values, use MoneyPuck standard: 999 for min, 0 for max
+    if time_since_faceoff is None:
+        return {
+            # Shooter TOI
+            'shooter_time_on_ice': None,
+            'shooter_time_on_ice_since_faceoff': None,
+            # Shooting team TOI (using proxy - all players have same TOI proxy)
+            'shooting_team_average_time_on_ice': None,
+            'shooting_team_max_time_on_ice': 0,  # MoneyPuck standard
+            'shooting_team_min_time_on_ice': 999,  # MoneyPuck standard
+            'shooting_team_average_time_on_ice_of_forwards': None,
+            'shooting_team_max_time_on_ice_of_forwards': 0,
+            'shooting_team_min_time_on_ice_of_forwards': 999,
+            'shooting_team_average_time_on_ice_of_defencemen': None,
+            'shooting_team_max_time_on_ice_of_defencemen': 0,
+            'shooting_team_min_time_on_ice_of_defencemen': 999,
+            # Shooting team TOI since faceoff
+            'shooting_team_average_time_on_ice_since_faceoff': None,
+            'shooting_team_max_time_on_ice_since_faceoff': 0,
+            'shooting_team_min_time_on_ice_since_faceoff': 999,
+            'shooting_team_average_time_on_ice_of_forwards_since_faceoff': None,
+            'shooting_team_max_time_on_ice_of_forwards_since_faceoff': 0,
+            'shooting_team_min_time_on_ice_of_forwards_since_faceoff': 999,
+            'shooting_team_average_time_on_ice_of_defencemen_since_faceoff': None,
+            'shooting_team_max_time_on_ice_of_defencemen_since_faceoff': 0,
+            'shooting_team_min_time_on_ice_of_defencemen_since_faceoff': 999,
+            # Defending team TOI (same proxy)
+            'defending_team_average_time_on_ice': None,
+            'defending_team_max_time_on_ice': 0,
+            'defending_team_min_time_on_ice': 999,
+            'defending_team_average_time_on_ice_of_forwards': None,
+            'defending_team_max_time_on_ice_of_forwards': 0,
+            'defending_team_min_time_on_ice_of_forwards': 999,
+            'defending_team_average_time_on_ice_of_defencemen': None,
+            'defending_team_max_time_on_ice_of_defencemen': 0,
+            'defending_team_min_time_on_ice_of_defencemen': 999,
+            # Defending team TOI since faceoff
+            'defending_team_average_time_on_ice_since_faceoff': None,
+            'defending_team_max_time_on_ice_since_faceoff': 0,
+            'defending_team_min_time_on_ice_since_faceoff': 999,
+            'defending_team_average_time_on_ice_of_forwards_since_faceoff': None,
+            'defending_team_max_time_on_ice_of_forwards_since_faceoff': 0,
+            'defending_team_min_time_on_ice_of_forwards_since_faceoff': 999,
+            'defending_team_average_time_on_ice_of_defencemen_since_faceoff': None,
+            'defending_team_max_time_on_ice_of_defencemen_since_faceoff': 0,
+            'defending_team_min_time_on_ice_of_defencemen_since_faceoff': 999,
+        }
+    
+    # Use time_since_faceoff as proxy for all TOI metrics
+    # In reality, players have different shift lengths, but this is a reasonable proxy
+    toi_proxy = time_since_faceoff
+    
+    return {
+        # Shooter TOI
+        'shooter_time_on_ice': toi_proxy,
+        'shooter_time_on_ice_since_faceoff': toi_proxy,
+        # Shooting team TOI (all players have same proxy for now)
+        'shooting_team_average_time_on_ice': toi_proxy,
+        'shooting_team_max_time_on_ice': toi_proxy,
+        'shooting_team_min_time_on_ice': toi_proxy,
+        'shooting_team_average_time_on_ice_of_forwards': toi_proxy,
+        'shooting_team_max_time_on_ice_of_forwards': toi_proxy,
+        'shooting_team_min_time_on_ice_of_forwards': toi_proxy,
+        'shooting_team_average_time_on_ice_of_defencemen': toi_proxy,
+        'shooting_team_max_time_on_ice_of_defencemen': toi_proxy,
+        'shooting_team_min_time_on_ice_of_defencemen': toi_proxy,
+        # Shooting team TOI since faceoff (same as above for proxy method)
+        'shooting_team_average_time_on_ice_since_faceoff': toi_proxy,
+        'shooting_team_max_time_on_ice_since_faceoff': toi_proxy,
+        'shooting_team_min_time_on_ice_since_faceoff': toi_proxy,
+        'shooting_team_average_time_on_ice_of_forwards_since_faceoff': toi_proxy,
+        'shooting_team_max_time_on_ice_of_forwards_since_faceoff': toi_proxy,
+        'shooting_team_min_time_on_ice_of_forwards_since_faceoff': toi_proxy,
+        'shooting_team_average_time_on_ice_of_defencemen_since_faceoff': toi_proxy,
+        'shooting_team_max_time_on_ice_of_defencemen_since_faceoff': toi_proxy,
+        'shooting_team_min_time_on_ice_of_defencemen_since_faceoff': toi_proxy,
+        # Defending team TOI (same proxy)
+        'defending_team_average_time_on_ice': toi_proxy,
+        'defending_team_max_time_on_ice': toi_proxy,
+        'defending_team_min_time_on_ice': toi_proxy,
+        'defending_team_average_time_on_ice_of_forwards': toi_proxy,
+        'defending_team_max_time_on_ice_of_forwards': toi_proxy,
+        'defending_team_min_time_on_ice_of_forwards': toi_proxy,
+        'defending_team_average_time_on_ice_of_defencemen': toi_proxy,
+        'defending_team_max_time_on_ice_of_defencemen': toi_proxy,
+        'defending_team_min_time_on_ice_of_defencemen': toi_proxy,
+        # Defending team TOI since faceoff
+        'defending_team_average_time_on_ice_since_faceoff': toi_proxy,
+        'defending_team_max_time_on_ice_since_faceoff': toi_proxy,
+        'defending_team_min_time_on_ice_since_faceoff': toi_proxy,
+        'defending_team_average_time_on_ice_of_forwards_since_faceoff': toi_proxy,
+        'defending_team_max_time_on_ice_of_forwards_since_faceoff': toi_proxy,
+        'defending_team_min_time_on_ice_of_forwards_since_faceoff': toi_proxy,
+        'defending_team_average_time_on_ice_of_defencemen_since_faceoff': toi_proxy,
+        'defending_team_max_time_on_ice_of_defencemen_since_faceoff': toi_proxy,
+        'defending_team_min_time_on_ice_of_defencemen_since_faceoff': toi_proxy,
+    }
+
+
+def calculate_rest_difference_features(shooting_toi_metrics, defending_toi_metrics):
+    """
+    Calculate rest/fatigue difference features.
+    
+    Args:
+        shooting_toi_metrics: dict from calculate_toi_features_proxy
+        defending_toi_metrics: dict from calculate_toi_features_proxy
+    
+    Returns:
+        dict with rest difference features
+    """
+    shooting_min = shooting_toi_metrics.get('shooting_team_min_time_on_ice')
+    defending_min = defending_toi_metrics.get('defending_team_min_time_on_ice')
+    
+    shooting_avg_sf = shooting_toi_metrics.get('shooting_team_average_time_on_ice_since_faceoff')
+    defending_avg_sf = defending_toi_metrics.get('defending_team_average_time_on_ice_since_faceoff')
+    
+    time_difference_since_change = None
+    if shooting_min is not None and defending_min is not None:
+        if shooting_min != 999 and defending_min != 999:  # Not missing values
+            time_difference_since_change = shooting_min - defending_min
+    
+    average_rest_difference = None
+    if shooting_avg_sf is not None and defending_avg_sf is not None:
+        average_rest_difference = shooting_avg_sf - defending_avg_sf
+    
+    return {
+        'time_difference_since_change': time_difference_since_change,
+        'average_rest_difference': average_rest_difference,
+    }
+
+
 def scrape_pbp_and_process(date_str='2025-12-07'):
     """
     Scrapes raw PBP for all finished games and processes data.
@@ -554,14 +894,59 @@ def scrape_pbp_and_process(date_str='2025-12-07'):
             previous_play = None  # Track previous play for rebound detection
             previous_plays = []  # Track last 15 plays for pass detection (need more history than rebounds)
             
+            # Track powerplay start time for MoneyPuck Variable 12: Time since current Powerplay started
+            # Format: {team_id: {period: (start_time_seconds, start_play)}}
+            powerplay_start_times = {}  # Track when powerplay started for each team per period
+            
+            # Initialize last event state for reliable tracking of ALL events with coordinates
+            # This ensures we capture hits, blocks, faceoffs, etc., not just shots
+            # Use None to indicate uninitialized state (not 0, which would pass is not None check)
+            last_event_state = {
+                'time_in_seconds': None,
+                'x_coord': None,  # None = uninitialized, will be set when first event with coordinates is found
+                'y_coord': None,
+                'type_code': None,
+                'period': None
+            }
+            
             for play in raw_data.get('plays', []):
                 type_code = play.get('typeCode')
-                # Only process shots on goal (506), goals (505), and missed shots (507)
-                if type_code not in [505, 506, 507]: 
-                    continue
-                
-                # Get details (coordinates and player info are in details)
                 details = play.get('details', {})
+                
+                # Get current event coordinates and time (for ALL events, not just shots)
+                current_x = details.get('xCoord') if details else None
+                current_y = details.get('yCoord') if details else None
+                current_time_in_period = play.get('timeInPeriod', '')
+                current_period = play.get('periodDescriptor', {}).get('number')
+                current_time_seconds = parse_time_to_seconds(current_time_in_period)
+                
+                # Only process shots on goal (506), goals (505), and missed shots (507) for feature extraction
+                # But we'll update state for ALL events with coordinates
+                is_shot_event = type_code in [505, 506, 507]
+                
+                if not is_shot_event:
+                    # Not a shot - just update state if this event has coordinates
+                    # CRITICAL FIX: Allow time = 0 (period start) - only require it's not None
+                    if current_x is not None and current_y is not None and current_time_seconds is not None:
+                        # Flip coordinates if needed (same logic as shots)
+                        if current_x < 0:
+                            current_x = -current_x
+                            current_y = -current_y if current_y else None
+                        
+                        # Update state for next event
+                        last_event_state['time_in_seconds'] = current_time_seconds
+                        last_event_state['x_coord'] = current_x
+                        last_event_state['y_coord'] = current_y
+                        last_event_state['type_code'] = type_code
+                        last_event_state['period'] = current_period
+                    # DEBUG: Track if we're missing coordinate updates
+                    elif current_x is None or current_y is None:
+                        # Event has no coordinates - this is expected for some event types
+                        pass
+                    
+                    continue  # Skip feature extraction for non-shot events
+                
+                # From here on, we're processing a shot event (505, 506, or 507)
                 if not details:
                     continue
                 
@@ -816,6 +1201,11 @@ def scrape_pbp_and_process(date_str='2025-12-07'):
                 if len(previous_plays) > 15:  # Keep last 15 plays
                     previous_plays.pop(0)
                 
+                # CRITICAL FIX: DO NOT update last_event_state here!
+                # We need to calculate features using the PREVIOUS event's state,
+                # then update the state AFTER we've calculated features.
+                # Moving state update to after shot_record creation (line ~1928)
+                
                 # FEATURE 4: SHOT_TYPE_ENCODED (Categorical, encoded as integer)
                 # What: Type of shot taken (wrist, snap, slap, etc.)
                 # Why: Some shot types are more effective (8.5% importance)
@@ -875,10 +1265,13 @@ def scrape_pbp_and_process(date_str='2025-12-07'):
                 # Power Play Codes: '5v4', '5v3', '4v3', '6v4', '6v3' (man advantage)
                 # Even Strength: '5v5' (normal play)
                 # Shorthanded: '4v5', '3v5', '3v4' (man disadvantage)
-                situation_code = str(play.get('situationCode', ''))
-                is_power_play = 1 if any(pp in situation_code for pp in ['5v4', '5v3', '4v3', '6v4', '6v3']) else 0
+                
+                # Get situation_code for parsing
+                situation_code_raw = play.get('situationCode', '')
+                situation_code = str(situation_code_raw) if situation_code_raw else ''
                 
                 # ENHANCED: Parse situation_code for detailed situation info
+                # Define this function first so we can use it for powerplay detection
                 def parse_situation_code(situation_code, event_owner_team_id, home_team_id):
                     """Parse situation_code to extract skaters on ice, empty net, penalty info."""
                     home_skaters = 5
@@ -892,44 +1285,122 @@ def scrape_pbp_and_process(date_str='2025-12-07'):
                     if not situation_code or situation_code == '':
                         return home_skaters, away_skaters, is_empty_net, home_empty_net, away_empty_net, penalty_length, penalty_time_left
                     
-                    # Parse format like "5-4" (5v4), "6-5" (6v5 empty net), etc.
-                    # Format: "home-away" or "home-away-EN" for empty net
-                    parts = situation_code.replace('v', '-').split('-')
+                    # Handle both string and numeric situation codes
+                    # String format: "5-4", "5v4", etc.
+                    # Numeric format: 1551 (5v5), 541 (5v4), 641 (6v4), etc.
                     
-                    if len(parts) >= 2:
+                    situation_str = str(situation_code).strip()
+                    
+                    # Try parsing as string first (format: "5-4" or "5v4")
+                    if '-' in situation_str or 'v' in situation_str or 'V' in situation_str:
+                        parts = situation_str.replace('v', '-').replace('V', '-').split('-')
+                        if len(parts) >= 2:
+                            try:
+                                home_skaters = int(parts[0])
+                                away_skaters = int(parts[1])
+                            except ValueError:
+                                pass
+                    else:
+                        # Parse numeric format (e.g., 1551, 541, 641)
+                        # Format: For 4-digit codes (1551), use digits 1-2: 5v5
+                        #         For 3-digit codes (541), use digits 0-1: 5v4
                         try:
-                            home_skaters = int(parts[0])
-                            away_skaters = int(parts[1])
-                        except ValueError:
-                            pass
+                            code_int = int(situation_str)
+                            code_str = str(code_int)
+                            
+                            if len(code_str) == 3:
+                                # 3-digit: ABC -> A=home, B=away
+                                home_skaters = int(code_str[0])
+                                away_skaters = int(code_str[1])
+                            elif len(code_str) == 4:
+                                # 4-digit: ABCD -> B=home, C=away (digits 1-2)
+                                # Examples: 1551 = 5v5, 541 = 5v4, 641 = 6v4
+                                home_skaters = int(code_str[1])
+                                away_skaters = int(code_str[2])
+                            elif len(code_str) == 2:
+                                # 2-digit: AB -> A=home, B=away
+                                home_skaters = int(code_str[0])
+                                away_skaters = int(code_str[1])
+                        except (ValueError, IndexError):
+                            pass  # Keep defaults
                     
-                    # Check for empty net indicators
-                    if 'EN' in situation_code.upper():
+                    # Check for empty net (either team has 6 skaters)
+                    if home_skaters == 6:
                         is_empty_net = True
-                        # Determine which team has empty net (team with 6 skaters)
-                        if home_skaters == 6:
-                            home_empty_net = True
-                        elif away_skaters == 6:
-                            away_empty_net = True
-                    elif len(parts) >= 2:
-                        # Check if either team has 6 skaters (empty net)
-                        if home_skaters == 6:
-                            is_empty_net = True
-                            home_empty_net = True
-                        elif away_skaters == 6:
-                            is_empty_net = True
-                            away_empty_net = True
+                        home_empty_net = True
+                    elif away_skaters == 6:
+                        is_empty_net = True
+                        away_empty_net = True
                     
                     # Penalty info would need to be extracted from penalty events
                     # For now, we'll leave these as None
                     
                     return home_skaters, away_skaters, is_empty_net, home_empty_net, away_empty_net, penalty_length, penalty_time_left
                 
+                # Parse situation_code to get skaters on ice (needed for powerplay detection)
                 home_skaters_on_ice, away_skaters_on_ice, is_empty_net, home_empty_net, away_empty_net, penalty_length, penalty_time_left = parse_situation_code(
-                    situation_code, 
+                    situation_code_raw, 
                     details.get('eventOwnerTeamId'),
                     home_team_id
                 )
+                
+                # MoneyPuck Variable 12: Time since current Powerplay started
+                # Track when powerplay situation begins and calculate elapsed time
+                # NOTE: current_time_seconds already defined at line 921 for all events
+                # We'll use that value - no need to recalculate here
+                # (current_time_seconds is in scope from the outer loop)
+                time_since_powerplay_started = 0.0
+                
+                # Determine which team is shooting
+                shooting_team_id = details.get('eventOwnerTeamId')
+                is_home_shooting = (shooting_team_id == home_team_id) if shooting_team_id and home_team_id else None
+                
+                # Check if we're on a powerplay (shooting team has man advantage)
+                if is_home_shooting is not None:
+                    if is_home_shooting:
+                        # Home team shooting: powerplay if home_skaters > away_skaters
+                        is_power_play = 1 if home_skaters_on_ice > away_skaters_on_ice else 0
+                    else:
+                        # Away team shooting: powerplay if away_skaters > home_skaters
+                        is_power_play = 1 if away_skaters_on_ice > home_skaters_on_ice else 0
+                else:
+                    # Fallback: check string format (old method)
+                    is_power_play = 1 if any(pp in situation_code for pp in ['5v4', '5v3', '4v3', '6v4', '6v3']) else 0
+                
+                if is_power_play and event_owner_team_id:
+                    # Determine which team is on powerplay (the team shooting)
+                    pp_team_id = event_owner_team_id
+                    
+                    # Initialize tracking for this team/period if needed
+                    if pp_team_id not in powerplay_start_times:
+                        powerplay_start_times[pp_team_id] = {}
+                    
+                    if period_number not in powerplay_start_times[pp_team_id]:
+                        # Powerplay just started - record start time
+                        powerplay_start_times[pp_team_id][period_number] = current_time_seconds
+                        time_since_powerplay_started = 0.0
+                    else:
+                        # Powerplay already in progress - calculate elapsed time
+                        pp_start_time = powerplay_start_times[pp_team_id][period_number]
+                        time_since_powerplay_started = current_time_seconds - pp_start_time
+                        # Ensure non-negative (shouldn't happen, but safety check)
+                        time_since_powerplay_started = max(0.0, time_since_powerplay_started)
+                else:
+                    # Not on powerplay - check if we should reset tracking
+                    # Only reset if we're definitely not on a powerplay (even strength or shorthanded)
+                    # AND we're not in the middle of tracking a powerplay
+                    # Actually, keep tracking until powerplay definitively ends (goal scored or penalty expires)
+                    # For now, if not on PP, set to 0 but don't delete tracking (in case PP resumes)
+                    time_since_powerplay_started = 0.0
+                
+                # Reset powerplay tracking on goals (powerplay ends when goal is scored)
+                if type_code == 505:  # Goal
+                    for team_id in [home_team_id, away_team_id]:
+                        if team_id and team_id in powerplay_start_times:
+                            if period_number in powerplay_start_times[team_id]:
+                                del powerplay_start_times[team_id][period_number]
+                
+                # Note: parse_situation_code already defined and called above for powerplay detection
                 
                 # FEATURE 6: SCORE_DIFFERENTIAL (Integer, typically -5 to +5)
                 # What: Score difference from shooting team's perspective at time of shot
@@ -954,6 +1425,7 @@ def scrape_pbp_and_process(date_str='2025-12-07'):
                 # ============================================================
                 
                 # LAST EVENT DETAILS
+                # Use last_event_state for reliable tracking of ALL events with coordinates
                 last_event_category = None
                 last_event_x = None
                 last_event_y = None
@@ -965,10 +1437,17 @@ def scrape_pbp_and_process(date_str='2025-12-07'):
                 last_event_shot_distance = None
                 player_num_that_did_last_event = None
                 
-                if previous_play:
-                    prev_type_code = previous_play.get('typeCode')
-                    prev_details = previous_play.get('details', {})
-                    prev_team_id = prev_details.get('eventOwnerTeamId')
+                # Use last_event_state directly (tracks ALL events with coordinates, not just shots)
+                # CRITICAL: Check that state is initialized (not None) - allow time = 0 (period start)
+                if (last_event_state['x_coord'] is not None and 
+                    last_event_state['y_coord'] is not None and
+                    last_event_state['time_in_seconds'] is not None):  # Allow time = 0 (period start)
+                    
+                    last_event_x = last_event_state['x_coord']
+                    last_event_y = last_event_state['y_coord']
+                    last_event_time = last_event_state['time_in_seconds']
+                    last_event_type_code = last_event_state['type_code']
+                    last_event_period = last_event_state['period']
                     
                     # Map type codes to event categories
                     type_code_to_category = {
@@ -976,52 +1455,89 @@ def scrape_pbp_and_process(date_str='2025-12-07'):
                         509: 'BLOCK', 516: 'PENL', 517: 'STOP', 520: 'GIVE', 521: 'TAKE',
                         502: 'TAKE', 518: 'CHL', 519: 'GIVE'
                     }
-                    last_event_category = type_code_to_category.get(prev_type_code, 'OTHER')
+                    last_event_category = type_code_to_category.get(last_event_type_code, 'OTHER')
                     
-                    # Get last event coordinates
-                    last_event_x = prev_details.get('xCoord')
-                    last_event_y = prev_details.get('yCoord')
+                    # Calculate distance from last event
+                    distance_from_last_event = math.sqrt(
+                        (shot_coord_x - last_event_x)**2 + 
+                        (shot_coord_y - last_event_y)**2
+                    )
                     
-                    # Flip coordinates if needed
-                    if last_event_x and last_event_x < 0:
-                        last_event_x = -last_event_x
-                        last_event_y = -last_event_y if last_event_y else None
+                    # Calculate time difference (ensure same period and valid times)
+                    # Use time_in_period directly (already parsed at line 921 as current_time_seconds)
+                    # But recalculate here to be safe and ensure we have the right value
+                    shot_time_seconds = parse_time_to_seconds(time_in_period)
                     
-                    # Determine last event team
-                    if prev_team_id:
-                        if prev_team_id == home_team_id:
-                            last_event_team = 'HOME'
-                        else:
-                            last_event_team = 'AWAY'
-                    
-                    # Get player who did last event
-                    if prev_type_code == 505:  # Goal
-                        player_num_that_did_last_event = prev_details.get('scoringPlayerId')
-                    elif prev_type_code in [506, 507]:  # Shot
-                        player_num_that_did_last_event = prev_details.get('shootingPlayerId')
-                    elif prev_type_code == 503:  # Faceoff
-                        player_num_that_did_last_event = prev_details.get('winningPlayerId')
+                    # CRITICAL FIX: Allow time = 0 (period start), but ensure both times are valid
+                    if (last_event_period == period_number and 
+                        last_event_time is not None and
+                        shot_time_seconds is not None and 
+                        shot_time_seconds >= last_event_time):  # Current time should be >= last event time
+                        time_since_last_event = shot_time_seconds - last_event_time
+                        # Ensure non-negative (shouldn't happen, but safety check)
+                        if time_since_last_event < 0:
+                            time_since_last_event = 0.0
                     else:
-                        player_num_that_did_last_event = prev_details.get('eventOwnerTeamId')  # Fallback
-                    
-                    # Calculate distance and time from last event
-                    if last_event_x is not None and last_event_y is not None:
-                        distance_from_last_event = math.sqrt(
-                            (shot_coord_x - last_event_x)**2 + 
-                            (shot_coord_y - last_event_y)**2
-                        )
-                    
-                    time_since_last_event = calculate_time_difference(previous_play, play)
+                        # Different period or invalid time - set to 0
+                        time_since_last_event = 0.0
                     
                     # Calculate speed (distance per second)
-                    if distance_from_last_event and time_since_last_event and time_since_last_event > 0:
+                    if time_since_last_event > 0:
                         speed_from_last_event = distance_from_last_event / time_since_last_event
+                    else:
+                        # Time is 0 (first shot or different period) - speed is undefined, set to 0
+                        speed_from_last_event = 0.0
+                else:
+                    # State not initialized or invalid - set defaults
+                    # DEBUG: This should only happen for the very first shot in a game/period
+                    distance_from_last_event = 0.0
+                    time_since_last_event = 0.0
+                    speed_from_last_event = 0.0
+                    last_event_category = None
                     
-                    # Calculate last event shot metrics if it was a shot
-                    if prev_type_code in [505, 506, 507] and last_event_x and last_event_y:
-                        last_event_shot_angle, last_event_shot_distance = calculate_last_event_shot_metrics(
-                            prev_type_code, last_event_x, last_event_y
-                        )
+                    # Try to get last event team and player from previous_plays for additional context
+                    # (fallback for player info, but coordinates come from state)
+                    previous_play_for_context = None
+                    for prev_play in reversed(previous_plays):
+                        if prev_play.get('typeCode') not in [517]:  # Skip stoppages
+                            previous_play_for_context = prev_play
+                            break
+                    
+                    if previous_play_for_context:
+                        prev_details = previous_play_for_context.get('details', {})
+                        prev_team_id = prev_details.get('eventOwnerTeamId')
+                        
+                        # Determine last event team
+                        if prev_team_id:
+                            if prev_team_id == home_team_id:
+                                last_event_team = 'HOME'
+                            else:
+                                last_event_team = 'AWAY'
+                        
+                        # Get player who did last event
+                        prev_type_code = previous_play_for_context.get('typeCode')
+                        if prev_type_code == 505:  # Goal
+                            player_num_that_did_last_event = prev_details.get('scoringPlayerId')
+                        elif prev_type_code in [506, 507]:  # Shot
+                            player_num_that_did_last_event = prev_details.get('shootingPlayerId')
+                        elif prev_type_code == 503:  # Faceoff
+                            player_num_that_did_last_event = prev_details.get('winningPlayerId')
+                        else:
+                            player_num_that_did_last_event = prev_details.get('eventOwnerTeamId')  # Fallback
+                
+                # FALLBACK: Ensure all values are set (not None) before saving
+                if distance_from_last_event is None:
+                    distance_from_last_event = 0.0
+                if time_since_last_event is None:
+                    time_since_last_event = 0.0
+                if speed_from_last_event is None:
+                    speed_from_last_event = 0.0
+                    
+                # Calculate last event shot metrics if it was a shot
+                if last_event_state['type_code'] in [505, 506, 507] and last_event_x and last_event_y:
+                    last_event_shot_angle, last_event_shot_distance = calculate_last_event_shot_metrics(
+                        last_event_state['type_code'], last_event_x, last_event_y
+                    )
                 
                 # GOALIE INFORMATION
                 goalie_id = details.get('goalieInNetId')
@@ -1112,24 +1628,9 @@ def scrape_pbp_and_process(date_str='2025-12-07'):
                             else:
                                 shot_play_continued_outside_zone = True
                 
-                # RUSH DETECTION
-                is_rush = False
-                # Rush: shot from neutral/defensive zone with quick transition
-                if zone in ['NEUTRALZONE', 'AWAYZONE'] if is_home_team else ['NEUTRALZONE', 'HOMEZONE']:
-                    # Check if we entered offensive zone recently
-                    for prev_play in reversed(previous_plays[-10:]):  # Look back 10 plays
-                        prev_details = prev_play.get('details', {})
-                        prev_x = prev_details.get('xCoord', 0)
-                        if prev_x:
-                            if prev_x < 0:
-                                prev_x = -prev_x
-                            
-                            # If previous play was in defensive/neutral zone and this is in offensive zone
-                            if prev_x < 25 and shot_coord_x > 25:
-                                time_to_shot = calculate_time_difference(prev_play, play)
-                                if time_to_shot and time_to_shot < 3.0:  # Quick transition
-                                    is_rush = True
-                                    break
+                # NOTE: MoneyPuck does NOT use binary rush detection
+                # Instead, they use speed_from_last_event (distance/time) which is calculated above
+                # This captures rush situations through the speed variable, not a binary flag
 
                 # Store pass coordinates for raw_shots table
                 pass_x_coord = None
@@ -1142,6 +1643,70 @@ def scrape_pbp_and_process(date_str='2025-12-07'):
                     if pass_x_coord < 0:
                         pass_x_coord = -pass_x_coord
                         pass_y_coord = -pass_y_coord
+                
+                # ============================================================
+                # PHASE 1: TOI FEATURES (36 features)
+                # ============================================================
+                shooting_toi = calculate_toi_features_proxy(time_since_faceoff, time_since_last_event)
+                defending_toi = calculate_toi_features_proxy(time_since_faceoff, time_since_last_event)
+                rest_features = calculate_rest_difference_features(shooting_toi, defending_toi)
+                
+                # ============================================================
+                # PHASE 2: TEAM COMPOSITION FEATURES (4 features)
+                # ============================================================
+                # Note: Full implementation requires roster/lineup data
+                # For now, use skaters_on_ice as proxy
+                shooting_team_forwards_on_ice = None  # Would need position data
+                shooting_team_defencemen_on_ice = None
+                defending_team_forwards_on_ice = None
+                defending_team_defencemen_on_ice = None
+                
+                # ============================================================
+                # PHASE 3: DEFENDER PROXIMITY FEATURES (3 features)
+                # ============================================================
+                # Note: Requires tracking last known positions of defenders
+                distance_to_nearest_defender = None  # Would need defender position tracking
+                skaters_in_screening_box = None  # Would need position tracking
+                nearest_defender_to_net_distance = None
+                
+                # ============================================================
+                # PHASE 4: ADVANCED SHOT QUALITY FEATURES (7 features)
+                # ============================================================
+                # Angle and distance change
+                angle_change_from_last_event = None
+                if last_event_shot_angle is not None:
+                    angle_change_from_last_event = abs(angle - last_event_shot_angle)
+                angle_change_squared = angle_change_from_last_event ** 2 if angle_change_from_last_event else None
+                distance_change_from_last_event = None
+                if last_event_shot_distance is not None:
+                    distance_change_from_last_event = abs(distance - last_event_shot_distance)
+                
+                # Advanced rebound features
+                shot_angle_rebound_royal_road = 0
+                if is_rebound and previous_play:
+                    # Check if puck crossed middle (y changed sign)
+                    prev_y = previous_play.get('details', {}).get('yCoord', 0)
+                    if prev_y and shot_coord_y:
+                        # Flip coordinates if needed
+                        if prev_y < 0:
+                            prev_y = -prev_y
+                        if shot_coord_y < 0:
+                            shot_y_check = -shot_coord_y
+                        else:
+                            shot_y_check = shot_coord_y
+                        # Royal road: y changed sign (crossed middle)
+                        if (prev_y < 0 and shot_y_check > 0) or (prev_y > 0 and shot_y_check < 0):
+                            shot_angle_rebound_royal_road = 1
+                
+                # MoneyPuck Variable 7: If Rebound, difference in shot angle divided by time
+                # Set to 0 if not a rebound, or angle_change/time if it is a rebound
+                shot_angle_plus_rebound_speed = 0.0
+                if is_rebound and angle_change_from_last_event is not None and time_since_last_event:
+                    if time_since_last_event > 0:
+                        shot_angle_plus_rebound_speed = angle_change_from_last_event / time_since_last_event
+                
+                # Player position (would need roster lookup)
+                player_position = None  # 'L', 'R', 'D', 'C'
                 
                 # Append the features required by the model
                 shot_record = {
@@ -1160,6 +1725,7 @@ def scrape_pbp_and_process(date_str='2025-12-07'):
                     'is_slot_shot': is_slot_shot,  # NEW: High-danger zone flag
                     'shot_type_encoded': shot_type_encoded,
                     'is_power_play': is_power_play,
+                    'time_since_powerplay_started': time_since_powerplay_started,  # MoneyPuck Variable 12
                     'score_differential': score_differential,
                     # EXISTING PASS FEATURES (for xG model):
                     'has_pass_before_shot': has_pass_before_shot,
@@ -1188,6 +1754,8 @@ def scrape_pbp_and_process(date_str='2025-12-07'):
                     # Situation features
                     'home_skaters_on_ice': home_skaters_on_ice,
                     'away_skaters_on_ice': away_skaters_on_ice,
+                    # MoneyPuck Variable 9: Other team's # of skaters on ice (defending team)
+                    'defending_team_skaters_on_ice': away_skaters_on_ice if is_home_team else home_skaters_on_ice if is_home_team is not None else 5,
                     'is_empty_net': 1 if is_empty_net else 0,
                     'home_empty_net': 1 if home_empty_net else 0,  # MoneyPuck feature
                     'away_empty_net': 1 if away_empty_net else 0,  # MoneyPuck feature
@@ -1204,6 +1772,10 @@ def scrape_pbp_and_process(date_str='2025-12-07'):
                     'last_event_shot_angle': last_event_shot_angle,
                     'last_event_shot_distance': last_event_shot_distance,
                     'player_num_that_did_last_event': player_num_that_did_last_event,
+                    # MoneyPuck Location Features (Variables 6, 10, 14)
+                    'east_west_location_of_shot': shot_coord_y,  # Variable 10: East-West Location on Ice of Shot
+                    'east_west_location_of_last_event': last_event_y,  # Variable 6: East-West Location of Last Event
+                    'north_south_location_of_shot': shot_coord_x,  # Variable 14: North-South Location on Ice of Shot
                     # Goalie features
                     'goalie_id': goalie_id,
                     'goalie_name': goalie_name,
@@ -1227,8 +1799,7 @@ def scrape_pbp_and_process(date_str='2025-12-07'):
                     'shot_play_stopped': 1 if shot_play_stopped else 0,
                     'shot_play_continued_in_zone': 1 if shot_play_continued_in_zone else 0,
                     'shot_play_continued_outside_zone': 1 if shot_play_continued_outside_zone else 0,
-                    # Rush detection
-                    'is_rush': 1 if is_rush else 0,
+                    # NOTE: is_rush removed - MoneyPuck uses speed_from_last_event instead
                     # ADDITIONAL RAW DATA FIELDS (maximize extraction):
                     # Play identification
                     'event_id': event_id,
@@ -1260,9 +1831,108 @@ def scrape_pbp_and_process(date_str='2025-12-07'):
                     # Shot details (raw)
                     'shot_type_raw': shot_type_raw,
                     'miss_reason': miss_reason,
+                    # ============================================================
+                    # PHASE 0: ARENA ADJUSTED COORDINATES (Schuckers/Curro)
+                    # ============================================================
+                    # These will be calculated in apply_calculated_features_to_dataframe
+                    # 'arena_adjusted_x', 'arena_adjusted_y', 'arena_adjusted_shot_distance'
+                    # ============================================================
+                    # PHASE 1: TOI FEATURES (36 features)
+                    # ============================================================
+                    # Shooter TOI
+                    'shooter_time_on_ice': shooting_toi.get('shooter_time_on_ice'),
+                    'shooter_time_on_ice_since_faceoff': shooting_toi.get('shooter_time_on_ice_since_faceoff'),
+                    # Shooting team TOI
+                    'shooting_team_average_time_on_ice': shooting_toi.get('shooting_team_average_time_on_ice'),
+                    'shooting_team_max_time_on_ice': shooting_toi.get('shooting_team_max_time_on_ice'),
+                    'shooting_team_min_time_on_ice': shooting_toi.get('shooting_team_min_time_on_ice'),
+                    'shooting_team_average_time_on_ice_of_forwards': shooting_toi.get('shooting_team_average_time_on_ice_of_forwards'),
+                    'shooting_team_max_time_on_ice_of_forwards': shooting_toi.get('shooting_team_max_time_on_ice_of_forwards'),
+                    'shooting_team_min_time_on_ice_of_forwards': shooting_toi.get('shooting_team_min_time_on_ice_of_forwards'),
+                    'shooting_team_average_time_on_ice_of_defencemen': shooting_toi.get('shooting_team_average_time_on_ice_of_defencemen'),
+                    'shooting_team_max_time_on_ice_of_defencemen': shooting_toi.get('shooting_team_max_time_on_ice_of_defencemen'),
+                    'shooting_team_min_time_on_ice_of_defencemen': shooting_toi.get('shooting_team_min_time_on_ice_of_defencemen'),
+                    # Shooting team TOI since faceoff
+                    'shooting_team_average_time_on_ice_since_faceoff': shooting_toi.get('shooting_team_average_time_on_ice_since_faceoff'),
+                    'shooting_team_max_time_on_ice_since_faceoff': shooting_toi.get('shooting_team_max_time_on_ice_since_faceoff'),
+                    'shooting_team_min_time_on_ice_since_faceoff': shooting_toi.get('shooting_team_min_time_on_ice_since_faceoff'),
+                    'shooting_team_average_time_on_ice_of_forwards_since_faceoff': shooting_toi.get('shooting_team_average_time_on_ice_of_forwards_since_faceoff'),
+                    'shooting_team_max_time_on_ice_of_forwards_since_faceoff': shooting_toi.get('shooting_team_max_time_on_ice_of_forwards_since_faceoff'),
+                    'shooting_team_min_time_on_ice_of_forwards_since_faceoff': shooting_toi.get('shooting_team_min_time_on_ice_of_forwards_since_faceoff'),
+                    'shooting_team_average_time_on_ice_of_defencemen_since_faceoff': shooting_toi.get('shooting_team_average_time_on_ice_of_defencemen_since_faceoff'),
+                    'shooting_team_max_time_on_ice_of_defencemen_since_faceoff': shooting_toi.get('shooting_team_max_time_on_ice_of_defencemen_since_faceoff'),
+                    'shooting_team_min_time_on_ice_of_defencemen_since_faceoff': shooting_toi.get('shooting_team_min_time_on_ice_of_defencemen_since_faceoff'),
+                    # Defending team TOI
+                    'defending_team_average_time_on_ice': defending_toi.get('shooting_team_average_time_on_ice'),  # Same structure, different prefix
+                    'defending_team_max_time_on_ice': defending_toi.get('shooting_team_max_time_on_ice'),
+                    'defending_team_min_time_on_ice': defending_toi.get('shooting_team_min_time_on_ice'),
+                    'defending_team_average_time_on_ice_of_forwards': defending_toi.get('shooting_team_average_time_on_ice_of_forwards'),
+                    'defending_team_max_time_on_ice_of_forwards': defending_toi.get('shooting_team_max_time_on_ice_of_forwards'),
+                    'defending_team_min_time_on_ice_of_forwards': defending_toi.get('shooting_team_min_time_on_ice_of_forwards'),
+                    'defending_team_average_time_on_ice_of_defencemen': defending_toi.get('shooting_team_average_time_on_ice_of_defencemen'),
+                    'defending_team_max_time_on_ice_of_defencemen': defending_toi.get('shooting_team_max_time_on_ice_of_defencemen'),
+                    'defending_team_min_time_on_ice_of_defencemen': defending_toi.get('shooting_team_min_time_on_ice_of_defencemen'),
+                    # Defending team TOI since faceoff
+                    'defending_team_average_time_on_ice_since_faceoff': defending_toi.get('shooting_team_average_time_on_ice_since_faceoff'),
+                    'defending_team_max_time_on_ice_since_faceoff': defending_toi.get('shooting_team_max_time_on_ice_since_faceoff'),
+                    'defending_team_min_time_on_ice_since_faceoff': defending_toi.get('shooting_team_min_time_on_ice_since_faceoff'),
+                    'defending_team_average_time_on_ice_of_forwards_since_faceoff': defending_toi.get('shooting_team_average_time_on_ice_of_forwards_since_faceoff'),
+                    'defending_team_max_time_on_ice_of_forwards_since_faceoff': defending_toi.get('shooting_team_max_time_on_ice_of_forwards_since_faceoff'),
+                    'defending_team_min_time_on_ice_of_forwards_since_faceoff': defending_toi.get('shooting_team_min_time_on_ice_of_forwards_since_faceoff'),
+                    'defending_team_average_time_on_ice_of_defencemen_since_faceoff': defending_toi.get('shooting_team_average_time_on_ice_of_defencemen_since_faceoff'),
+                    'defending_team_max_time_on_ice_of_defencemen_since_faceoff': defending_toi.get('shooting_team_max_time_on_ice_of_defencemen_since_faceoff'),
+                    'defending_team_min_time_on_ice_of_defencemen_since_faceoff': defending_toi.get('shooting_team_min_time_on_ice_of_defencemen_since_faceoff'),
+                    # Rest/fatigue difference features
+                    'time_difference_since_change': rest_features.get('time_difference_since_change'),
+                    'average_rest_difference': rest_features.get('average_rest_difference'),
+                    # ============================================================
+                    # PHASE 2: TEAM COMPOSITION FEATURES (4 features)
+                    # ============================================================
+                    'shooting_team_forwards_on_ice': shooting_team_forwards_on_ice,
+                    'shooting_team_defencemen_on_ice': shooting_team_defencemen_on_ice,
+                    'defending_team_forwards_on_ice': defending_team_forwards_on_ice,
+                    'defending_team_defencemen_on_ice': defending_team_defencemen_on_ice,
+                    # ============================================================
+                    # PHASE 3: DEFENDER PROXIMITY FEATURES (3 features)
+                    # ============================================================
+                    'distance_to_nearest_defender': distance_to_nearest_defender,
+                    'skaters_in_screening_box': skaters_in_screening_box,
+                    'nearest_defender_to_net_distance': nearest_defender_to_net_distance,
+                    # ============================================================
+                    # PHASE 4: ADVANCED SHOT QUALITY FEATURES (7 features)
+                    # ============================================================
+                    'angle_change_from_last_event': angle_change_from_last_event,
+                    'angle_change_squared': angle_change_squared,
+                    'distance_change_from_last_event': distance_change_from_last_event,
+                    'shot_angle_rebound_royal_road': shot_angle_rebound_royal_road,
+                    'player_position': player_position,
+                    # MoneyPuck Variable 7: If Rebound, difference in shot angle divided by time
+                    'shot_angle_plus_rebound_speed': shot_angle_plus_rebound_speed,
+                    # shot_angle_plus_rebound is calculated in feature_calculations.py
                 }
                 all_shot_data.append(shot_record)
                 shots_in_game += 1
+                
+                # CRITICAL FIX: Update last_event_state AFTER calculating features
+                # This ensures the next shot can use this shot's coordinates
+                # The state should contain the PREVIOUS event when we calculate features,
+                # then we update it to contain THIS event for the next shot
+                if shot_coord_x is not None and shot_coord_y is not None and current_time_seconds is not None:
+                    last_event_state['time_in_seconds'] = current_time_seconds
+                    last_event_state['x_coord'] = shot_coord_x  # Already flipped if needed
+                    last_event_state['y_coord'] = shot_coord_y
+                    last_event_state['type_code'] = type_code
+                    last_event_state['period'] = period_number
+                
+                # Update state on goals (goal location is the last event, don't reset to 0)
+                if type_code == 505:  # Goal
+                    # Keep goal coordinates as last event (don't reset to 0)
+                    if shot_coord_x is not None and shot_coord_y is not None:
+                        last_event_state['x_coord'] = shot_coord_x  # Already flipped if needed
+                        last_event_state['y_coord'] = shot_coord_y
+                    last_event_state['time_in_seconds'] = current_time_seconds if current_time_seconds else None
+                    last_event_state['type_code'] = type_code
+                    last_event_state['period'] = period_number
             
             games_processed += 1
             print(f"  ✅ Processed {shots_in_game} shots from Game {game_id}")
@@ -1291,8 +1961,46 @@ def scrape_pbp_and_process(date_str='2025-12-07'):
     if not all_shot_data:
         print("No shots found to process.")
         return None
+    
+    # 🔬 GEMINI DEBUG: Audit final data structure before DataFrame creation
+    print("\n" + "=" * 80)
+    print("--- Final Data Structure Audit (Gemini Debug) ---")
+    print("=" * 80)
+    if len(all_shot_data) > 0:
+        # Check first 10 records
+        sample_records = all_shot_data[:10]
+        print(f"\nSample of first 10 shot records:")
+        for i, record in enumerate(sample_records, 1):
+            speed = record.get('speed_from_last_event', 'MISSING')
+            distance = record.get('distance_from_last_event', 'MISSING')
+            time = record.get('time_since_last_event', 'MISSING')
+            game_id = record.get('game_id', 'MISSING')
+            print(f"  Record {i} (game {game_id}): speed={speed}, distance={distance}, time={time}")
+        
+        # Count non-zero values
+        non_zero_speed = sum(1 for r in all_shot_data if r.get('speed_from_last_event', 0) and r.get('speed_from_last_event', 0) != 0)
+        non_zero_dist = sum(1 for r in all_shot_data if r.get('distance_from_last_event', 0) and r.get('distance_from_last_event', 0) != 0)
+        non_zero_time = sum(1 for r in all_shot_data if r.get('time_since_last_event', 0) and r.get('time_since_last_event', 0) != 0)
+        
+        print(f"\n📊 Non-zero counts in all_shot_data list:")
+        print(f"   speed_from_last_event: {non_zero_speed}/{len(all_shot_data)} ({non_zero_speed/len(all_shot_data)*100:.2f}%)")
+        print(f"   distance_from_last_event: {non_zero_dist}/{len(all_shot_data)} ({non_zero_dist/len(all_shot_data)*100:.2f}%)")
+        print(f"   time_since_last_event: {non_zero_time}/{len(all_shot_data)} ({non_zero_time/len(all_shot_data)*100:.2f}%)")
+    print("=" * 80 + "\n")
         
     df_shots = pd.DataFrame(all_shot_data)
+    
+    # 🔬 GEMINI DEBUG: Audit DataFrame after creation
+    print("--- DataFrame Structure Audit (Gemini Debug) ---")
+    if len(df_shots) > 0:
+        if 'speed_from_last_event' in df_shots.columns:
+            non_zero_speed_df = (pd.to_numeric(df_shots['speed_from_last_event'], errors='coerce') > 0).sum()
+            print(f"   DataFrame speed_from_last_event > 0: {non_zero_speed_df}/{len(df_shots)} ({non_zero_speed_df/len(df_shots)*100:.2f}%)")
+            print(f"   Sample values: {df_shots['speed_from_last_event'].head(10).tolist()}")
+        if 'distance_from_last_event' in df_shots.columns:
+            non_zero_dist_df = (pd.to_numeric(df_shots['distance_from_last_event'], errors='coerce') > 0).sum()
+            print(f"   DataFrame distance_from_last_event > 0: {non_zero_dist_df}/{len(df_shots)} ({non_zero_dist_df/len(df_shots)*100:.2f}%)")
+    print("=" * 80 + "\n")
     
     # Apply calculated/derived features (matching MoneyPuck's calculated features)
     try:
@@ -1326,6 +2034,17 @@ def scrape_pbp_and_process(date_str='2025-12-07'):
                     df_shots['last_event_category'].fillna('unknown').astype(str)
                 )
     
+    # Calculate derived features that the model expects (before feature check)
+    # Distance × Angle interaction (important for shot quality)
+    if 'distance' in df_shots.columns and 'angle' in df_shots.columns:
+        df_shots['distance_angle_interaction'] = (df_shots['distance'] * df_shots['angle']) / 100  # Normalize
+    
+    # Log transform speed (if speed_from_last_event exists)
+    if 'speed_from_last_event' in df_shots.columns:
+        # Fix pandas FutureWarning: convert to numeric first, then fillna
+        speed_series = pd.to_numeric(df_shots['speed_from_last_event'], errors='coerce').fillna(0)
+        df_shots['speed_from_last_event_log'] = np.log1p(speed_series)
+    
     # Select the exact features the model was trained on
     # First, ensure all required features exist in df_shots
     for feature in MODEL_FEATURES:
@@ -1341,6 +2060,18 @@ def scrape_pbp_and_process(date_str='2025-12-07'):
                     df_shots[feature] = 0
             elif feature == 'last_event_category_encoded':
                 df_shots[feature] = 0  # Will be encoded above if needed
+            elif feature == 'distance_angle_interaction':
+                # Calculate from distance and angle if available
+                if 'distance' in df_shots.columns and 'angle' in df_shots.columns:
+                    df_shots[feature] = (df_shots['distance'] * df_shots['angle']) / 100
+                else:
+                    df_shots[feature] = 0
+            elif feature == 'speed_from_last_event_log':
+                # Calculate from speed_from_last_event if available
+                if 'speed_from_last_event' in df_shots.columns:
+                    df_shots[feature] = np.log1p(df_shots['speed_from_last_event'].fillna(0))
+                else:
+                    df_shots[feature] = 0
             else:
                 df_shots[feature] = 0  # Default to 0 for missing numeric features
     
@@ -1354,17 +2085,30 @@ def scrape_pbp_and_process(date_str='2025-12-07'):
                           'goalie_movement_score', 'pass_quality_score', 'pass_zone_encoded',
                           'has_pass_before_shot', 'is_rebound', 'is_slot_shot', 'is_power_play',
                           'is_empty_net', 'home_empty_net', 'away_empty_net']:
-                X_predict[feature] = X_predict[feature].fillna(0)
+                # Fix pandas FutureWarning: convert to numeric first, then fillna
+                X_predict[feature] = pd.to_numeric(X_predict[feature], errors='coerce').fillna(0)
             elif feature in ['time_since_last_event', 'distance_from_last_event', 'speed_from_last_event',
                             'last_event_shot_angle', 'last_event_shot_distance', 'last_event_category_encoded']:
-                X_predict[feature] = X_predict[feature].fillna(0)
+                # For these features, use median of non-zero values instead of 0
+                non_zero_values = X_predict[feature][X_predict[feature] > 0]
+                if len(non_zero_values) > 0:
+                    fill_value = non_zero_values.median()
+                    # Fix pandas FutureWarning: convert to numeric first, then fillna
+                    X_predict[feature] = pd.to_numeric(X_predict[feature], errors='coerce').fillna(fill_value)
+                else:
+                    # Only use 0 if no non-zero values exist
+                    # Fix pandas FutureWarning: convert to numeric first, then fillna
+                    X_predict[feature] = pd.to_numeric(X_predict[feature], errors='coerce').fillna(0)
             elif feature == 'shot_angle_adjusted':
                 if 'angle' in df_shots.columns:
-                    X_predict[feature] = X_predict[feature].fillna(df_shots['angle'].abs())
+                    # Fix pandas FutureWarning: convert to numeric first, then fillna
+                    X_predict[feature] = pd.to_numeric(X_predict[feature], errors='coerce').fillna(df_shots['angle'].abs())
                 else:
-                    X_predict[feature] = X_predict[feature].fillna(0)
+                    X_predict[feature] = pd.to_numeric(X_predict[feature], errors='coerce').fillna(0)
             else:
-                X_predict[feature] = X_predict[feature].fillna(X_predict[feature].median())
+                # Fix pandas FutureWarning: convert to numeric first, then fillna
+                median_val = pd.to_numeric(X_predict[feature], errors='coerce').median()
+                X_predict[feature] = pd.to_numeric(X_predict[feature], errors='coerce').fillna(median_val)
     
     # 2. Predict xG values
     if USE_MONEYPUCK_MODEL:
@@ -1381,7 +2125,29 @@ def scrape_pbp_and_process(date_str='2025-12-07'):
         df_shots['xG_Value'] = np.power(raw_xg, CALIBRATION_FACTOR)
         df_shots['xG_Value'] = df_shots['xG_Value'].clip(upper=0.50)
         SCALE_FACTOR = 0.19
-        df_shots['xG_Value'] = df_shots['xG_Value'] * SCALE_FACTOR 
+        df_shots['xG_Value'] = df_shots['xG_Value'] * SCALE_FACTOR
+    
+    # 3. Apply Flurry Adjusted Expected Goals (MoneyPuck post-processing)
+    try:
+        from feature_calculations import calculate_flurry_adjusted_xg
+        print("  🔧 Applying flurry adjustment to xG values...")
+        df_shots = calculate_flurry_adjusted_xg(
+            df_shots,
+            xg_column='xG_Value',
+            game_id_col='game_id',
+            team_code_col='team_code',
+            period_col='period',
+            time_in_period_col='time_in_period',
+            time_since_last_event_col='time_since_last_event'
+        )
+        print("  ✅ Flurry adjustment applied")
+    except ImportError:
+        print("  ⚠️  feature_calculations.py not found - skipping flurry adjustment")
+        df_shots['flurry_adjusted_xg'] = df_shots['xG_Value']  # Fallback to regular xG
+    except Exception as e:
+        print(f"  ⚠️  Error applying flurry adjustment: {e}")
+        print("  Continuing with regular xG values only...")
+        df_shots['flurry_adjusted_xg'] = df_shots['xG_Value']  # Fallback to regular xG 
 
     # --- EXPECTED ASSISTS (xA) PREDICTION ---
     # Only calculate xA for shots that have passes before them
@@ -1471,6 +2237,7 @@ def scrape_pbp_and_process(date_str='2025-12-07'):
                     'normalized_lateral_distance': float(row['normalized_lateral_distance']) if pd.notna(row['normalized_lateral_distance']) else None,
                     'zone_relative_distance': float(row['zone_relative_distance']) if pd.notna(row['zone_relative_distance']) else None,
                     'xg_value': float(row['xG_Value']),
+                    'flurry_adjusted_xg': float(row['flurry_adjusted_xg']) if pd.notna(row.get('flurry_adjusted_xg')) else float(row['xG_Value']),
                     'xa_value': float(row['xA_Value']) if pd.notna(row['xA_Value']) and row['xA_Value'] > 0 else None,
                     'shot_type_encoded': int(row['shot_type_encoded']),
                     'pass_zone_encoded': int(row['pass_zone_encoded']) if pd.notna(row['pass_zone_encoded']) else None,
@@ -1486,6 +2253,15 @@ def scrape_pbp_and_process(date_str='2025-12-07'):
                     'last_event_x': float(row['last_event_x']) if pd.notna(row.get('last_event_x')) else None,
                     'last_event_y': float(row['last_event_y']) if pd.notna(row.get('last_event_y')) else None,
                     'last_event_team': str(row['last_event_team']) if pd.notna(row.get('last_event_team')) else None,
+                    # MoneyPuck Location Features (Variables 6, 10, 14)
+                    'east_west_location_of_last_event': float(row['east_west_location_of_last_event']) if pd.notna(row.get('east_west_location_of_last_event')) else None,
+                    'east_west_location_of_shot': float(row['east_west_location_of_shot']) if pd.notna(row.get('east_west_location_of_shot')) else None,
+                    'north_south_location_of_shot': float(row['north_south_location_of_shot']) if pd.notna(row.get('north_south_location_of_shot')) else None,
+                    # MoneyPuck Variable 9: Defending team skaters
+                    # Fix: Use correct column name (no double underscore)
+                    'defending_team_skaters_on_ice': int(row['defending_team_skaters_on_ice']) if pd.notna(row.get('defending_team_skaters_on_ice')) else None,
+                    # MoneyPuck Variable 12: Time since powerplay started
+                    'time_since_powerplay_started': float(row['time_since_powerplay_started']) if pd.notna(row.get('time_since_powerplay_started')) else 0.0,
                     'distance_from_last_event': float(row['distance_from_last_event']) if pd.notna(row.get('distance_from_last_event')) else None,
                     'time_since_last_event': float(row['time_since_last_event']) if pd.notna(row.get('time_since_last_event')) else None,
                     'speed_from_last_event': float(row['speed_from_last_event']) if pd.notna(row.get('speed_from_last_event')) else None,
