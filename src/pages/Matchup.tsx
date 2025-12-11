@@ -66,16 +66,23 @@ const Matchup = () => {
       try {
         setLoading(true);
         console.log('[Matchup] Loading demo matchup data...');
+        console.log('[Matchup] userLeagueState:', userLeagueState);
+        
         const matchupData = await DemoDataService.getDemoMatchupData();
         console.log('[Matchup] Demo matchup data loaded:', {
           myTeamCount: matchupData.myTeam.length,
-          opponentTeamCount: matchupData.opponentTeam.length
+          opponentTeamCount: matchupData.opponentTeam.length,
+          myTeamStarters: matchupData.myTeam.filter(p => p.isStarter).length,
+          myTeamBench: matchupData.myTeam.filter(p => !p.isStarter).length,
+          opponentTeamStarters: matchupData.opponentTeam.filter(p => p.isStarter).length,
+          opponentTeamBench: matchupData.opponentTeam.filter(p => !p.isStarter).length
         });
         setDemoMyTeam(matchupData.myTeam);
         setDemoOpponentTeam(matchupData.opponentTeam);
         setLoading(false);
       } catch (error) {
         console.error('[Matchup] Error loading demo matchup data:', error);
+        console.error('[Matchup] Error stack:', error instanceof Error ? error.stack : 'No stack trace');
         // Fallback to static data if loading fails
         console.log('[Matchup] Falling back to static demo data');
         const staticMyTeam = DemoDataService.getDemoMyTeam();

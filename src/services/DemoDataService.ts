@@ -216,13 +216,20 @@ export const DemoDataService = {
    * Transforms actual roster players into MatchupPlayer format
    */
   async getDemoMatchupData(): Promise<{ myTeam: MatchupPlayer[]; opponentTeam: MatchupPlayer[] }> {
-    const { LeagueService } = await import('./LeagueService');
-    const { MatchupService } = await import('./MatchupService');
-    const { PlayerService } = await import('./PlayerService');
-    
-    // Ensure demo league is initialized
-    const allPlayers = await PlayerService.getAllPlayers();
-    await LeagueService.initializeLeague(allPlayers);
+    try {
+      console.log('[DemoDataService] getDemoMatchupData() called');
+      const { LeagueService } = await import('./LeagueService');
+      const { MatchupService } = await import('./MatchupService');
+      const { PlayerService } = await import('./PlayerService');
+      
+      console.log('[DemoDataService] Services imported, loading players...');
+      // Ensure demo league is initialized
+      const allPlayers = await PlayerService.getAllPlayers();
+      console.log('[DemoDataService] Players loaded:', allPlayers.length);
+      
+      console.log('[DemoDataService] Initializing league...');
+      await LeagueService.initializeLeague(allPlayers);
+      console.log('[DemoDataService] League initialized');
     
     // Get rosters for Team 3 (My Team) and Team 1 (Opponent)
     // getTeamRoster returns Player[], we need to convert to HockeyPlayer[]
@@ -382,9 +389,14 @@ export const DemoDataService = {
       opponentTeamMatchupCount: opponentTeamMatchupPlayers.length
     });
     
-    return {
-      myTeam: myTeamMatchupPlayers,
-      opponentTeam: opponentTeamMatchupPlayers
-    };
+      return {
+        myTeam: myTeamMatchupPlayers,
+        opponentTeam: opponentTeamMatchupPlayers
+      };
+    } catch (error) {
+      console.error('[DemoDataService] Error in getDemoMatchupData():', error);
+      console.error('[DemoDataService] Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+      throw error; // Re-throw to let caller handle it
+    }
   },
 };
