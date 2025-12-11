@@ -143,29 +143,30 @@ const Standings = () => {
         });
 
         setTeams(standingsTeams);
-      } catch (err: any) {
-        console.error('Error loading standings:', err);
-        toast({
-          title: 'Error',
-          description: err.message || 'Failed to load standings',
-          variant: 'destructive',
-        });
-        // Fallback to demo data
-        const demoTeams = LeagueService.getAllTeams();
-        const standingsTeams: StandingsTeam[] = demoTeams.map(t => ({
-          id: String(t.id),
-          name: t.name,
-          owner: t.owner,
-          logo: t.logo,
-          record: t.record,
-          points: t.points,
-          pointsFor: t.points, // Using points as pointsFor for demo
-          pointsAgainst: Math.floor(t.points * 0.85), // Demo calculation
-          streak: t.streak,
-        }));
-        setTeams(standingsTeams);
-      } finally {
-        setLoading(false);
+        } catch (err: any) {
+          console.error('Error loading standings:', err);
+          toast({
+            title: 'Error',
+            description: err.message || 'Failed to load standings',
+            variant: 'destructive',
+          });
+          // Fallback to demo data
+          const demoTeams = LeagueService.getAllTeams();
+          const standingsTeams: StandingsTeam[] = demoTeams.map(t => ({
+            id: String(t.id),
+            name: t.name,
+            owner: t.owner,
+            logo: t.logo,
+            record: t.record,
+            points: t.points,
+            pointsFor: t.points, // Using points as pointsFor for demo
+            pointsAgainst: Math.floor(t.points * 0.85), // Demo calculation
+            streak: t.streak,
+          }));
+          setTeams(standingsTeams);
+        } finally {
+          setLoading(false);
+        }
       }
     };
 
