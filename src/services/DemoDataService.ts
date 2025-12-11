@@ -1,8 +1,94 @@
 /**
- * DemoDataService
+ * ============================================================================
+ * DEMO STATE PILLARS - CRITICAL PRINCIPLES
+ * ============================================================================
  * 
- * Centralized service for managing demo league data.
- * Provides read-only dummy data for guest users and logged-in users without leagues.
+ * The demo state is a READ-ONLY, STATIC demonstration of the application.
+ * It serves as a showcase for guest users and logged-in users without leagues.
+ * 
+ * ═══════════════════════════════════════════════════════════════════════════
+ * PILLAR 1: READ-ONLY DATA
+ * ═══════════════════════════════════════════════════════════════════════════
+ * - All demo data is STATIC and HARDCODED
+ * - Demo data NEVER changes based on user interactions
+ * - Demo data is NOT stored in the database
+ * - Demo data is NOT persisted across sessions
+ * - Demo data is NOT affected by any write operations
+ * 
+ * ═══════════════════════════════════════════════════════════════════════════
+ * PILLAR 2: FOR SHOW ONLY
+ * ═══════════════════════════════════════════════════════════════════════════
+ * - Demo state is PURELY for demonstration purposes
+ * - Users CANNOT make changes that affect demo data
+ * - All "actions" in demo state are DISABLED or redirect to sign-up/login
+ * - Demo state shows what the app CAN do, not what the user HAS done
+ * - Demo state is a PREVIEW, not a functional workspace
+ * 
+ * ═══════════════════════════════════════════════════════════════════════════
+ * PILLAR 3: COMPLETE ISOLATION
+ * ═══════════════════════════════════════════════════════════════════════════
+ * - Demo state is COMPLETELY SEPARATE from logged-in user state
+ * - Changes in logged-in state NEVER affect demo state
+ * - Demo state NEVER affects logged-in user data
+ * - Demo state uses its own isolated data structures
+ * - Demo state has its own "league ID" ('demo-league-id') that is NOT a real database ID
+ * 
+ * ═══════════════════════════════════════════════════════════════════════════
+ * PILLAR 4: THREE USER STATES
+ * ═══════════════════════════════════════════════════════════════════════════
+ * 
+ * STATE 1: GUEST (user = null)
+ *   - Shows: Full demo league with all 10 teams, rosters, matchups, standings
+ *   - Actions: All actions redirect to sign-up/login
+ *   - Data Source: Static demo data (DemoDataService, LEAGUE_TEAMS_DATA)
+ *   - Persistence: None - resets on every page load
+ * 
+ * STATE 2: LOGGED-IN, NO LEAGUE (user exists, userLeagues.length === 0)
+ *   - Shows: Same demo league as guests, but with CTAs to create a league
+ *   - Actions: CTAs redirect to league creation flow
+ *   - Data Source: Static demo data (same as guests)
+ *   - Persistence: None - still using demo data
+ * 
+ * STATE 3: ACTIVE USER (user exists, userLeagues.length > 0)
+ *   - Shows: User's actual league data from database
+ *   - Actions: All actions work normally and persist to database
+ *   - Data Source: Supabase database (real user data)
+ *   - Persistence: Full - all changes saved to database
+ * 
+ * ═══════════════════════════════════════════════════════════════════════════
+ * PILLAR 5: ALL 10 DEMO TEAMS
+ * ═══════════════════════════════════════════════════════════════════════════
+ * - Demo league contains exactly 10 teams (IDs 1-10)
+ * - Team 3 is the "user's team" (Citrus Crushers) shown to guests
+ * - All 10 teams have full rosters with 18-21 players each
+ * - All 10 teams have valid starting lineups
+ * - All 10 teams are visible in Standings page
+ * - All teams use the same static data structure
+ * 
+ * ═══════════════════════════════════════════════════════════════════════════
+ * WHAT NEVER HAPPENS IN DEMO STATE
+ * ═══════════════════════════════════════════════════════════════════════════
+ * ❌ User cannot save lineup changes
+ * ❌ User cannot add/drop players
+ * ❌ User cannot make trades
+ * ❌ User cannot modify team settings
+ * ❌ User cannot create matchups
+ * ❌ User cannot update standings
+ * ❌ Any write operation to database using demo league ID
+ * ❌ Any mutation of demo data structures
+ * 
+ * ═══════════════════════════════════════════════════════════════════════════
+ * WHAT ALWAYS HAPPENS IN DEMO STATE
+ * ═══════════════════════════════════════════════════════════════════════════
+ * ✅ Demo data loads instantly from static sources
+ * ✅ All 10 teams display with full rosters
+ * ✅ Matchup page shows demo matchup data
+ * ✅ Standings page shows all 10 demo teams
+ * ✅ Roster page shows Team 3 (Citrus Crushers) roster
+ * ✅ All UI elements render correctly
+ * ✅ Actions redirect to sign-up/login or league creation
+ * 
+ * ============================================================================
  */
 
 import { LeagueTeam, LEAGUE_TEAMS_DATA } from './LeagueService';
@@ -24,12 +110,18 @@ export interface DemoLeague {
 }
 
 /**
- * Get demo league data
- * This is a static, read-only dataset for demonstration purposes
+ * DemoDataService
+ * 
+ * Centralized service for managing demo league data.
+ * Provides read-only dummy data for guest users and logged-in users without leagues.
+ * 
+ * ⚠️ CRITICAL: This service provides STATIC, READ-ONLY data only.
+ * No write operations are allowed. All data is hardcoded and never changes.
  */
 export const DemoDataService = {
   /**
    * Get demo league information
+   * Returns a complete demo league structure with all 10 teams
    */
   getDemoLeague(): DemoLeague {
     return {
@@ -49,6 +141,7 @@ export const DemoDataService = {
 
   /**
    * Get demo teams for standings
+   * Returns all 10 demo teams with their static records and stats
    */
   getDemoTeams(): LeagueTeam[] {
     return LEAGUE_TEAMS_DATA;
@@ -56,6 +149,7 @@ export const DemoDataService = {
 
   /**
    * Get demo "My Team" roster players for matchup view
+   * This represents Team 3 (Citrus Crushers) - the team shown to guests
    */
   getDemoMyTeam(): MatchupPlayer[] {
     return [
@@ -83,6 +177,7 @@ export const DemoDataService = {
 
   /**
    * Get demo opponent team for matchup view
+   * This represents the opponent team in the demo matchup
    */
   getDemoOpponentTeam(): MatchupPlayer[] {
     return [
@@ -106,10 +201,12 @@ export const DemoDataService = {
   /**
    * Get demo roster players (for roster page)
    * This will be populated from LeagueService.getMyTeam() which uses cached demo data
+   * 
+   * ⚠️ NOTE: This returns Team 3 (Citrus Crushers) roster from the demo league
+   * All 10 demo teams have rosters, but this is the one shown to guests
    */
   async getDemoRoster(allPlayers: Player[]): Promise<Player[]> {
     const { LeagueService } = await import('./LeagueService');
     return LeagueService.getMyTeam(allPlayers);
   },
 };
-

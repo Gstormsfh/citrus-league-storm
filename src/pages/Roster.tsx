@@ -326,9 +326,20 @@ const Roster = () => {
         let teamId: string | number | null = null;
         let userTeamData: { id: string; league_id: string; team_name: string } | null = null;
 
-        // State 1: Guest - show demo data
-        // State 2: Logged in, no league - show demo data (will show CTAs in UI)
-        // State 3: Active user - show real data
+        // ═══════════════════════════════════════════════════════════════════
+        // DEMO STATE: Guest or Logged-in without league
+        // ═══════════════════════════════════════════════════════════════════
+        // State 1: Guest (user = null) - show demo data
+        // State 2: Logged in, no league (userLeagues.length === 0) - show demo data with CTAs
+        // 
+        // ⚠️ CRITICAL DEMO STATE PRINCIPLES:
+        // - Demo data is READ-ONLY and STATIC
+        // - Demo data is NEVER persisted to database
+        // - Demo data is NEVER modified by user actions
+        // - All 10 demo teams (IDs 1-10) are initialized
+        // - Team 3 (Citrus Crushers) is shown to guests
+        // - Changes in demo state NEVER affect logged-in state
+        // ═══════════════════════════════════════════════════════════════════
         if (userLeagueState === 'guest' || userLeagueState === 'logged-in-no-league') {
           // Show demo team (Team 3) from database
           if (allPlayers.length === 0) {

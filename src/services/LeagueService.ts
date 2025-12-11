@@ -25,10 +25,35 @@ export interface Team {
   updated_at: string;
 }
 
-// Hardcoded "Draft" results to ensure consistency across the app
-// We assign players to teams deterministically based on their ID hash or simple round-robin
-// We assume we have 10 teams in the league (ID 1-10).
-// ID 3 is the User's team ("Citrus Crushers").
+/**
+ * ============================================================================
+ * DEMO LEAGUE DATA - READ-ONLY STATIC DATA
+ * ============================================================================
+ * 
+ * ⚠️ CRITICAL: This data is STATIC and READ-ONLY for demo purposes only.
+ * 
+ * The demo league contains exactly 10 teams (IDs 1-10):
+ * - Team 1: Touchdown Titans
+ * - Team 2: Scoring Sharks
+ * - Team 3: Citrus Crushers (shown to guests as "My Team")
+ * - Team 4: Field Generals
+ * - Team 5: Blitz Brigade
+ * - Team 6: Goal Getters
+ * - Team 7: Victory Vipers
+ * - Team 8: Hustle Heroes
+ * - Team 9: Gridiron Gladiators
+ * - Team 10: Puck Pythons
+ * 
+ * All 10 teams have:
+ * - Static records (wins/losses)
+ * - Static point totals
+ * - Static rosters (18-21 players each, distributed via snake draft simulation)
+ * - Static lineups (initialized once, never change)
+ * 
+ * This data is NEVER modified by user actions.
+ * This data is NEVER persisted to the database.
+ * This data is ONLY for demonstration purposes.
+ */
 
 export interface LeagueTeam {
   id: number;
@@ -516,14 +541,25 @@ export const LeagueService = {
       // Always verify and fix lineups - this catches invalid lineups (e.g., all players on bench)
       // The initializeDefaultLineups function will skip teams with valid lineups, so it's safe to call multiple times
       if (!cachedLineupsInitialized) {
-        console.log('initializeLeague: Initializing lineups for all demo teams...');
-        await this.initializeDefaultLineups();
-        cachedLineupsInitialized = true;
+        console.log('initializeLeague: Starting async lineup initialization for all 10 demo teams (non-blocking)...');
+        cachedLineupsInitialized = true; // Mark immediately to prevent blocking
+        // Run asynchronously - don't block roster loading
+        // This processes ALL 10 teams (1-10), ensuring each has a valid lineup
+        this.initializeDefaultLineups().then(() => {
+          console.log('initializeLeague: ✅ All 10 demo team lineups initialized successfully');
+        }).catch(err => {
+          console.error('initializeLeague: Error initializing lineups (non-critical):', err);
+        });
       } else {
         // Even if initialized before, verify and fix any invalid lineups
         // This is important for fixing corrupted lineups (e.g., teams 1, 4, 6 with all players on bench)
-        console.log('initializeLeague: Verifying all demo team lineups are valid (fixing any invalid ones)...');
-        await this.initializeDefaultLineups();
+        console.log('initializeLeague: Verifying all 10 demo team lineups are valid (fixing any invalid ones, non-blocking)...');
+        // Run asynchronously - don't block
+        this.initializeDefaultLineups().then(() => {
+          console.log('initializeLeague: ✅ All 10 demo team lineups verified');
+        }).catch(err => {
+          console.error('initializeLeague: Error verifying lineups (non-critical):', err);
+        });
       }
       return;
     }
@@ -727,26 +763,39 @@ export const LeagueService = {
     cachedLeagueState = leagueRosters;
     cachedFreeAgents = availablePlayers;
     
-    // Initialize default lineups for all demo teams (only once per session)
+    // Initialize default lineups for ALL 10 demo teams (only once per session)
     // This ensures all 10 demo teams have full starting lineups for non-logged-in users
     // NOTE: Do this asynchronously so it doesn't block roster loading
     if (!cachedLineupsInitialized) {
-      console.log('initializeLeague: Starting async lineup initialization (non-blocking)...');
+      console.log('initializeLeague: Starting async lineup initialization for all 10 demo teams (non-blocking)...');
       cachedLineupsInitialized = true; // Mark immediately to prevent blocking
       // Run lineup initialization in background - don't await
+      // This processes ALL 10 teams (1-10), not just Team 3
       this.initializeDefaultLineups().then(() => {
-        console.log('initializeLeague: Default lineups initialization complete');
+        console.log('initializeLeague: ✅ All 10 demo team lineups initialized successfully');
       }).catch((error) => {
-        console.error('initializeLeague: Error initializing default lineups (non-critical):', error);
-        // This is non-critical - rosters are already available
+        console.error('initializeLeague: Error initializing lineups (non-critical):', error);
+        // This is non-critical - rosters are already available in cachedLeagueState
       });
     }
   },
 
   /**
-   * Initialize default lineups for all teams in the demo league
-   * This ensures all teams have proper starting lineups, not just teams that have been viewed
-   * For the demo league, we ALWAYS ensure all 10 teams have full lineups
+   * Initialize default lineups for ALL 10 teams in the demo league
+   * 
+   * ⚠️ DEMO STATE ONLY: This function creates static lineups for all demo teams.
+   * 
+   * This function:
+   * 1. Processes ALL 10 demo teams (IDs 1-10)
+   * 2. Creates valid starting lineups for each team (10+ starters, bench players)
+   * 3. Saves lineups to database using demo league ID ('demo-league-id')
+   * 4. Runs asynchronously (non-blocking) so it doesn't delay roster loading
+   * 
+   * CRITICAL: This ensures ALL 10 demo teams have complete, valid lineups.
+   * Not just Team 3 (the guest's team), but ALL teams in the demo league.
+   * 
+   * The lineups are saved to the database but are completely isolated from real user data.
+   * They use the special 'demo-league-id' which is not a real league.
    */
   async initializeDefaultLineups() {
     if (!cachedLeagueState) {
@@ -769,8 +818,10 @@ export const LeagueService = {
       return 'UTIL';
     };
 
-    // Process ALL demo teams (1-10) from LEAGUE_TEAMS_DATA
-    // This ensures every team in the demo league has a full lineup
+    // Process ALL 10 demo teams (IDs 1-10) from LEAGUE_TEAMS_DATA
+    // This ensures EVERY team in the demo league has a full, valid lineup
+    // Not just Team 3 (guest's team), but ALL 10 teams
+    console.log(`initializeDefaultLineups: Processing all ${LEAGUE_TEAMS_DATA.length} demo teams...`);
     for (let teamIdNum = 1; teamIdNum <= LEAGUE_TEAMS_DATA.length; teamIdNum++) {
       const players = cachedLeagueState[teamIdNum] || [];
       
