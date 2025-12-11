@@ -332,6 +332,10 @@ const Roster = () => {
           dbPlayers = await LeagueService.getMyTeam(allPlayers);
           teamId = 3; // Demo team ID
           setUserTeamId(3);
+          // Set demo team data for display
+          if (userLeagueState === 'guest') {
+            setUserTeam({ id: '3', league_id: 'demo-league', team_name: 'Citrus Crushers' });
+          }
         } else if (userLeagueState === 'active-user' && user) {
           // Logged-in users with leagues: Get their actual team from Supabase
           // If activeLeagueId is set, prefer that league's team, otherwise get any team
@@ -1361,28 +1365,26 @@ const Roster = () => {
                     </ToggleGroup>
                 </div>
 
-                {(loading || (user && leagueLoading)) ? (
+                {loading ? (
                   <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
                     <Loader2 className="w-10 h-10 animate-spin mb-4 text-primary" />
-                    <p>Loading your roster...</p>
+                    <p>{userLeagueState === 'guest' ? 'Loading demo roster...' : 'Loading your roster...'}</p>
                   </div>
-                ) : !userTeamId || userLeagueState === 'logged-in-no-league' ? (
+                ) : userLeagueState === 'logged-in-no-league' ? (
                   <div className="py-8">
-                    {userLeagueState === 'logged-in-no-league' ? (
-                      <LeagueCreationCTA 
-                        title="Your Roster Awaits"
-                        description="Create your league to start building your roster, making trades, and competing with friends."
-                      />
-                    ) : (
-                      <div className="flex flex-col items-center justify-center py-20 text-center">
-                        <Trophy className="w-16 h-16 text-muted-foreground mb-4 opacity-50" />
-                        <h3 className="text-xl font-semibold mb-2">No Team Yet</h3>
-                        <p className="text-muted-foreground mb-4">Join or create a league to start building your roster.</p>
-                        <Button asChild>
-                          <a href="/create-league">Create or Join a League</a>
-                        </Button>
-                      </div>
-                    )}
+                    <LeagueCreationCTA 
+                      title="Your Roster Awaits"
+                      description="Create your league to start building your roster, making trades, and competing with friends."
+                    />
+                  </div>
+                ) : !userTeamId && userLeagueState === 'active-user' ? (
+                  <div className="flex flex-col items-center justify-center py-20 text-center">
+                    <Trophy className="w-16 h-16 text-muted-foreground mb-4 opacity-50" />
+                    <h3 className="text-xl font-semibold mb-2">No Team Yet</h3>
+                    <p className="text-muted-foreground mb-4">Join or create a league to start building your roster.</p>
+                    <Button asChild>
+                      <a href="/create-league">Create or Join a League</a>
+                    </Button>
                   </div>
                 ) : roster.starters.length === 0 && roster.bench.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-20 text-center">

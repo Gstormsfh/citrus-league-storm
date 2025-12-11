@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useAuth } from '@/contexts/AuthContext';
 import { useLeague } from '@/contexts/LeagueContext';
 import Navbar from '../components/Navbar';
@@ -49,8 +49,14 @@ const Matchup = () => {
   const [opponentDailyPoints, setOpponentDailyPoints] = useState<number[]>([]);
 
   // Demo data - shown to guests and logged-in users without leagues
-  const [demoMyTeam] = useState<MatchupPlayer[]>(userLeagueState === 'active-user' ? [] : DemoDataService.getDemoMyTeam());
-  const [demoOpponentTeam] = useState<MatchupPlayer[]>(userLeagueState === 'active-user' ? [] : DemoDataService.getDemoOpponentTeam());
+  // Use useMemo to recalculate when userLeagueState changes
+  const demoMyTeam = React.useMemo(() => {
+    return userLeagueState === 'active-user' ? [] : DemoDataService.getDemoMyTeam();
+  }, [userLeagueState]);
+  
+  const demoOpponentTeam = React.useMemo(() => {
+    return userLeagueState === 'active-user' ? [] : DemoDataService.getDemoOpponentTeam();
+  }, [userLeagueState]);
 
   const toHockeyPlayer = (p: MatchupPlayer): HockeyPlayer => ({
     id: p.id.toString(),
