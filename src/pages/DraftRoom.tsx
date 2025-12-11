@@ -1,11 +1,13 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { LeagueService, League, Team } from '@/services/LeagueService';
+import { useLeague } from '@/contexts/LeagueContext';
+import { LeagueService, League, Team, LEAGUE_TEAMS_DATA } from '@/services/LeagueService';
 import { DraftService, DraftPick, DraftState } from '@/services/DraftService';
 import { PlayerService, Player } from '@/services/PlayerService';
 import { supabase } from '@/integrations/supabase/client';
 import { logger } from '@/utils/logger';
+import { LeagueCreationCTA } from '@/components/LeagueCreationCTA';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { DraftLobby } from '@/components/draft/DraftLobby';
@@ -50,6 +52,7 @@ const DraftRoom = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
+  const { userLeagueState } = useLeague();
   const leagueId = searchParams.get('league');
 
   const [loading, setLoading] = useState(true);
@@ -89,6 +92,15 @@ const DraftRoom = () => {
 
   // Memoize loadUserLeague to prevent infinite loops
   const loadUserLeague = useCallback(async () => {
+    // ═══════════════════════════════════════════════════════════════════
+    // DEMO STATE: Allow guests to view demo draft room
+    // ═══════════════════════════════════════════════════════════════════
+    if (userLeagueState === 'guest' || userLeagueState === 'logged-in-no-league') {
+      // Load demo draft data directly
+      await loadDraftData();
+      return;
+    }
+    
     if (!user) {
       setLoading(false);
       return;
@@ -118,7 +130,7 @@ const DraftRoom = () => {
       setError('Failed to load your leagues. Please try again.');
       setLoading(false);
     }
-  }, [user, navigate, searchParams]);
+  }, [user, navigate, searchParams, userLeagueState, loadDraftData]);
 
   // Memoize loadDraftData to prevent infinite loops
   const loadDraftData = useCallback(async () => {
@@ -268,11 +280,19 @@ const DraftRoom = () => {
       setDraftPhase(DraftPhase.LOBBY);
       // Don't redirect on error - show error message instead
     }
-  }, [leagueId, user, navigate]);
+  }, [leagueId, user, navigate, userLeagueState, generateDemoDraftPicks]);
 
   useEffect(() => {
     // Wait for auth to finish loading before proceeding
     if (authLoading) {
+      return;
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // DEMO STATE: Allow guests to view demo draft room
+    // ═══════════════════════════════════════════════════════════════════
+    if (userLeagueState === 'guest' || userLeagueState === 'logged-in-no-league') {
+      loadDraftData();
       return;
     }
 
@@ -290,7 +310,7 @@ const DraftRoom = () => {
     }
 
     loadDraftData();
-  }, [leagueId, user, authLoading, loadDraftData, loadUserLeague, navigate]);
+  }, [leagueId, user, authLoading, userLeagueState, loadDraftData, loadUserLeague, navigate]);
 
 
   // Debounced realtime subscription to reduce lag
@@ -749,6 +769,16 @@ const DraftRoom = () => {
   // This gives explicit control over when the timer starts/stops
 
   const handlePlayerDraft = async (player: Player, isAutoDraft: boolean = false) => {
+    // ⚠️ DEMO STATE: Disable all draft actions
+    if (userLeagueState === 'guest' || userLeagueState === 'logged-in-no-league') {
+      if (userLeagueState === 'guest') {
+        navigate('/auth');
+      } else {
+        navigate('/create-league');
+      }
+      return;
+    }
+    
     logger.log('handlePlayerDraft called:', { 
       leagueId, 
       draftState, 
@@ -1009,6 +1039,16 @@ const DraftRoom = () => {
 
   // Prepare draft - initializes draft order but doesn't start yet
   const handlePrepareDraft = async (settings: DraftSettings) => {
+    // ⚠️ DEMO STATE: Disable all draft actions
+    if (userLeagueState === 'guest' || userLeagueState === 'logged-in-no-league') {
+      if (userLeagueState === 'guest') {
+        navigate('/auth');
+      } else {
+        navigate('/create-league');
+      }
+      return;
+    }
+    
     if (!leagueId || !isCommissioner) return;
 
     try {
@@ -1085,6 +1125,16 @@ const DraftRoom = () => {
 
   // Actually start the draft - begins the draft instance
   const handleStartDraft = async (settings: DraftSettings) => {
+    // ⚠️ DEMO STATE: Disable all draft actions
+    if (userLeagueState === 'guest' || userLeagueState === 'logged-in-no-league') {
+      if (userLeagueState === 'guest') {
+        navigate('/auth');
+      } else {
+        navigate('/create-league');
+      }
+      return;
+    }
+    
     if (!leagueId || !isCommissioner) return;
 
     try {
@@ -1769,8 +1819,8 @@ const DraftRoom = () => {
         {/* ACTIVE PHASE */}
         {!loading && !authLoading && !error && draftPhase === DraftPhase.ACTIVE && (
           <>
-            {/* Show "Start Draft Timer" button if commissioner and no picks made yet */}
-            {isCommissioner && (draftHistory?.length || 0) === 0 && !draftTimerStarted && (
+            {/* Show "Start Draft Timer" button if commissioner and no picks made yet - Disabled in demo state */}
+            {isCommissioner && userLeagueState === 'active-user' && (draftHistory?.length || 0) === 0 && !draftTimerStarted && (
               <div className="container mx-auto px-4 py-6">
                 <Card className="border-2 border-primary bg-primary/5">
                   <CardContent className="p-6 text-center">
@@ -1856,7 +1906,8 @@ const DraftRoom = () => {
                             </div>
                           </div>
                           
-                          {currentTeam?.owner_id === user?.id && (
+                          {/* Disable draft button in demo state */}
+                          {currentTeam?.owner_id === user?.id && userLeagueState === 'active-user' && (
                             <Button
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -1925,7 +1976,8 @@ const DraftRoom = () => {
                       totalTime={draftSettings.pickTimeLimit}
                     />
                     
-                    {currentTeam?.owner_id === user?.id && (
+                    {/* Disable draft button in demo state */}
+                    {currentTeam?.owner_id === user?.id && userLeagueState === 'active-user' && (
                       <Button 
                         variant="default" 
                         size="sm"
@@ -1933,6 +1985,16 @@ const DraftRoom = () => {
                         disabled={!selectedPlayer && draftQueue.length === 0}
                       >
                         {selectedPlayer ? 'Draft Player' : 'Auto Draft'}
+                      </Button>
+                    )}
+                    {/* Show CTA for demo state */}
+                    {(userLeagueState === 'guest' || userLeagueState === 'logged-in-no-league') && (
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => userLeagueState === 'guest' ? navigate('/auth') : navigate('/create-league')}
+                      >
+                        {userLeagueState === 'guest' ? 'Sign Up to Draft' : 'Create League to Draft'}
                       </Button>
                     )}
                   </div>
@@ -2181,22 +2243,46 @@ const DraftRoom = () => {
               <p className="text-xl text-muted-foreground mb-6">
                 The draft is complete! Your rosters are now locked and ready for the season.
               </p>
+              {/* Demo State CTA */}
+              {userLeagueState === 'logged-in-no-league' && (
+                <div className="max-w-3xl mx-auto mb-8">
+                  <LeagueCreationCTA 
+                    title="Your Draft Awaits"
+                    description="Create your league to start drafting players, building your team, and competing with friends."
+                  />
+                </div>
+              )}
+              
               <div className="flex gap-4 justify-center flex-wrap">
-                <Button onClick={() => navigate(`/roster?league=${leagueId}`)}>
-                  View My Roster
-                </Button>
-                <Button variant="outline" onClick={() => navigate(`/standings?league=${leagueId}`)}>
-                  View Standings
-                </Button>
-                <Button 
-                  variant="default" 
-                  onClick={handleViewDraftSnapshot}
-                  disabled={savingSnapshot}
-                  className="bg-fantasy-primary hover:bg-fantasy-primary/90"
-                >
-                  <Camera className="h-4 w-4 mr-2" />
-                  {savingSnapshot ? 'Saving...' : 'View Draft Results'}
-                </Button>
+                {/* Disable navigation buttons in demo state */}
+                {userLeagueState === 'active-user' ? (
+                  <>
+                    <Button onClick={() => navigate(`/roster?league=${leagueId}`)}>
+                      View My Roster
+                    </Button>
+                    <Button variant="outline" onClick={() => navigate(`/standings?league=${leagueId}`)}>
+                      View Standings
+                    </Button>
+                    <Button 
+                      variant="default" 
+                      onClick={handleViewDraftSnapshot}
+                      disabled={savingSnapshot}
+                      className="bg-fantasy-primary hover:bg-fantasy-primary/90"
+                    >
+                      <Camera className="h-4 w-4 mr-2" />
+                      {savingSnapshot ? 'Saving...' : 'View Draft Results'}
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button onClick={() => navigate('/auth')}>
+                      Sign Up to Create Your League
+                    </Button>
+                    <Button variant="outline" onClick={() => navigate('/standings')}>
+                      View Standings
+                    </Button>
+                  </>
+                )}
               </div>
             </Card>
 
@@ -2227,8 +2313,8 @@ const DraftRoom = () => {
                </div>
             )}
 
-            {/* Show Pause/Continue buttons for in-progress drafts */}
-            {isCommissioner && draftPhase === DraftPhase.ACTIVE && (draftHistory?.length || 0) > 0 && (
+            {/* Show Pause/Continue buttons for in-progress drafts - Disabled in demo state */}
+            {isCommissioner && userLeagueState === 'active-user' && draftPhase === DraftPhase.ACTIVE && (draftHistory?.length || 0) > 0 && (
               <div className="fixed bottom-4 right-4 z-50">
                 {draftTimerStarted ? (
                   <Button
