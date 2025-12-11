@@ -342,13 +342,28 @@ const Roster = () => {
           
           // Ensure league is initialized - this distributes players to teams
           console.log('[Roster] Starting league initialization...');
-          await LeagueService.initializeLeague(allPlayers);
-          console.log('[Roster] League initialization complete');
+          try {
+            // Add timeout to prevent hanging
+            const initPromise = LeagueService.initializeLeague(allPlayers);
+            const timeoutPromise = new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('League initialization timeout after 30s')), 30000)
+            );
+            await Promise.race([initPromise, timeoutPromise]);
+            console.log('[Roster] League initialization complete');
+          } catch (error: any) {
+            console.error('[Roster] League initialization error:', error);
+            // Continue anyway - cachedLeagueState might still be populated
+          }
           
           // Get demo team (Team 3) players
           console.log('[Roster] Calling getMyTeam...');
-          dbPlayers = await LeagueService.getMyTeam(allPlayers);
-          console.log('[Roster] getMyTeam returned, players count:', dbPlayers.length);
+          try {
+            dbPlayers = await LeagueService.getMyTeam(allPlayers);
+            console.log('[Roster] getMyTeam returned, players count:', dbPlayers.length);
+          } catch (error: any) {
+            console.error('[Roster] getMyTeam error:', error);
+            dbPlayers = [];
+          }
           if (dbPlayers.length > 0) {
             console.log('[Roster] First few demo players:', dbPlayers.slice(0, 3).map(p => p.full_name || p.id));
           } else {

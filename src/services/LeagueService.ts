@@ -727,13 +727,26 @@ export const LeagueService = {
     cachedLeagueState = leagueRosters;
     cachedFreeAgents = availablePlayers;
     
+    // Log roster distribution for debugging
+    console.log('initializeLeague: Roster distribution complete');
+    Object.keys(leagueRosters).forEach(teamId => {
+      console.log(`  Team ${teamId}: ${leagueRosters[Number(teamId)].length} players`);
+    });
+    console.log(`  Team 3 (demo): ${leagueRosters[3]?.length || 0} players`);
+    
     // Initialize default lineups for all demo teams (only once per session)
     // This ensures all 10 demo teams have full starting lineups for non-logged-in users
+    // NOTE: Do this asynchronously so it doesn't block roster loading
     if (!cachedLineupsInitialized) {
-      console.log('initializeLeague: Initializing default lineups for all demo teams...');
-      await this.initializeDefaultLineups();
-      cachedLineupsInitialized = true;
-      console.log('initializeLeague: Default lineups initialization complete');
+      console.log('initializeLeague: Starting async lineup initialization (non-blocking)...');
+      cachedLineupsInitialized = true; // Mark immediately to prevent blocking
+      // Run lineup initialization in background - don't await
+      this.initializeDefaultLineups().then(() => {
+        console.log('initializeLeague: Default lineups initialization complete');
+      }).catch((error) => {
+        console.error('initializeLeague: Error initializing default lineups (non-critical):', error);
+        // This is non-critical - rosters are already available
+      });
     }
   },
 
@@ -747,6 +760,9 @@ export const LeagueService = {
       console.log('initializeDefaultLineups: No cached league state, skipping');
       return;
     }
+    
+    // Use a fixed demo league ID for demo teams (not a real database league)
+    const demoLeagueId = 'demo-league-id';
     
     console.log('initializeDefaultLineups: Starting lineup initialization for all demo teams (1-10)');
 
