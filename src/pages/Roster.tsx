@@ -302,10 +302,12 @@ const Roster = () => {
   // Fetch and adapt players from staging files (SINGLE SOURCE OF TRUTH)
   // Extract loadRoster so it can be called manually for refresh
   const loadRoster = useCallback(async (keepCurrentRoster = false) => {
-    // Wait for league context to finish loading before making decisions
+    // For guests, load immediately. For logged-in users, wait for league context to finish loading
     if (user && leagueLoading) {
       return; // Don't load roster until we know the user's league state
     }
+    
+    // For guests, userLeagueState should be 'guest' immediately, so proceed
 
     // Only set loading if not keeping current roster (prevents flash during refresh)
     if (!keepCurrentRoster) {
@@ -329,7 +331,9 @@ const Roster = () => {
         // State 3: Active user - show real data
         if (userLeagueState === 'guest' || userLeagueState === 'logged-in-no-league') {
           // Show demo team (Team 3) from database
+          console.log('[Roster] Loading demo data for state:', userLeagueState);
           dbPlayers = await LeagueService.getMyTeam(allPlayers);
+          console.log('[Roster] Demo players loaded:', dbPlayers.length);
           teamId = 3; // Demo team ID
           setUserTeamId(3);
           // Set demo team data for display
@@ -646,10 +650,13 @@ const Roster = () => {
       }
   }, [user, profile, toast, userLeagueState, leagueLoading, activeLeagueId]);
 
-  // Initial load on mount
+  // Initial load on mount and when userLeagueState changes
   useEffect(() => {
-    loadRoster();
-  }, [loadRoster]);
+    // For guests, load immediately. For logged-in users, wait for league context
+    if (userLeagueState === 'guest' || !leagueLoading) {
+      loadRoster();
+    }
+  }, [loadRoster, userLeagueState, leagueLoading]);
 
   // Expose refreshRoster function for manual refresh (e.g., after add/drop)
   const refreshRoster = useCallback(() => {
@@ -1281,11 +1288,15 @@ const Roster = () => {
             <div className="flex flex-col md:flex-row justify-between items-center gap-4">
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-2xl font-bold">
-                  {userTeam?.team_name?.substring(0, 2).toUpperCase() || profile?.username?.substring(0, 2).toUpperCase() || 'TM'}
+                  {userLeagueState === 'guest' ? 'CC' : (userTeam?.team_name?.substring(0, 2).toUpperCase() || profile?.username?.substring(0, 2).toUpperCase() || 'TM')}
                 </div>
                 <div>
-                  <h1 className="text-2xl font-bold">{userTeam?.team_name || 'My Team'}</h1>
-                  <div className="text-muted-foreground text-sm">Manager: {profile?.username || 'You'}</div>
+                  <h1 className="text-2xl font-bold">
+                    {userLeagueState === 'guest' ? 'Citrus Crushers' : (userTeam?.team_name || 'My Team')}
+                  </h1>
+                  <div className="text-muted-foreground text-sm">
+                    Manager: {userLeagueState === 'guest' ? 'Demo Team' : (profile?.username || 'You')}
+                  </div>
                 </div>
               </div>
 
@@ -1386,7 +1397,7 @@ const Roster = () => {
                       <a href="/create-league">Create or Join a League</a>
                     </Button>
                   </div>
-                ) : roster.starters.length === 0 && roster.bench.length === 0 ? (
+                ) : roster.starters.length === 0 && roster.bench.length === 0 && userLeagueState !== 'guest' ? (
                   <div className="flex flex-col items-center justify-center py-20 text-center">
                     <Users className="w-16 h-16 text-muted-foreground mb-4 opacity-50" />
                     <h3 className="text-xl font-semibold mb-2">Empty Roster</h3>

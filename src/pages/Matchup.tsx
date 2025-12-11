@@ -51,11 +51,17 @@ const Matchup = () => {
   // Demo data - shown to guests and logged-in users without leagues
   // Use useMemo to recalculate when userLeagueState changes
   const demoMyTeam = React.useMemo(() => {
-    return userLeagueState === 'active-user' ? [] : DemoDataService.getDemoMyTeam();
+    if (userLeagueState === 'active-user') return [];
+    const demo = DemoDataService.getDemoMyTeam();
+    console.log('[Matchup] Demo my team loaded:', demo.length, 'players');
+    return demo;
   }, [userLeagueState]);
   
   const demoOpponentTeam = React.useMemo(() => {
-    return userLeagueState === 'active-user' ? [] : DemoDataService.getDemoOpponentTeam();
+    if (userLeagueState === 'active-user') return [];
+    const demo = DemoDataService.getDemoOpponentTeam();
+    console.log('[Matchup] Demo opponent team loaded:', demo.length, 'players');
+    return demo;
   }, [userLeagueState]);
 
   const toHockeyPlayer = (p: MatchupPlayer): HockeyPlayer => ({
@@ -457,19 +463,19 @@ const Matchup = () => {
              )}
           </div>
           
-          {loading && (
+          {loading && userLeagueState === 'active-user' && (
             <div className="flex items-center justify-center py-20">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
           )}
           
-          {!loading && error && (
+          {!loading && error && userLeagueState === 'active-user' && (
             <div className="text-center py-20">
               <p className="text-destructive text-lg">{error}</p>
             </div>
           )}
           
-          {!loading && !error && userLeagueState === 'logged-in-no-league' && (
+          {userLeagueState === 'logged-in-no-league' && (
             <div className="py-12">
               <LeagueCreationCTA 
                 title="Your Matchup Awaits"
@@ -478,7 +484,7 @@ const Matchup = () => {
             </div>
           )}
 
-          {!loading && !error && userLeagueState !== 'logged-in-no-league' && (
+          {(userLeagueState === 'guest' || (userLeagueState === 'active-user' && !loading && !error)) && (
             <>
           
           <ScoreCard
@@ -535,14 +541,22 @@ const Matchup = () => {
                 </div>
                 {/* Opponent Team - Always on the RIGHT - Second in DOM order */}
                 <div className="order-2 lg:order-2">
-                <TeamCard
-                  title={user ? (opponentTeam?.team_name || 'Bye Week') : 'Thunder Titans'}
-                  starters={opponentStarters}
-                  bench={opponentBench}
-                  slotAssignments={opponentTeamSlotAssignments}
-                  gradientClass="border-t-4 border-fantasy-primary"
-                  onPlayerClick={handlePlayerClick}
-                />
+                {userLeagueState === 'logged-in-no-league' ? (
+                  <LeagueCreationCTA 
+                    title="Opponent Team"
+                    description="Create your league to see your matchups and compete against other teams."
+                    variant="compact"
+                  />
+                ) : (
+                  <TeamCard
+                    title={userLeagueState === 'active-user' ? (opponentTeam?.team_name || 'Bye Week') : 'Thunder Titans'}
+                    starters={opponentStarters}
+                    bench={opponentBench}
+                    slotAssignments={opponentTeamSlotAssignments}
+                    gradientClass="border-t-4 border-fantasy-primary"
+                    onPlayerClick={handlePlayerClick}
+                  />
+                )}
                 </div>
               </div>
             </TabsContent>
