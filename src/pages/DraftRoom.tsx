@@ -92,15 +92,6 @@ const DraftRoom = () => {
 
   // Memoize loadUserLeague to prevent infinite loops
   const loadUserLeague = useCallback(async () => {
-    // ═══════════════════════════════════════════════════════════════════
-    // DEMO STATE: Allow guests to view demo draft room
-    // ═══════════════════════════════════════════════════════════════════
-    if (userLeagueState === 'guest' || userLeagueState === 'logged-in-no-league') {
-      // Load demo draft data directly
-      await loadDraftData();
-      return;
-    }
-    
     if (!user) {
       setLoading(false);
       return;
@@ -130,10 +121,142 @@ const DraftRoom = () => {
       setError('Failed to load your leagues. Please try again.');
       setLoading(false);
     }
-  }, [user, navigate, searchParams, userLeagueState, loadDraftData]);
+  }, [user, navigate, searchParams]);
+
+  /**
+   * Generate demo draft picks for all 10 demo teams
+   * Simulates a completed draft with realistic player distribution
+   */
+  const generateDemoDraftPicks = useCallback(async (): Promise<DraftPick[]> => {
+    const allPlayers = await PlayerService.getAllPlayers();
+    // Sort players by value (points) for realistic draft simulation
+    const sortedPlayers = [...allPlayers].sort((a, b) => (b.points || 0) - (a.points || 0));
+    
+    const demoPicks: DraftPick[] = [];
+    const rounds = 21;
+    const teamsCount = 10;
+    let playerIndex = 0;
+    
+    // Snake draft: Round 1 goes 1->10, Round 2 goes 10->1, etc.
+    for (let round = 1; round <= rounds; round++) {
+      const isOddRound = round % 2 === 1;
+      const teamOrder = isOddRound 
+        ? [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+        : [10, 9, 8, 7, 6, 5, 4, 3, 2, 1];
+      
+      for (let teamIndex = 0; teamIndex < teamsCount; teamIndex++) {
+        const teamId = teamOrder[teamIndex];
+        const pickNumber = (round - 1) * teamsCount + teamIndex + 1;
+        
+        // Find next available player
+        while (playerIndex < sortedPlayers.length && demoPicks.some(p => p.player_id === sortedPlayers[playerIndex].id)) {
+          playerIndex++;
+        }
+        
+        if (playerIndex < sortedPlayers.length) {
+          const player = sortedPlayers[playerIndex];
+          demoPicks.push({
+            id: `demo-pick-${pickNumber}`,
+            league_id: 'demo-league-id',
+            round_number: round,
+            pick_number: pickNumber,
+            team_id: String(teamId),
+            player_id: player.id,
+            picked_at: new Date(Date.now() - (210 - pickNumber) * 30000).toISOString(), // Simulate picks over time
+            draft_session_id: 'demo-session-id'
+          });
+          playerIndex++;
+        }
+      }
+    }
+    
+    return demoPicks;
+  }, []);
 
   // Memoize loadDraftData to prevent infinite loops
   const loadDraftData = useCallback(async () => {
+    // ═══════════════════════════════════════════════════════════════════
+    // DEMO STATE: Load demo draft room
+    // ═══════════════════════════════════════════════════════════════════
+    if (userLeagueState === 'guest' || userLeagueState === 'logged-in-no-league') {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        // Create demo league
+        const demoLeague: League = {
+          id: 'demo-league-id',
+          name: 'Demo League',
+          commissioner_id: 'demo-commissioner',
+          draft_status: 'completed',
+          join_code: 'DEMO123',
+          roster_size: 21,
+          draft_rounds: 21,
+          settings: {},
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+        setLeague(demoLeague);
+        setIsCommissioner(false); // Guests are never commissioners
+        
+        // Create demo teams from LEAGUE_TEAMS_DATA
+        const demoTeams: (Team & { owner_name?: string })[] = LEAGUE_TEAMS_DATA.map(team => ({
+          id: String(team.id),
+          league_id: 'demo-league-id',
+          team_name: team.name,
+          owner_id: null,
+          owner_name: team.owner,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }));
+        setTeams(demoTeams);
+        
+        // Set user team to Team 3 (Citrus Crushers)
+        const userDemoTeam = demoTeams.find(t => t.id === '3') || null;
+        setUserTeam(userDemoTeam);
+        
+        // Generate demo draft picks
+        const demoPicks = await generateDemoDraftPicks();
+        setDraftHistory(demoPicks);
+        setDraftedPlayerIds(new Set(demoPicks.map(p => p.player_id)));
+        
+        // Create demo draft state (completed)
+        const demoDraftState: DraftState = {
+          currentRound: 21,
+          currentPick: 210, // 10 teams * 21 rounds
+          totalPicks: 210,
+          nextTeamId: null,
+          isComplete: true,
+          sessionId: 'demo-session-id'
+        };
+        setDraftState(demoDraftState);
+        setDraftPhase(DraftPhase.COMPLETED);
+        
+        // Load available players
+        const allPlayers = await PlayerService.getAllPlayers();
+        setAvailablePlayers(allPlayers);
+        
+        // Set draft settings
+        setDraftSettings({
+          rounds: 21,
+          pickTimeLimit: 90,
+          draftOrder: 'serpentine',
+          scoringFormat: 'standard'
+        });
+        
+        setLoading(false);
+        return;
+      } catch (error: any) {
+        logger.error('DraftRoom: Error loading demo draft:', error);
+        setError('Failed to load demo draft. Please try again.');
+        setLoading(false);
+        return;
+      }
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════
+    // ACTIVE USER STATE: Load real draft data
+    // ═══════════════════════════════════════════════════════════════════
     if (!leagueId || !user) {
       logger.log('DraftRoom: Cannot load draft data - missing leagueId or user', { leagueId, hasUser: !!user });
       setLoading(false);
@@ -280,7 +403,7 @@ const DraftRoom = () => {
       setDraftPhase(DraftPhase.LOBBY);
       // Don't redirect on error - show error message instead
     }
-  }, [leagueId, user, navigate, userLeagueState, generateDemoDraftPicks]);
+  }, [leagueId, user, navigate, userLeagueState, generateDemoDraftPicks, loadDraftState]);
 
   useEffect(() => {
     // Wait for auth to finish loading before proceeding
