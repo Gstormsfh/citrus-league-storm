@@ -225,8 +225,18 @@ export const DemoDataService = {
     await LeagueService.initializeLeague(allPlayers);
     
     // Get rosters for Team 3 (My Team) and Team 1 (Opponent)
-    const myTeamRoster = await LeagueService.getTeamRoster(3, allPlayers);
-    const opponentTeamRoster = await LeagueService.getTeamRoster(1, allPlayers);
+    // getTeamRoster returns Player[], we need to convert to HockeyPlayer[]
+    const myTeamPlayers = await LeagueService.getTeamRoster(3, allPlayers);
+    const opponentTeamPlayers = await LeagueService.getTeamRoster(1, allPlayers);
+    
+    console.log('[DemoDataService] Demo rosters loaded:', {
+      myTeamCount: myTeamPlayers.length,
+      opponentTeamCount: opponentTeamPlayers.length
+    });
+    
+    // Convert Player[] to HockeyPlayer[] using MatchupService
+    const myTeamRoster = myTeamPlayers.map(p => MatchupService.transformToHockeyPlayer(p));
+    const opponentTeamRoster = opponentTeamPlayers.map(p => MatchupService.transformToHockeyPlayer(p));
     
     // Get starting lineups for both teams
     const myTeamLineup = await LeagueService.getLineup('3', 'demo-league-id');
@@ -281,6 +291,11 @@ export const DemoDataService = {
         'America/Denver',
         games
       );
+    });
+    
+    console.log('[DemoDataService] Demo matchup players transformed:', {
+      myTeamMatchupCount: myTeamMatchupPlayers.length,
+      opponentTeamMatchupCount: opponentTeamMatchupPlayers.length
     });
     
     return {

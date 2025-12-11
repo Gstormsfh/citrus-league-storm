@@ -65,15 +65,23 @@ const Matchup = () => {
     const loadDemoMatchup = async () => {
       try {
         setLoading(true);
+        console.log('[Matchup] Loading demo matchup data...');
         const matchupData = await DemoDataService.getDemoMatchupData();
+        console.log('[Matchup] Demo matchup data loaded:', {
+          myTeamCount: matchupData.myTeam.length,
+          opponentTeamCount: matchupData.opponentTeam.length
+        });
         setDemoMyTeam(matchupData.myTeam);
         setDemoOpponentTeam(matchupData.opponentTeam);
         setLoading(false);
       } catch (error) {
-        console.error('Error loading demo matchup data:', error);
+        console.error('[Matchup] Error loading demo matchup data:', error);
         // Fallback to static data if loading fails
-        setDemoMyTeam(DemoDataService.getDemoMyTeam());
-        setDemoOpponentTeam(DemoDataService.getDemoOpponentTeam());
+        console.log('[Matchup] Falling back to static demo data');
+        const staticMyTeam = DemoDataService.getDemoMyTeam();
+        const staticOpponentTeam = DemoDataService.getDemoOpponentTeam();
+        setDemoMyTeam(staticMyTeam);
+        setDemoOpponentTeam(staticOpponentTeam);
         setLoading(false);
       }
     };
@@ -507,7 +515,11 @@ const Matchup = () => {
             </div>
           )}
 
-          {!loading && (userLeagueState === 'guest' || (userLeagueState === 'active-user' && !error) || (userLeagueState === 'logged-in-no-league' && (demoMyTeam.length > 0 || demoOpponentTeam.length > 0))) && (
+          {!loading && (
+            (userLeagueState === 'guest' && (demoMyTeam.length > 0 || demoOpponentTeam.length > 0)) ||
+            (userLeagueState === 'active-user' && !error) ||
+            (userLeagueState === 'logged-in-no-league' && (demoMyTeam.length > 0 || demoOpponentTeam.length > 0))
+          ) && (
             <>
           
           <ScoreCard
