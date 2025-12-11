@@ -214,184 +214,237 @@ export const DemoDataService = {
    * Get demo matchup data from actual demo rosters
    * Uses Team 3 (Citrus Crushers) as "My Team" and Team 1 as opponent
    * Transforms actual roster players into MatchupPlayer format
+   * Uses two-tier approach: database first, static fallback
    */
-  async getDemoMatchupData(): Promise<{ myTeam: MatchupPlayer[]; opponentTeam: MatchupPlayer[] }> {
+  async getDemoMatchupData(): Promise<{ 
+    myTeam: MatchupPlayer[]; 
+    opponentTeam: MatchupPlayer[];
+    myTeamSlotAssignments: Record<string, string>;
+    opponentTeamSlotAssignments: Record<string, string>;
+  }> {
     try {
-      console.log('[DemoDataService] getDemoMatchupData() called');
-      const { LeagueService } = await import('./LeagueService');
+      console.log('[DemoDataService] getDemoMatchupData() called - using same logic as Roster.tsx');
       const { MatchupService } = await import('./MatchupService');
       const { PlayerService } = await import('./PlayerService');
+      const { LeagueService } = await import('./LeagueService');
       
       console.log('[DemoDataService] Services imported, loading players...');
-      // Ensure demo league is initialized
       const allPlayers = await PlayerService.getAllPlayers();
       console.log('[DemoDataService] Players loaded:', allPlayers.length);
       
-      console.log('[DemoDataService] Initializing league...');
+      // Use same approach as Roster.tsx - use LeagueService.getTeamRoster
+      // Initialize demo league (same as Roster.tsx)
       await LeagueService.initializeLeague(allPlayers);
-      console.log('[DemoDataService] League initialized');
-    
-    // Get rosters for Team 3 (My Team) and Team 1 (Opponent)
-    // getTeamRoster returns Player[], we need to convert to HockeyPlayer[]
-    const myTeamPlayers = await LeagueService.getTeamRoster(3, allPlayers);
-    const opponentTeamPlayers = await LeagueService.getTeamRoster(1, allPlayers);
-    
-    console.log('[DemoDataService] Demo rosters loaded:', {
-      myTeamCount: myTeamPlayers.length,
-      opponentTeamCount: opponentTeamPlayers.length
-    });
-    
-    // Convert Player[] to HockeyPlayer[] using MatchupService
-    const myTeamRoster = myTeamPlayers.map(p => MatchupService.transformToHockeyPlayer(p));
-    const opponentTeamRoster = opponentTeamPlayers.map(p => MatchupService.transformToHockeyPlayer(p));
-    
-    // Get starting lineups for both teams
-    // Wait a bit for lineups to be initialized (they're created asynchronously)
-    let myTeamLineup = await LeagueService.getLineup('3', 'demo-league-id');
-    let opponentTeamLineup = await LeagueService.getLineup('1', 'demo-league-id');
-    
-    // If lineups don't exist yet, wait a bit and retry (lineups are initialized asynchronously)
-    if (!myTeamLineup || !opponentTeamLineup || !myTeamLineup.starters || !opponentTeamLineup.starters) {
-      console.log('[DemoDataService] Lineups not ready yet, waiting for initialization...');
-      // Wait up to 3 seconds for lineups to be initialized
-      for (let i = 0; i < 6; i++) {
-        await new Promise(resolve => setTimeout(resolve, 500));
-        myTeamLineup = await LeagueService.getLineup('3', 'demo-league-id');
-        opponentTeamLineup = await LeagueService.getLineup('1', 'demo-league-id');
-        if (myTeamLineup?.starters && opponentTeamLineup?.starters && 
-            myTeamLineup.starters.length > 0 && opponentTeamLineup.starters.length > 0) {
-          console.log('[DemoDataService] Lineups loaded after wait');
-          break;
+      
+      // Get Team 3 (My Team) roster - same as Roster.tsx
+      const myTeamRoster = await LeagueService.getTeamRoster(3, allPlayers);
+      console.log('[DemoDataService] My team (Team 3) roster loaded:', myTeamRoster.length, 'players');
+      
+      // Get Team 1 (Opponent) roster - same approach
+      const opponentTeamRoster = await LeagueService.getTeamRoster(1, allPlayers);
+      console.log('[DemoDataService] Opponent team (Team 1) roster loaded:', opponentTeamRoster.length, 'players');
+      
+      if (myTeamRoster.length === 0 || opponentTeamRoster.length === 0) {
+        console.error('[DemoDataService] One or both rosters are empty!');
+        throw new Error('Demo rosters not available');
+      }
+      
+      // Convert Player[] to HockeyPlayer[] using MatchupService
+      const myTeamHockeyPlayers = myTeamRoster.map(p => MatchupService.transformToHockeyPlayer(p));
+      const opponentTeamHockeyPlayers = opponentTeamRoster.map(p => MatchupService.transformToHockeyPlayer(p));
+      
+      console.log('[DemoDataService] Demo rosters loaded:', {
+        myTeamCount: myTeamHockeyPlayers.length,
+        opponentTeamCount: opponentTeamHockeyPlayers.length
+      });
+      
+      // Sort players consistently by ID for deterministic auto-assignment (same as Roster.tsx)
+      myTeamHockeyPlayers.sort((a, b) => {
+        const idA = typeof a.id === 'string' ? parseInt(a.id) : a.id;
+        const idB = typeof b.id === 'string' ? parseInt(b.id) : b.id;
+        return idA - idB;
+      });
+      
+      opponentTeamHockeyPlayers.sort((a, b) => {
+        const idA = typeof a.id === 'string' ? parseInt(a.id) : a.id;
+        const idB = typeof b.id === 'string' ? parseInt(b.id) : b.id;
+        return idA - idB;
+      });
+      
+      // Use same simple auto-organization logic as Roster.tsx (same as OtherTeam.tsx)
+      const getFantasyPosition = (position: string): string => {
+        const pos = position?.toUpperCase() || '';
+        if (['C', 'CENTRE', 'CENTER'].includes(pos)) return 'C';
+        if (['LW', 'LEFT WING', 'LEFTWING', 'L'].includes(pos)) return 'LW';
+        if (['RW', 'RIGHT WING', 'RIGHTWING', 'R'].includes(pos)) return 'RW';
+        if (['D', 'DEFENCE', 'DEFENSE'].includes(pos)) return 'D';
+        if (['G', 'GOALIE'].includes(pos)) return 'G';
+        return 'UTIL';
+      };
+      
+      // Helper function to organize roster into starters/bench (EXACT SAME LOGIC AS Roster.tsx)
+      // This creates slot assignments as it organizes, ensuring consistency with Roster page
+      const organizeRoster = (roster: any[]) => {
+        const slotsNeeded = { 'C': 2, 'LW': 2, 'RW': 2, 'D': 4, 'G': 2, 'UTIL': 1 };
+        const slotsFilled = { 'C': 0, 'LW': 0, 'RW': 0, 'D': 0, 'G': 0, 'UTIL': 0 };
+        
+        const starters: any[] = [];
+        const bench: any[] = [];
+        const ir: any[] = [];
+        const slotAssignments: Record<string, string> = {};
+        let irSlotIndex = 1;
+        
+        roster.forEach(p => {
+          if (p.status === 'IR' || p.status === 'SUSP') {
+            if (irSlotIndex <= 3) {
+              ir.push(p);
+              slotAssignments[String(p.id)] = `ir-slot-${irSlotIndex}`;
+              irSlotIndex++;
+            } else {
+              bench.push(p);
+            }
+            return;
+          }
+          
+          const pos = getFantasyPosition(p.position);
+          let assigned = false;
+          
+          if (pos !== 'UTIL' && slotsFilled[pos] < slotsNeeded[pos]) {
+            slotsFilled[pos]++;
+            assigned = true;
+            slotAssignments[String(p.id)] = `slot-${pos}-${slotsFilled[pos]}`;
+          } else if (pos !== 'G' && slotsFilled['UTIL'] < slotsNeeded['UTIL']) {
+            slotsFilled['UTIL']++;
+            assigned = true;
+            slotAssignments[String(p.id)] = 'slot-UTIL';
+          }
+          
+          if (assigned) {
+            starters.push(p);
+          } else {
+            bench.push(p);
+          }
+        });
+        
+        return { starters, bench, ir, slotAssignments };
+      };
+      
+      // Auto-organize both teams (same as Roster.tsx - always auto-organize for demo)
+      console.log('[DemoDataService] Auto-organizing my team roster');
+      const myTeamOrganized = organizeRoster(myTeamHockeyPlayers);
+      const myTeamStarters = new Set(myTeamOrganized.starters.map(p => String(p.id)));
+      const myTeamSlotAssignmentsFromOrg = myTeamOrganized.slotAssignments;
+      
+      console.log('[DemoDataService] Auto-organizing opponent team roster');
+      const opponentTeamOrganized = organizeRoster(opponentTeamHockeyPlayers);
+      const opponentTeamStarters = new Set(opponentTeamOrganized.starters.map(p => String(p.id)));
+      const opponentTeamSlotAssignmentsFromOrg = opponentTeamOrganized.slotAssignments;
+      
+      console.log('[DemoDataService] Organized rosters:', {
+        myTeamStarters: myTeamOrganized.starters.length,
+        myTeamBench: myTeamOrganized.bench.length,
+        opponentTeamStarters: opponentTeamOrganized.starters.length,
+        opponentTeamBench: opponentTeamOrganized.bench.length
+      });
+      
+      // Get current week for schedule data
+      const now = new Date();
+      const weekStart = new Date(now);
+      weekStart.setDate(now.getDate() - now.getDay() + 1); // Monday
+      weekStart.setHours(0, 0, 0, 0);
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekStart.getDate() + 6); // Sunday
+      weekEnd.setHours(23, 59, 59, 999);
+      
+      // Get all unique teams from both rosters for batch schedule query
+      const allTeams = Array.from(new Set([
+        ...myTeamHockeyPlayers.map(p => p.team || '').filter(t => t),
+        ...opponentTeamHockeyPlayers.map(p => p.team || '').filter(t => t)
+      ]));
+      
+      // Batch fetch games for all teams at once (more efficient)
+      const { ScheduleService } = await import('./ScheduleService');
+      const { gamesByTeam } = await ScheduleService.getGamesForTeams(allTeams, weekStart, weekEnd);
+      
+      // Transform rosters to MatchupPlayer format
+      const myTeamMatchupPlayers = myTeamHockeyPlayers.map((player, index) => {
+        const teamAbbrev = player.team || '';
+        const games = gamesByTeam.get(teamAbbrev) || [];
+        const playerIdStr = String(player.id);
+        
+        // Check if player is a starter
+        const isStarter = myTeamStarters.has(playerIdStr);
+        
+        return MatchupService.transformToMatchupPlayerWithGames(
+          player,
+          isStarter,
+          weekStart,
+          weekEnd,
+          'America/Denver',
+          games
+        );
+      });
+      
+      const opponentTeamMatchupPlayers = opponentTeamHockeyPlayers.map((player, index) => {
+        const teamAbbrev = player.team || '';
+        const games = gamesByTeam.get(teamAbbrev) || [];
+        const playerIdStr = String(player.id);
+        
+        // Check if player is a starter
+        const isStarter = opponentTeamStarters.has(playerIdStr);
+        
+        return MatchupService.transformToMatchupPlayerWithGames(
+          player,
+          isStarter,
+          weekStart,
+          weekEnd,
+          'America/Denver',
+          games
+        );
+      });
+      
+      console.log('[DemoDataService] Matchup players with starter status:', {
+        myTeamTotal: myTeamMatchupPlayers.length,
+        myTeamStarters: myTeamMatchupPlayers.filter(p => p.isStarter).length,
+        myTeamBench: myTeamMatchupPlayers.filter(p => !p.isStarter).length,
+        opponentTeamTotal: opponentTeamMatchupPlayers.length,
+        opponentTeamStarters: opponentTeamMatchupPlayers.filter(p => p.isStarter).length,
+        opponentTeamBench: opponentTeamMatchupPlayers.filter(p => !p.isStarter).length
+      });
+      
+      // Use slot assignments from organizeRoster (which matches Roster.tsx logic exactly)
+      // This ensures consistency between Roster page and Matchup page
+      // We need to map the slot assignments from HockeyPlayer IDs to MatchupPlayer IDs
+      // (they should be the same, but we'll ensure consistency)
+      const myTeamSlotAssignments: Record<string, string> = {};
+      const opponentTeamSlotAssignments: Record<string, string> = {};
+      
+      // Map slot assignments from organized rosters to matchup players
+      // This preserves the exact slot assignments created during organization
+      myTeamMatchupPlayers.forEach(mp => {
+        const slot = myTeamSlotAssignmentsFromOrg[String(mp.id)];
+        if (slot) {
+          myTeamSlotAssignments[String(mp.id)] = slot;
         }
-      }
-    }
-    
-    console.log('[DemoDataService] Lineup data:', {
-      myTeamLineup: myTeamLineup ? { starters: myTeamLineup.starters?.length || 0, bench: myTeamLineup.bench?.length || 0 } : null,
-      opponentTeamLineup: opponentTeamLineup ? { starters: opponentTeamLineup.starters?.length || 0, bench: opponentTeamLineup.bench?.length || 0 } : null
-    });
-    
-    // Convert lineup starter IDs to strings and create sets
-    // Lineup starters might be stored as strings or numbers, so normalize them
-    const myTeamStarters = new Set((myTeamLineup?.starters || []).map(id => {
-      const idStr = String(id);
-      console.log(`[DemoDataService] My team starter ID: ${idStr} (original type: ${typeof id})`);
-      return idStr;
-    }));
-    const opponentTeamStarters = new Set((opponentTeamLineup?.starters || []).map(id => {
-      const idStr = String(id);
-      console.log(`[DemoDataService] Opponent team starter ID: ${idStr} (original type: ${typeof id})`);
-      return idStr;
-    }));
-    
-    console.log('[DemoDataService] Starter sets:', {
-      myTeamStarterCount: myTeamStarters.size,
-      opponentTeamStarterCount: opponentTeamStarters.size,
-      myTeamStarterIds: Array.from(myTeamStarters).slice(0, 5),
-      opponentTeamStarterIds: Array.from(opponentTeamStarters).slice(0, 5)
-    });
-    
-    // Get current week for schedule data
-    const now = new Date();
-    const weekStart = new Date(now);
-    weekStart.setDate(now.getDate() - now.getDay() + 1); // Monday
-    weekStart.setHours(0, 0, 0, 0);
-    const weekEnd = new Date(weekStart);
-    weekEnd.setDate(weekStart.getDate() + 6); // Sunday
-    weekEnd.setHours(23, 59, 59, 999);
-    
-    // Get all unique teams from both rosters for batch schedule query
-    const allTeams = Array.from(new Set([
-      ...myTeamRoster.map(p => p.team || '').filter(t => t),
-      ...opponentTeamRoster.map(p => p.team || '').filter(t => t)
-    ]));
-    
-    // Batch fetch games for all teams at once (more efficient)
-    const { ScheduleService } = await import('./ScheduleService');
-    const { gamesByTeam } = await ScheduleService.getGamesForTeams(allTeams, weekStart, weekEnd);
-    
-    // Debug: Log sample player IDs and starter IDs to check for matching
-    console.log('[DemoDataService] Sample player IDs from roster:', {
-      myTeamSample: myTeamRoster.slice(0, 3).map(p => ({ name: p.name, id: p.id, idType: typeof p.id })),
-      opponentTeamSample: opponentTeamRoster.slice(0, 3).map(p => ({ name: p.name, id: p.id, idType: typeof p.id }))
-    });
-    console.log('[DemoDataService] Sample starter IDs from lineup:', {
-      myTeamStartersSample: Array.from(myTeamStarters).slice(0, 5),
-      opponentTeamStartersSample: Array.from(opponentTeamStarters).slice(0, 5)
-    });
-    
-    // Transform rosters to MatchupPlayer format
-    const myTeamMatchupPlayers = myTeamRoster.map((player, index) => {
-      const teamAbbrev = player.team || '';
-      const games = gamesByTeam.get(teamAbbrev) || [];
-      const playerIdStr = String(player.id);
+      });
       
-      // Check if player is a starter - try multiple ID formats to handle type mismatches
-      const isStarter = myTeamStarters.has(playerIdStr) || 
-                        myTeamStarters.has(String(Number(playerIdStr))) ||
-                        myTeamStarters.has(Number(playerIdStr).toString());
+      opponentTeamMatchupPlayers.forEach(mp => {
+        const slot = opponentTeamSlotAssignmentsFromOrg[String(mp.id)];
+        if (slot) {
+          opponentTeamSlotAssignments[String(mp.id)] = slot;
+        }
+      });
       
-      // Debug log for first few players
-      if (index < 5) {
-        console.log(`[DemoDataService] My Team Player ${player.name} (ID: ${playerIdStr}, type: ${typeof player.id}): isStarter=${isStarter}`);
-        console.log(`  - Direct check: ${myTeamStarters.has(playerIdStr)}`);
-        console.log(`  - Starter set contains: ${Array.from(myTeamStarters).slice(0, 3).join(', ')}`);
-      }
+      console.log('[DemoDataService] Slot assignments calculated:', {
+        myTeamSlots: Object.keys(myTeamSlotAssignments).length,
+        opponentTeamSlots: Object.keys(opponentTeamSlotAssignments).length
+      });
       
-      return MatchupService.transformToMatchupPlayerWithGames(
-        player,
-        isStarter,
-        weekStart,
-        weekEnd,
-        'America/Denver',
-        games
-      );
-    });
-    
-    const opponentTeamMatchupPlayers = opponentTeamRoster.map((player, index) => {
-      const teamAbbrev = player.team || '';
-      const games = gamesByTeam.get(teamAbbrev) || [];
-      const playerIdStr = String(player.id);
-      
-      // Check if player is a starter - try multiple ID formats to handle type mismatches
-      const isStarter = opponentTeamStarters.has(playerIdStr) || 
-                        opponentTeamStarters.has(String(Number(playerIdStr))) ||
-                        opponentTeamStarters.has(Number(playerIdStr).toString());
-      
-      // Debug log for first few players
-      if (index < 5) {
-        console.log(`[DemoDataService] Opponent Team Player ${player.name} (ID: ${playerIdStr}, type: ${typeof player.id}): isStarter=${isStarter}`);
-        console.log(`  - Direct check: ${opponentTeamStarters.has(playerIdStr)}`);
-        console.log(`  - Starter set contains: ${Array.from(opponentTeamStarters).slice(0, 3).join(', ')}`);
-      }
-      
-      return MatchupService.transformToMatchupPlayerWithGames(
-        player,
-        isStarter,
-        weekStart,
-        weekEnd,
-        'America/Denver',
-        games
-      );
-    });
-    
-    console.log('[DemoDataService] Matchup players with starter status:', {
-      myTeamTotal: myTeamMatchupPlayers.length,
-      myTeamStarters: myTeamMatchupPlayers.filter(p => p.isStarter).length,
-      myTeamBench: myTeamMatchupPlayers.filter(p => !p.isStarter).length,
-      opponentTeamTotal: opponentTeamMatchupPlayers.length,
-      opponentTeamStarters: opponentTeamMatchupPlayers.filter(p => p.isStarter).length,
-      opponentTeamBench: opponentTeamMatchupPlayers.filter(p => !p.isStarter).length
-    });
-    
-    console.log('[DemoDataService] Demo matchup players transformed:', {
-      myTeamMatchupCount: myTeamMatchupPlayers.length,
-      opponentTeamMatchupCount: opponentTeamMatchupPlayers.length
-    });
-    
       return {
         myTeam: myTeamMatchupPlayers,
-        opponentTeam: opponentTeamMatchupPlayers
+        opponentTeam: opponentTeamMatchupPlayers,
+        myTeamSlotAssignments,
+        opponentTeamSlotAssignments
       };
     } catch (error) {
       console.error('[DemoDataService] Error in getDemoMatchupData():', error);

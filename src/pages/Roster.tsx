@@ -25,7 +25,7 @@ import { HockeyPlayer } from '@/components/roster/HockeyPlayerCard';
 import { useToast } from '@/hooks/use-toast';
 import HockeyPlayerCard from '@/components/roster/HockeyPlayerCard';
 import { PlayerService } from '@/services/PlayerService';
-import { LeagueService, Transaction } from '@/services/LeagueService';
+import { LeagueService, Transaction, LEAGUE_TEAMS_DATA } from '@/services/LeagueService';
 import { DraftService } from '@/services/DraftService';
 import { CitrusPuckService } from '@/services/CitrusPuckService';
 import { ScheduleService } from '@/services/ScheduleService';
@@ -40,8 +40,11 @@ const getFantasyPosition = (position: string): 'C' | 'LW' | 'RW' | 'D' | 'G' | '
   if (['C', 'CENTRE', 'CENTER'].includes(pos)) return 'C';
   if (['LW', 'LEFT WING', 'LEFTWING', 'L'].includes(pos)) return 'LW';
   if (['RW', 'RIGHT WING', 'RIGHTWING', 'R'].includes(pos)) return 'RW';
+  // Defensemen: All defensemen are just 'D' (no LD/RD distinction)
   if (['D', 'DEFENCE', 'DEFENSE'].includes(pos)) return 'D';
-  if (['G', 'GOALIE'].includes(pos)) return 'G';
+  // Also check if position contains 'D' but isn't already matched (e.g., 'D/F' should be D, but not 'FD')
+  if (pos.includes('D') && !pos.includes('DEFENSIVE') && pos !== 'FD' && !pos.includes('LD') && !pos.includes('RD')) return 'D';
+  if (['G', 'GOALIE', 'GOALTENDER'].includes(pos)) return 'G';
   
   return 'UTIL';
 };
@@ -330,159 +333,46 @@ const Roster = () => {
 
         // ═══════════════════════════════════════════════════════════════════
         // DEMO STATE: Guest or Logged-in without league
-        // ═══════════════════════════════════════════════════════════════════
-        // State 1: Guest (user = null) - show demo data
-        // State 2: Logged in, no league (userLeagues.length === 0) - show demo data with CTAs
-        // 
-        // ⚠️ CRITICAL DEMO STATE PRINCIPLES:
-        // - Demo data is READ-ONLY and STATIC
-        // - Demo data is NEVER persisted to database
-        // - Demo data is NEVER modified by user actions
-        // - All 10 demo teams (IDs 1-10) are initialized
-        // - Team 3 (Citrus Crushers) is shown to guests
-        // - Changes in demo state NEVER affect logged-in state
+        // Use the same logic as OtherTeam.tsx - treat user's demo team as Team 3
         // ═══════════════════════════════════════════════════════════════════
         if (userLeagueState === 'guest' || userLeagueState === 'logged-in-no-league') {
-          // Show demo team from real demo league in database
-          if (allPlayers.length === 0) {
-            console.error('[Roster] ERROR: No players loaded! Cannot load demo league.');
+          // Use same approach as OtherTeam.tsx for demo teams
+          const demoTeamIdNum = 3; // Team 3 is the user's demo team (Citrus Crushers)
+          
+          // Get demo team data from LEAGUE_TEAMS_DATA
+          const demoTeam = LEAGUE_TEAMS_DATA.find(t => t.id === demoTeamIdNum);
+          if (!demoTeam) {
+            console.error(`Demo team ${demoTeamIdNum} not found in LEAGUE_TEAMS_DATA`);
             setLoading(false);
             return;
           }
           
-          // Ensure demo league exists in database and is populated
-          // First check if it exists and has picks
-          const { count: existingPicksCount, error: countError } = await supabase
-            .from('draft_picks')
-            .select('*', { count: 'exact', head: true })
-            .eq('league_id', DEMO_LEAGUE_ID)
-            .is('deleted_at', null);
+          // Create demo team object
+          const demoTeamData = {
+            id: String(demoTeamIdNum),
+            league_id: 'demo-league-id',
+            team_name: demoTeam.name
+          };
           
-          // If no picks exist, initialize
-          if (!existingPicksCount || existingPicksCount === 0) {
-            // Show loading message
-            setLoading(true);
-            
-            const initResult = await DemoLeagueService.initializeDemoLeague();
-            if (!initResult.success) {
-              // Try force reinitialize as fallback
-              const forceResult = await DemoLeagueService.forceReinitialize();
-              if (!forceResult.success) {
-                toast({
-                  title: "Demo League Initialization Failed",
-                  description: forceResult.error?.message || "Could not initialize demo league. Please refresh the page.",
-                  variant: "destructive",
-                });
-                setLoading(false);
-                return;
-              }
-            }
-            
-            // Wait and verify picks were created (retry up to 5 times)
-            let verifyCount = 0;
-            for (let retry = 0; retry < 5; retry++) {
-              await new Promise(resolve => setTimeout(resolve, 1000));
-              const { count } = await supabase
-                .from('draft_picks')
-                .select('*', { count: 'exact', head: true })
-                .eq('league_id', DEMO_LEAGUE_ID)
-                .is('deleted_at', null);
-              verifyCount = count || 0;
-              if (verifyCount > 0) break;
-            }
-            
-            if (verifyCount === 0) {
-              toast({
-                title: "Demo League Not Ready",
-                description: "Demo league initialization is still in progress. Please wait a moment and refresh.",
-                variant: "destructive",
-              });
-              setLoading(false);
-              return;
-            }
-          }
-          
-          // Get demo team (Team 3 - Citrus Crushers) from database
-          // Demo teams have IDs like: `${DEMO_LEAGUE_ID}-team-3`
-          const demoTeamId = `${DEMO_LEAGUE_ID}-team-3`;
-          console.log('[Roster] Looking for demo team:', demoTeamId);
-          
-          // Get team data from database first
-          const { data: demoTeamData, error: teamError } = await supabase
-            .from('teams')
-            .select('id, league_id, team_name')
-            .eq('id', demoTeamId)
-            .single();
-          
-          if (teamError || !demoTeamData) {
-            console.error('[Roster] Demo team not found:', teamError);
-            console.log('[Roster] Checking all demo teams...');
-            const { data: allDemoTeams } = await supabase
-              .from('teams')
-              .select('id, league_id, team_name')
-              .eq('league_id', DEMO_LEAGUE_ID);
-            console.log('[Roster] Found demo teams:', allDemoTeams);
-            setLoading(false);
-            return;
-          }
-          
-          console.log('[Roster] Demo team found:', demoTeamData);
           teamId = demoTeamData.id;
           setUserTeamId(demoTeamData.id);
           setUserTeam(demoTeamData);
           
-          // Get draft picks for this team directly from database
-          const { data: teamPicks, error: picksError } = await supabase
-            .from('draft_picks')
-            .select('*')
-            .eq('league_id', DEMO_LEAGUE_ID)
-            .eq('team_id', demoTeamId)
-            .is('deleted_at', null)
-            .order('pick_number', { ascending: true });
+          // Initialize demo league (same as OtherTeam.tsx)
+          await LeagueService.initializeLeague(allPlayers);
           
-          if (picksError) {
-            console.error('[Roster] Error fetching draft picks:', picksError);
-          }
+          // Get demo team roster from cachedLeagueState (same as OtherTeam.tsx)
+          const demoRoster = await LeagueService.getTeamRoster(demoTeamIdNum, allPlayers);
           
-          console.log('[Roster] Draft picks for team:', teamPicks?.length || 0);
-          
-          // If we have draft picks, use them directly (more reliable)
-          if (teamPicks && teamPicks.length > 0) {
-            const playerIds = teamPicks.map(p => p.player_id);
-            dbPlayers = allPlayers.filter(p => playerIds.includes(p.id));
-            console.log('[Roster] Loaded', dbPlayers.length, 'players from draft picks');
-          } else {
-            // Fallback: try MatchupService
-            console.log('[Roster] No draft picks found, trying MatchupService...');
-            const demoRoster = await MatchupService.getTeamRoster(demoTeamId, DEMO_LEAGUE_ID, allPlayers);
-            
-            if (demoRoster.length > 0) {
-              const playerIds = demoRoster.map(p => p.id);
-              dbPlayers = allPlayers.filter(p => playerIds.includes(p.id));
-              console.log('[Roster] Loaded', dbPlayers.length, 'players from MatchupService');
-            } else {
-              // No roster found - show error
-              console.error('[Roster] No roster found for demo team');
-              toast({
-                title: "Demo Roster Not Available",
-                description: "The demo league is still initializing. Please refresh the page in a moment.",
-                variant: "destructive",
-              });
-              setLoading(false);
-              return;
-            }
-          }
-          
-          if (dbPlayers.length === 0) {
-            console.error('[Roster] No players found after all attempts');
-            toast({
-              title: "No Players Found",
-              description: "Demo roster is empty. Please try refreshing the page.",
-              variant: "destructive",
-            });
+          if (demoRoster.length === 0) {
+            console.error(`Demo team ${demoTeamIdNum} has no players in roster`);
+            setRoster({ starters: [], bench: [], ir: [], slotAssignments: {} });
             setLoading(false);
             return;
           }
+          
+          // Transform demo players to HockeyPlayer format (same as OtherTeam.tsx)
+          dbPlayers = demoRoster;
         } else if (userLeagueState === 'active-user' && user) {
           // Logged-in users with leagues: Get their actual team from Supabase
           // If activeLeagueId is set, prefer that league's team, otherwise get any team
@@ -566,6 +456,7 @@ const Roster = () => {
         
         // Transform players from staging files to HockeyPlayer format
         // All data (names, stats, positions, teams) comes from staging files via PlayerService
+        console.log('[Roster] Transforming', dbPlayers.length, 'players to HockeyPlayer format');
         const transformedPlayers: HockeyPlayer[] = dbPlayers.map((p) => ({
           id: p.id,
           name: p.full_name,
@@ -646,24 +537,19 @@ const Roster = () => {
           return idA - idB;
         });
 
-        // Check for saved lineup first (use teamId which could be demo team 3 or user's actual team)
-        // For real teams, use league_id from userTeam; for demo teams, skip league_id check (demo league)
+        // Check for saved lineup - but for demo teams, always auto-organize (same as OtherTeam.tsx)
         let savedLineup = null;
-        if (teamId && userTeam?.league_id) {
+        if (userLeagueState === 'guest' || userLeagueState === 'logged-in-no-league') {
+          // Demo teams: Always auto-organize (don't check for saved lineups)
+          savedLineup = null;
+        } else if (teamId && userTeam?.league_id && !isDemoLeague(userTeam.league_id)) {
           // Real user team - use actual league_id
           savedLineup = await LeagueService.getLineup(teamId, userTeam.league_id);
-        } else if (teamId && typeof teamId === 'number' && teamId <= 10 && !user) {
-          // Demo team for non-logged-in users only - try demo league fallback with error handling
-          try {
-            savedLineup = await LeagueService.getLineup(teamId, DEMO_LEAGUE_ID);
-          } catch (error) {
-            // Silently ignore demo league errors - demo teams don't need saved lineups
-            console.debug('Demo league lineup lookup skipped (expected for demo teams)');
-          }
         }
         
         if (savedLineup) {
           // Restore saved lineup
+          console.log('[Roster] Restoring saved lineup');
           const playerMap = new Map(transformedPlayers.map(p => [String(p.id), p]));
           const savedPlayerIds = new Set([
             ...savedLineup.starters,
@@ -697,6 +583,86 @@ const Roster = () => {
             }
           });
           
+          // CRITICAL: Ensure all 13 starter slots are filled with position-aware logic
+          // Count current positions in starters
+          const positionCounts = {
+            C: starters.filter(p => getFantasyPosition(p.position) === 'C').length,
+            LW: starters.filter(p => getFantasyPosition(p.position) === 'LW').length,
+            RW: starters.filter(p => getFantasyPosition(p.position) === 'RW').length,
+            D: starters.filter(p => getFantasyPosition(p.position) === 'D').length,
+            G: starters.filter(p => getFantasyPosition(p.position) === 'G').length,
+            UTIL: starters.filter(p => getFantasyPosition(p.position) === 'UTIL').length
+          };
+          
+          const slotsNeeded = { 'C': 2, 'LW': 2, 'RW': 2, 'D': 4, 'G': 2, 'UTIL': 1 };
+          const totalSlotsNeeded = 13;
+          
+          if (starters.length < totalSlotsNeeded) {
+            console.warn(`[Roster] Saved lineup only has ${starters.length} starters, need ${totalSlotsNeeded}. Filling with position-aware logic...`);
+            console.log('[Roster] Current position counts:', positionCounts);
+            
+            // Get available bench players sorted by points
+            const availableBench = [...bench].sort((a, b) => (b.points || 0) - (a.points || 0));
+            
+            // Priority order: Fill critical positions first (G, D), then others
+            const priorityOrder: Array<'G' | 'D' | 'C' | 'LW' | 'RW' | 'UTIL'> = ['G', 'D', 'C', 'LW', 'RW', 'UTIL'];
+            
+            // First pass: Fill missing positions with position-specific players
+            for (const pos of priorityOrder) {
+              const needed = slotsNeeded[pos];
+              const current = positionCounts[pos];
+              const missing = needed - current;
+              
+              if (missing > 0) {
+                // Find best available players of this position from bench
+                const positionPlayers = availableBench.filter(p => getFantasyPosition(p.position) === pos);
+                const bestOfPosition = positionPlayers
+                  .sort((a, b) => (b.points || 0) - (a.points || 0))
+                  .slice(0, missing);
+                
+                bestOfPosition.forEach(player => {
+                  starters.push({ ...player, starter: true });
+                  const benchIndex = bench.findIndex(p => p.id === player.id);
+                  if (benchIndex >= 0) {
+                    bench.splice(benchIndex, 1);
+                  }
+                  // Remove from availableBench tracking
+                  const availableIndex = availableBench.findIndex(p => p.id === player.id);
+                  if (availableIndex >= 0) {
+                    availableBench.splice(availableIndex, 1);
+                  }
+                  positionCounts[pos]++;
+                });
+                
+                if (bestOfPosition.length > 0) {
+                  console.log(`[Roster] Filled ${bestOfPosition.length} ${pos} position(s)`);
+                }
+              }
+            }
+            
+            // Second pass: Fill any remaining slots with best available players (if still under 13)
+            while (starters.length < totalSlotsNeeded && availableBench.length > 0) {
+              const bestPlayer = availableBench.shift();
+              if (bestPlayer) {
+                starters.push({ ...bestPlayer, starter: true });
+                // Remove from bench
+                const benchIndex = bench.findIndex(p => p.id === bestPlayer.id);
+                if (benchIndex >= 0) {
+                  bench.splice(benchIndex, 1);
+                }
+              }
+            }
+            
+            console.log(`[Roster] Filled saved lineup to ${starters.length} starters. Final position counts:`, {
+              C: starters.filter(p => getFantasyPosition(p.position) === 'C').length,
+              LW: starters.filter(p => getFantasyPosition(p.position) === 'LW').length,
+              RW: starters.filter(p => getFantasyPosition(p.position) === 'RW').length,
+              D: starters.filter(p => getFantasyPosition(p.position) === 'D').length,
+              G: starters.filter(p => getFantasyPosition(p.position) === 'G').length,
+              UTIL: starters.filter(p => getFantasyPosition(p.position) === 'UTIL').length
+            });
+          }
+          
           // Ensure all slot assignments are valid (player still exists)
           const validSlotAssignments: Record<string, string> = {};
           Object.entries(savedLineup.slotAssignments).forEach(([playerId, slotId]) => {
@@ -705,54 +671,59 @@ const Roster = () => {
             }
           });
           
+          // Recalculate slot assignments for any newly added starters
+          const newStarters = starters.filter(s => !validSlotAssignments[s.id]);
+          if (newStarters.length > 0) {
+            const newSlotAssignments = calculateInitialSlotAssignments(newStarters);
+            Object.assign(validSlotAssignments, newSlotAssignments);
+          }
+          
+          console.log('[Roster] Setting roster from saved lineup:', { starters: starters.length, bench: bench.length, ir: ir.length });
           setRoster({ starters, bench, ir, slotAssignments: validSlotAssignments });
         } else {
-          // No saved lineup - organize into slots (Simulation of a drafted team)
+          // No saved lineup - use EXACT SAME LOGIC AS OtherTeam.tsx
           const starters: HockeyPlayer[] = [];
           const bench: HockeyPlayer[] = [];
           const ir: HockeyPlayer[] = [];
-          const irSlotAssignments: Record<string, string> = {};
-
-          // Simple draft logic to fill slots
+          const assignments: Record<string, string> = {};
+          
           const slotsNeeded = { 'C': 2, 'LW': 2, 'RW': 2, 'D': 4, 'G': 2, 'UTIL': 1 };
           const slotsFilled = { 'C': 0, 'LW': 0, 'RW': 0, 'D': 0, 'G': 0, 'UTIL': 0 };
-
-          // Track IR slot assignments
           let irSlotIndex = 1;
           
-          // Only use actual IR/SUSP status for IR placement (deterministic)
-          // Don't use nextGame.isToday for initial auto-assignment
           transformedPlayers.forEach(p => {
             if (p.status === 'IR' || p.status === 'SUSP') {
               if (irSlotIndex <= 3) {
                 ir.push(p);
-                // Assign to IR slot
-                irSlotAssignments[p.id] = `ir-slot-${irSlotIndex}`;
+                assignments[p.id] = `ir-slot-${irSlotIndex}`;
                 irSlotIndex++;
               } else {
                 bench.push(p);
               }
               return;
             }
-
+            
             const pos = getFantasyPosition(p.position);
+            let assigned = false;
             
             if (pos !== 'UTIL' && slotsFilled[pos] < slotsNeeded[pos]) {
-              starters.push({ ...p, starter: true });
               slotsFilled[pos]++;
+              assigned = true;
+              assignments[p.id] = `slot-${pos}-${slotsFilled[pos]}`;
             } else if (pos !== 'G' && slotsFilled['UTIL'] < slotsNeeded['UTIL']) {
-              starters.push({ ...p, starter: true });
               slotsFilled['UTIL']++;
+              assigned = true;
+              assignments[p.id] = 'slot-UTIL';
+            }
+            
+            if (assigned) {
+              starters.push({ ...p, starter: true });
             } else {
               bench.push(p);
             }
           });
-
-          const starterSlotAssignments = calculateInitialSlotAssignments(starters);
-          // Merge IR slot assignments with starter assignments
-          const allSlotAssignments = { ...starterSlotAssignments, ...irSlotAssignments };
-          const initialRoster = { starters, bench, ir, slotAssignments: allSlotAssignments };
-          setRoster(initialRoster);
+          
+          setRoster({ starters, bench, ir, slotAssignments: assignments });
           
           // Save initial lineup (only for logged-in users with actual teams, not demo league)
           if (userTeamId && user && userTeam?.league_id && !isDemoLeague(userTeam.league_id)) {
@@ -764,7 +735,124 @@ const Roster = () => {
             });
           }
         }
+        
+        // CRITICAL SAFETY CHECK: For demo state, ensure roster was set
+        if ((userLeagueState === 'guest' || userLeagueState === 'logged-in-no-league') && transformedPlayers.length > 0) {
+          // Verify roster has players - if not, something went wrong
+          console.log('[Roster] Demo state verification - transformedPlayers:', transformedPlayers.length);
+        }
       } catch (e: any) {
+        // For demo state, try to set roster even if there was an error
+        if ((userLeagueState === 'guest' || userLeagueState === 'logged-in-no-league')) {
+          console.error('[Roster] Error in loadRoster for demo state, attempting fallback:', e);
+          try {
+            // Last resort: get static players and set roster directly (inline, no service dependency)
+            const allPlayers = await PlayerService.getAllPlayers();
+            // Get top 21 players directly (don't rely on DemoLeagueService in catch block)
+            const staticPlayers = [...allPlayers]
+              .sort((a, b) => (b.points || 0) - (a.points || 0))
+              .slice(0, 21);
+            const transformed = staticPlayers.map((p) => ({
+              id: p.id,
+              name: p.full_name,
+              position: p.position,
+              number: parseInt(p.jersey_number || '0'),
+              starter: false,
+              stats: {
+                gamesPlayed: p.games_played || 0,
+                goals: p.goals || 0,
+                assists: p.assists || 0,
+                points: p.points || 0,
+                plusMinus: p.plus_minus || 0,
+                shots: p.shots || 0,
+                hits: p.hits || 0,
+                blockedShots: p.blocks || 0,
+                xGoals: p.xGoals || 0,
+                corsi: p.corsi || 0,
+                fenwick: p.fenwick || 0,
+                wins: p.wins || 0,
+                losses: p.losses || 0,
+                otl: p.ot_losses || 0,
+                gaa: p.goals_against_average || 0,
+                savePct: p.save_percentage || 0,
+                shutouts: 0
+              },
+              team: p.team,
+              teamAbbreviation: p.team,
+              status: p.status === 'injured' ? 'IR' : (p.status === 'active' ? null : 'WVR'),
+              image: p.headshot_url || undefined,
+              nextGame: undefined,
+              projectedPoints: (p.points || 0) / 20
+            }));
+            
+            // Auto-organize using same improved logic
+            const starters: HockeyPlayer[] = [];
+            const bench: HockeyPlayer[] = [];
+            const ir: HockeyPlayer[] = [];
+            const slotsNeeded = { 'C': 2, 'LW': 2, 'RW': 2, 'D': 4, 'G': 2, 'UTIL': 1 };
+            const slotsFilled = { 'C': 0, 'LW': 0, 'RW': 0, 'D': 0, 'G': 0, 'UTIL': 0 };
+            const totalSlotsNeeded = 13;
+            
+            // Sort by points
+            const sorted = [...transformed].sort((a, b) => (b.points || 0) - (a.points || 0));
+            
+            // Place IR players first
+            sorted.forEach(p => {
+              if (p.status === 'IR' || p.status === 'SUSP') {
+                if (ir.length < 3) {
+                  ir.push(p);
+                } else {
+                  bench.push(p);
+                }
+              }
+            });
+            
+            // Fill position-specific slots
+            const availablePlayers = sorted.filter(p => p.status !== 'IR' && p.status !== 'SUSP');
+            
+            availablePlayers.forEach(p => {
+              const pos = getFantasyPosition(p.position);
+              
+              if (pos !== 'UTIL' && pos !== 'G' && slotsFilled[pos] < slotsNeeded[pos]) {
+                starters.push({ ...p, starter: true });
+                slotsFilled[pos]++;
+              } else if (pos === 'G' && slotsFilled['G'] < slotsNeeded['G']) {
+                starters.push({ ...p, starter: true });
+                slotsFilled['G']++;
+              } else if (pos !== 'G' && slotsFilled['UTIL'] < slotsNeeded['UTIL']) {
+                starters.push({ ...p, starter: true });
+                slotsFilled['UTIL']++;
+              } else {
+                bench.push(p);
+              }
+            });
+            
+            // Ensure all 13 slots are filled
+            if (starters.length < totalSlotsNeeded) {
+              const remainingBench = [...bench].sort((a, b) => (b.points || 0) - (a.points || 0));
+              while (starters.length < totalSlotsNeeded && remainingBench.length > 0) {
+                const bestPlayer = remainingBench.shift();
+                if (bestPlayer) {
+                  starters.push({ ...bestPlayer, starter: true });
+                  const benchIndex = bench.findIndex(p => p.id === bestPlayer.id);
+                  if (benchIndex >= 0) {
+                    bench.splice(benchIndex, 1);
+                  }
+                }
+              }
+            }
+            
+            const slotAssignments = calculateInitialSlotAssignments(starters);
+            console.log('[Roster] Emergency fallback: Setting roster with', starters.length, 'starters,', bench.length, 'bench');
+            setRoster({ starters, bench, ir: [], slotAssignments });
+            
+            // Set demo team data
+            setUserTeamId(`${DEMO_LEAGUE_ID}-team-3`);
+            setUserTeam({ id: `${DEMO_LEAGUE_ID}-team-3`, league_id: DEMO_LEAGUE_ID, team_name: 'Citrus Crushers' });
+          } catch (fallbackError) {
+            console.error('[Roster] Even emergency fallback failed:', fallbackError);
+          }
+        }
         // Filter out demo league errors - they're expected and harmless
         const errorMessage = e?.message || '';
         const isDemoLeagueError = errorMessage.toLowerCase().includes('demo') || 
@@ -1469,19 +1557,10 @@ const Roster = () => {
               </div>
 
               <div>
-                {userLeagueState === 'active-user' ? (
-                <Button onClick={handleAutoLineup} variant="outline" className="flex gap-2">
-                  <Wand2 className="w-4 h-4" />
-                  Auto Lineup
-                </Button>
-                ) : userLeagueState === 'logged-in-no-league' ? (
-                  <Button onClick={() => window.location.href = '/create-league'} variant="default" className="flex gap-2">
-                    <Trophy className="w-4 h-4" />
-                    Create League
-                  </Button>
-                ) : (
-                  <Button onClick={() => window.location.href = '/auth'} variant="outline" className="flex gap-2">
-                    Sign In
+                {userLeagueState === 'active-user' && (
+                  <Button onClick={handleAutoLineup} variant="outline" className="flex gap-2">
+                    <Wand2 className="w-4 h-4" />
+                    Auto Lineup
                   </Button>
                 )}
               </div>

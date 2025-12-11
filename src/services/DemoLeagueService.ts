@@ -18,6 +18,18 @@ export const DEMO_LEAGUE_ID = '00000000-0000-0000-0000-000000000001';
 
 export const DemoLeagueService = {
   /**
+   * Get static demo roster for a team (fallback when DB fails)
+   * Returns top 21 players by points for the demo team
+   */
+  getStaticDemoTeamRoster(teamId: string, allPlayers: Player[]): Player[] {
+    // Return top 21 players sorted by points (best first)
+    // This ensures we always have a roster to display
+    return [...allPlayers]
+      .sort((a, b) => (b.points || 0) - (a.points || 0))
+      .slice(0, 21);
+  },
+
+  /**
    * Force reinitialize demo league (useful for debugging)
    * This will delete existing draft picks and recreate everything
    */
@@ -100,9 +112,27 @@ export const DemoLeagueService = {
 
   /**
    * Initialize demo league (idempotent - safe to call multiple times)
+   * Includes timeout handling for reliability
+   * NOTE: Guests (not logged in) cannot write to database - will return error
    */
-  async initializeDemoLeague(): Promise<{ success: boolean; error: any }> {
+  async initializeDemoLeague(timeoutMs: number = 30000): Promise<{ success: boolean; error: any }> {
+    const startTime = Date.now();
+    
     try {
+      // CRITICAL: Check if user is authenticated - guests can't write to database
+      // This check MUST happen before any database operations
+      try {
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
+        if (authError || !user) {
+          console.log('[DemoLeagueService] Guest user detected - cannot initialize demo league (requires authentication)');
+          return { success: false, error: new Error('Guest users cannot initialize demo league - use static fallback instead') };
+        }
+        console.log('[DemoLeagueService] User authenticated, proceeding with initialization');
+      } catch (authCheckError) {
+        console.log('[DemoLeagueService] Auth check failed - assuming guest, skipping initialization');
+        return { success: false, error: new Error('Authentication check failed - use static fallback instead') };
+      }
+      
       // Check if demo league already exists
       const exists = await this.demoLeagueExists();
       
@@ -123,9 +153,22 @@ export const DemoLeagueService = {
         return { success: true, error: null };
       }
 
+      // Check timeout before proceeding
+      if (Date.now() - startTime > timeoutMs) {
+        console.warn('[DemoLeagueService] Initialization timeout before starting');
+        return { success: false, error: new Error('Initialization timeout') };
+      }
+
       let teams = [];
       
       if (!exists) {
+        // Double-check authentication before attempting to create league
+        const { data: { user: verifyUser }, error: verifyError } = await supabase.auth.getUser();
+        if (verifyError || !verifyUser) {
+          console.log('[DemoLeagueService] Authentication verification failed - cannot create league');
+          return { success: false, error: new Error('Authentication required to create demo league') };
+        }
+        
         console.log('[DemoLeagueService] Creating demo league...');
 
         // 1. Create the league
@@ -145,6 +188,10 @@ export const DemoLeagueService = {
 
         if (leagueError) {
           console.error('[DemoLeagueService] Error creating league:', leagueError);
+          // If it's a 401 or RLS error, return a specific error
+          if (leagueError.code === '42501' || leagueError.code === 'PGRST301' || leagueError.message?.includes('row-level security')) {
+            return { success: false, error: new Error('Guest users cannot create demo league - use static fallback instead') };
+          }
           return { success: false, error: leagueError };
         }
 
@@ -190,13 +237,40 @@ export const DemoLeagueService = {
 
       // 3. Populate rosters via draft simulation
       const allPlayers = await PlayerService.getAllPlayers();
+      
+      // Check timeout
+      if (Date.now() - startTime > timeoutMs) {
+        console.warn('[DemoLeagueService] Timeout before populating rosters');
+        return { success: false, error: new Error('Initialization timeout') };
+      }
+      
       await this.populateDemoRosters(DEMO_LEAGUE_ID, teams, allPlayers);
 
-      // 4. Initialize default lineups for all teams
-      await this.initializeDemoLineups(DEMO_LEAGUE_ID, teams, allPlayers);
+      // 4. Initialize default lineups for all teams (non-blocking - can fail silently)
+      try {
+        await this.initializeDemoLineups(DEMO_LEAGUE_ID, teams, allPlayers);
+      } catch (lineupError) {
+        console.warn('[DemoLeagueService] Error initializing lineups (non-critical):', lineupError);
+      }
 
-      // 5. Create static matchups
-      await this.createDemoMatchups(DEMO_LEAGUE_ID, teams);
+      // 5. Create static matchups (non-blocking - can fail silently)
+      try {
+        await this.createDemoMatchups(DEMO_LEAGUE_ID, teams);
+      } catch (matchupError) {
+        console.warn('[DemoLeagueService] Error creating matchups (non-critical):', matchupError);
+      }
+
+      // Verify that picks were actually inserted
+      const { count: finalPicksCount } = await supabase
+        .from('draft_picks')
+        .select('*', { count: 'exact', head: true })
+        .eq('league_id', DEMO_LEAGUE_ID)
+        .is('deleted_at', null);
+
+      if ((finalPicksCount || 0) === 0) {
+        console.error('[DemoLeagueService] Initialization completed but no picks found');
+        return { success: false, error: new Error('No draft picks were created') };
+      }
 
       console.log('[DemoLeagueService] Demo league initialization complete');
       return { success: true, error: null };
@@ -416,7 +490,12 @@ export const DemoLeagueService = {
           const pos = getFantasyPosition(p.position);
           let assigned = false;
 
-          if (pos !== 'UTIL' && slotsFilled[pos] < slotsNeeded[pos]) {
+          // Prioritize position-specific slots (especially G and D)
+          if (pos === 'G' && slotsFilled['G'] < slotsNeeded['G']) {
+            slotsFilled['G']++;
+            assigned = true;
+            slotAssignments[playerId] = `slot-G-${slotsFilled['G']}`;
+          } else if (pos !== 'UTIL' && pos !== 'G' && slotsFilled[pos] < slotsNeeded[pos]) {
             slotsFilled[pos]++;
             assigned = true;
             slotAssignments[playerId] = `slot-${pos}-${slotsFilled[pos]}`;
@@ -433,14 +512,99 @@ export const DemoLeagueService = {
           }
         });
 
-        // Save lineup (one-time initialization)
-        if (starters.length >= 10 && bench.length > 0) {
+        // Position-aware filling: Ensure all 13 slots are filled
+        const totalSlotsNeeded = 13;
+        if (starters.length < totalSlotsNeeded) {
+          // Count current positions
+          const currentPositionCounts = {
+            C: starters.filter(id => {
+              const player = playerRoster.find(p => String(p.id) === id);
+              return player && getFantasyPosition(player.position) === 'C';
+            }).length,
+            LW: starters.filter(id => {
+              const player = playerRoster.find(p => String(p.id) === id);
+              return player && getFantasyPosition(player.position) === 'LW';
+            }).length,
+            RW: starters.filter(id => {
+              const player = playerRoster.find(p => String(p.id) === id);
+              return player && getFantasyPosition(player.position) === 'RW';
+            }).length,
+            D: starters.filter(id => {
+              const player = playerRoster.find(p => String(p.id) === id);
+              return player && getFantasyPosition(player.position) === 'D';
+            }).length,
+            G: starters.filter(id => {
+              const player = playerRoster.find(p => String(p.id) === id);
+              return player && getFantasyPosition(player.position) === 'G';
+            }).length,
+            UTIL: starters.filter(id => {
+              const player = playerRoster.find(p => String(p.id) === id);
+              return player && getFantasyPosition(player.position) === 'UTIL';
+            }).length
+          };
+
+          // Priority order: Fill critical positions first (G, D), then others
+          const priorityOrder: Array<'G' | 'D' | 'C' | 'LW' | 'RW' | 'UTIL'> = ['G', 'D', 'C', 'LW', 'RW', 'UTIL'];
+          const remainingBench = [...bench].map(id => {
+            const player = playerRoster.find(p => String(p.id) === id);
+            return { id, player };
+          }).filter(item => item.player).sort((a, b) => (b.player?.points || 0) - (a.player?.points || 0));
+
+          // First pass: Fill missing positions with position-specific players
+          for (const pos of priorityOrder) {
+            const needed = slotsNeeded[pos];
+            const current = currentPositionCounts[pos];
+            const missing = needed - current;
+            
+            if (missing > 0 && starters.length < totalSlotsNeeded) {
+              // Find best available players of this position from bench
+              const positionPlayers = remainingBench.filter(item => 
+                item.player && getFantasyPosition(item.player.position) === pos
+              );
+              const bestOfPosition = positionPlayers.slice(0, Math.min(missing, totalSlotsNeeded - starters.length));
+              
+              bestOfPosition.forEach(item => {
+                starters.push(item.id);
+                const benchIndex = bench.indexOf(item.id);
+                if (benchIndex >= 0) {
+                  bench.splice(benchIndex, 1);
+                }
+                const remainingIndex = remainingBench.findIndex(b => b.id === item.id);
+                if (remainingIndex >= 0) {
+                  remainingBench.splice(remainingIndex, 1);
+                }
+                slotAssignments[item.id] = `slot-${pos}-${currentPositionCounts[pos] + 1}`;
+                currentPositionCounts[pos]++;
+              });
+            }
+          }
+
+          // Second pass: Fill any remaining slots with best available players
+          while (starters.length < totalSlotsNeeded && remainingBench.length > 0) {
+            const bestItem = remainingBench.shift();
+            if (bestItem) {
+              starters.push(bestItem.id);
+              const benchIndex = bench.indexOf(bestItem.id);
+              if (benchIndex >= 0) {
+                bench.splice(benchIndex, 1);
+              }
+              const pos = bestItem.player ? getFantasyPosition(bestItem.player.position) : 'UTIL';
+              slotAssignments[bestItem.id] = `slot-${pos}-${Date.now()}`;
+            }
+          }
+        }
+
+        // Save lineup (one-time initialization) - ensure we have all 13 starters
+        if (starters.length >= 13 && bench.length > 0) {
           await LeagueService.saveLineup(team.id, leagueId, {
             starters,
             bench,
             ir,
             slotAssignments
           });
+          console.log(`[DemoLeagueService] Saved lineup for team ${team.team_name}: ${starters.length} starters, ${bench.length} bench, ${ir.length} IR`);
+        } else {
+          console.warn(`[DemoLeagueService] Lineup for team ${team.team_name} incomplete: ${starters.length} starters (need 13), ${bench.length} bench`);
         }
       }
 

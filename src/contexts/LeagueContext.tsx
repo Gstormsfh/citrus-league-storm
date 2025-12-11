@@ -154,17 +154,15 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
     return 'active-user';
   }, [user, userLeagues.length]);
 
-  // Initialize demo league for guests
-  useEffect(() => {
-    if (!user) {
-      // Guest user - initialize demo league
-      import('@/services/DemoLeagueService').then(({ DemoLeagueService }) => {
-        DemoLeagueService.initializeDemoLeague().catch(err => {
-          console.error('Failed to initialize demo league:', err);
-        });
-      });
-    }
-  }, [user]);
+    // NOTE: Do NOT initialize demo league for guests - they can't write to database (401 error)
+    // Demo league should be pre-initialized by an admin or created on first logged-in user access
+    // Guests will use static fallback data instead
+    // useEffect(() => {
+    //   if (!user) {
+    //     // Guest user - skip database initialization (causes 401 for guests)
+    //     // Demo data will be loaded via static fallback in components
+    //   }
+    // }, [user]);
 
   // Load leagues on mount and when user changes
   useEffect(() => {

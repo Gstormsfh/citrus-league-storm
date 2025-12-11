@@ -52,12 +52,16 @@ const Matchup = () => {
   // Load from actual demo rosters instead of static data
   const [demoMyTeam, setDemoMyTeam] = useState<MatchupPlayer[]>([]);
   const [demoOpponentTeam, setDemoOpponentTeam] = useState<MatchupPlayer[]>([]);
+  const [demoMyTeamSlotAssignments, setDemoMyTeamSlotAssignments] = useState<Record<string, string>>({});
+  const [demoOpponentTeamSlotAssignments, setDemoOpponentTeamSlotAssignments] = useState<Record<string, string>>({});
   
   // Load demo matchup data from actual rosters
   useEffect(() => {
     if (userLeagueState === 'active-user') {
       setDemoMyTeam([]);
       setDemoOpponentTeam([]);
+      setDemoMyTeamSlotAssignments({});
+      setDemoOpponentTeamSlotAssignments({});
       setLoading(false);
       return;
     }
@@ -75,10 +79,14 @@ const Matchup = () => {
           myTeamStarters: matchupData.myTeam.filter(p => p.isStarter).length,
           myTeamBench: matchupData.myTeam.filter(p => !p.isStarter).length,
           opponentTeamStarters: matchupData.opponentTeam.filter(p => p.isStarter).length,
-          opponentTeamBench: matchupData.opponentTeam.filter(p => !p.isStarter).length
+          opponentTeamBench: matchupData.opponentTeam.filter(p => !p.isStarter).length,
+          myTeamSlotCount: Object.keys(matchupData.myTeamSlotAssignments).length,
+          opponentTeamSlotCount: Object.keys(matchupData.opponentTeamSlotAssignments).length
         });
         setDemoMyTeam(matchupData.myTeam);
         setDemoOpponentTeam(matchupData.opponentTeam);
+        setDemoMyTeamSlotAssignments(matchupData.myTeamSlotAssignments);
+        setDemoOpponentTeamSlotAssignments(matchupData.opponentTeamSlotAssignments);
         setLoading(false);
       } catch (error) {
         console.error('[Matchup] Error loading demo matchup data:', error);
@@ -89,6 +97,48 @@ const Matchup = () => {
         const staticOpponentTeam = DemoDataService.getDemoOpponentTeam();
         setDemoMyTeam(staticMyTeam);
         setDemoOpponentTeam(staticOpponentTeam);
+        // For static fallback, calculate slot assignments
+        const calculateSlotAssignments = (starters: MatchupPlayer[]) => {
+          const assignments: Record<string, string> = {};
+          const getFantasyPosition = (position: string): string => {
+            const pos = position?.toUpperCase() || '';
+            if (['C', 'CENTRE', 'CENTER'].includes(pos)) return 'C';
+            if (['LW', 'LEFT WING', 'LEFTWING', 'L'].includes(pos)) return 'LW';
+            if (['RW', 'RIGHT WING', 'RIGHTWING', 'R'].includes(pos)) return 'RW';
+            if (['D', 'DEFENCE', 'DEFENSE'].includes(pos)) return 'D';
+            if (['G', 'GOALIE'].includes(pos)) return 'G';
+            return 'UTIL';
+          };
+          const playersByPos: Record<string, MatchupPlayer[]> = {
+            'C': [], 'LW': [], 'RW': [], 'D': [], 'G': [], 'UTIL': []
+          };
+          starters.forEach(p => {
+            const pos = getFantasyPosition(p.position);
+            if (pos !== 'UTIL') playersByPos[pos].push(p);
+          });
+          ['C', 'LW', 'RW'].forEach(pos => {
+            playersByPos[pos].slice(0, 2).forEach((p, i) => {
+              assignments[String(p.id)] = `slot-${pos}-${i + 1}`;
+            });
+          });
+          playersByPos['D'].slice(0, 4).forEach((p, i) => {
+            assignments[String(p.id)] = `slot-D-${i + 1}`;
+          });
+          playersByPos['G'].slice(0, 2).forEach((p, i) => {
+            assignments[String(p.id)] = `slot-G-${i + 1}`;
+          });
+          const assignedIds = new Set(Object.keys(assignments));
+          const unassigned = starters.filter(p => !assignedIds.has(String(p.id)));
+          const utilPlayer = unassigned.find(p => getFantasyPosition(p.position) !== 'G');
+          if (utilPlayer) {
+            assignments[String(utilPlayer.id)] = 'slot-UTIL';
+          }
+          return assignments;
+        };
+        const myStarters = staticMyTeam.filter(p => p.isStarter);
+        const oppStarters = staticOpponentTeam.filter(p => p.isStarter);
+        setDemoMyTeamSlotAssignments(calculateSlotAssignments(myStarters));
+        setDemoOpponentTeamSlotAssignments(calculateSlotAssignments(oppStarters));
         setLoading(false);
       }
     };
@@ -146,6 +196,8 @@ const Matchup = () => {
   // and opponentTeamPlayers is always the opponent (right side)
   const displayMyTeam = userLeagueState === 'active-user' ? myTeam : demoMyTeam;
   const displayOpponentTeam = userLeagueState === 'active-user' ? opponentTeamPlayers : demoOpponentTeam;
+  const displayMyTeamSlotAssignments = userLeagueState === 'active-user' ? myTeamSlotAssignments : demoMyTeamSlotAssignments;
+  const displayOpponentTeamSlotAssignments = userLeagueState === 'active-user' ? opponentTeamSlotAssignments : demoOpponentTeamSlotAssignments;
 
   // DEBUG: Log team data for verification
   if (user && myTeam.length > 0 && opponentTeamPlayers.length > 0) {
@@ -575,7 +627,7 @@ const Matchup = () => {
                     title={userLeagueState === 'active-user' ? (userTeam?.team_name || 'My Team') : 'Citrus Crushers'}
                     starters={myStarters}
                     bench={myBench}
-                    slotAssignments={myTeamSlotAssignments}
+                    slotAssignments={displayMyTeamSlotAssignments}
                     gradientClass="border-t-4 border-fantasy-secondary"
                     onPlayerClick={handlePlayerClick}
                   />
@@ -594,7 +646,7 @@ const Matchup = () => {
                     title={userLeagueState === 'active-user' ? (opponentTeam?.team_name || 'Bye Week') : 'Thunder Titans'}
                     starters={opponentStarters}
                     bench={opponentBench}
-                    slotAssignments={opponentTeamSlotAssignments}
+                    slotAssignments={displayOpponentTeamSlotAssignments}
                     gradientClass="border-t-4 border-fantasy-primary"
                     onPlayerClick={handlePlayerClick}
                   />
