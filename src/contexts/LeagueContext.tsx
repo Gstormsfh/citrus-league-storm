@@ -2,8 +2,16 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { useAuth } from './AuthContext';
 import { LeagueService, League } from '@/services/LeagueService';
 import { useSearchParams, useLocation } from 'react-router-dom';
+import { DEMO_LEAGUE_ID } from '@/services/DemoLeagueService';
 
 export type UserLeagueState = 'guest' | 'logged-in-no-league' | 'active-user';
+
+/**
+ * Check if a league ID is the demo league (read-only, isolated)
+ */
+export const isDemoLeague = (leagueId: string | null | undefined): boolean => {
+  return leagueId === DEMO_LEAGUE_ID;
+};
 
 interface LeagueContextType {
   activeLeagueId: string | null;
@@ -14,6 +22,8 @@ interface LeagueContextType {
   error: string | null;
   refreshLeagues: () => Promise<void>;
   userLeagueState: UserLeagueState;
+  demoLeagueId: string;
+  isDemoLeague: (leagueId: string | null | undefined) => boolean;
 }
 
 const LeagueContext = createContext<LeagueContextType | undefined>(undefined);
@@ -66,7 +76,9 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
         return;
       }
 
-      setUserLeagues(leagues || []);
+      // Exclude demo league from user's leagues (pillar of isolation)
+      const filteredLeagues = (leagues || []).filter(l => l.id !== DEMO_LEAGUE_ID);
+      setUserLeagues(filteredLeagues);
 
       // Determine active league:
       // 1. Use league_id from URL if present and valid
@@ -142,6 +154,18 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
     return 'active-user';
   }, [user, userLeagues.length]);
 
+  // Initialize demo league for guests
+  useEffect(() => {
+    if (!user) {
+      // Guest user - initialize demo league
+      import('@/services/DemoLeagueService').then(({ DemoLeagueService }) => {
+        DemoLeagueService.initializeDemoLeague().catch(err => {
+          console.error('Failed to initialize demo league:', err);
+        });
+      });
+    }
+  }, [user]);
+
   // Load leagues on mount and when user changes
   useEffect(() => {
     loadUserLeagues();
@@ -168,6 +192,8 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
     error,
     refreshLeagues,
     userLeagueState,
+    demoLeagueId: DEMO_LEAGUE_ID,
+    isDemoLeague,
   };
 
   return <LeagueContext.Provider value={value}>{children}</LeagueContext.Provider>;

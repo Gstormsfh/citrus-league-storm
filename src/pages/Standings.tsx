@@ -65,19 +65,19 @@ const Standings = () => {
 
       // State 3: Active user - load real data
       if (userLeagueState === 'active-user' && user) {
-        try {
-          setLoading(true);
-          
-          // Get user's leagues
-          const { leagues: userLeagues, error: leaguesError } = await LeagueService.getUserLeagues(user.id);
-          if (leaguesError) throw leaguesError;
+      try {
+        setLoading(true);
+        
+        // Get user's leagues
+        const { leagues: userLeagues, error: leaguesError } = await LeagueService.getUserLeagues(user.id);
+        if (leaguesError) throw leaguesError;
 
-          if (userLeagues.length === 0) {
+        if (userLeagues.length === 0) {
             // This shouldn't happen if userLeagueState is 'active-user', but handle gracefully
             setTeams([]);
-            setLoading(false);
-            return;
-          }
+          setLoading(false);
+          return;
+        }
 
         setLeagues(userLeagues);
         const leagueToUse = selectedLeagueId || userLeagues[0].id;
@@ -143,29 +143,29 @@ const Standings = () => {
         });
 
         setTeams(standingsTeams);
-        } catch (err: any) {
-          console.error('Error loading standings:', err);
-          toast({
-            title: 'Error',
-            description: err.message || 'Failed to load standings',
-            variant: 'destructive',
-          });
-          // Fallback to demo data
-          const demoTeams = LeagueService.getAllTeams();
-          const standingsTeams: StandingsTeam[] = demoTeams.map(t => ({
-            id: String(t.id),
-            name: t.name,
-            owner: t.owner,
-            logo: t.logo,
-            record: t.record,
-            points: t.points,
-            pointsFor: t.points, // Using points as pointsFor for demo
-            pointsAgainst: Math.floor(t.points * 0.85), // Demo calculation
-            streak: t.streak,
-          }));
-          setTeams(standingsTeams);
-        } finally {
-          setLoading(false);
+      } catch (err: any) {
+        console.error('Error loading standings:', err);
+        toast({
+          title: 'Error',
+          description: err.message || 'Failed to load standings',
+          variant: 'destructive',
+        });
+        // Fallback to demo data
+        const demoTeams = LeagueService.getAllTeams();
+        const standingsTeams: StandingsTeam[] = demoTeams.map(t => ({
+          id: String(t.id),
+          name: t.name,
+          owner: t.owner,
+          logo: t.logo,
+          record: t.record,
+          points: t.points,
+          pointsFor: t.points, // Using points as pointsFor for demo
+          pointsAgainst: Math.floor(t.points * 0.85), // Demo calculation
+          streak: t.streak,
+        }));
+        setTeams(standingsTeams);
+      } finally {
+        setLoading(false);
         }
       }
     };
@@ -228,7 +228,7 @@ const Standings = () => {
               />
             </div>
           )}
-
+          
           <div className="flex flex-col md:flex-row items-center justify-between max-w-5xl mx-auto mb-8">
             <div className="mb-4 md:mb-0 animated-element">
               <h2 className="text-2xl font-bold text-foreground">

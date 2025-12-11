@@ -1,5 +1,6 @@
 import React, { Suspense, lazy } from "react";
 import { Toaster } from "@/components/ui/toaster";
+import '@/utils/testDemoLeague'; // Load test utility
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -62,6 +63,7 @@ const Careers = lazyWithErrorHandling(() => import("./pages/Careers"));
 const Privacy = lazyWithErrorHandling(() => import("./pages/Privacy"));
 const Terms = lazyWithErrorHandling(() => import("./pages/Terms"));
 const Auth = lazyWithErrorHandling(() => import("./pages/Auth"));
+const AuthCallback = lazyWithErrorHandling(() => import("./pages/AuthCallback"));
 const ProfileSetup = lazyWithErrorHandling(() => import("./pages/ProfileSetup"));
 const LeagueDashboard = lazyWithErrorHandling(() => import("./pages/LeagueDashboard"));
 
@@ -111,6 +113,7 @@ const App = () => {
                   <Routes>
                     <Route path="/" element={<Index />} />
                 <Route path="/auth" element={<Auth />} />
+                <Route path="/auth/callback" element={<AuthCallback />} />
                 <Route path="/profile-setup" element={<ProfileSetup />} />
                 <Route path="/roster" element={<Roster />} />
                 <Route path="/standings" element={<Standings />} />

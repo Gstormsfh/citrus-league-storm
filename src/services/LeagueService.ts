@@ -281,20 +281,22 @@ export const LeagueService = {
    */
   async getUserLeagues(userId: string): Promise<{ leagues: League[]; error: any }> {
     try {
-      // Get leagues where user is commissioner
+      // Get leagues where user is commissioner (exclude demo league)
       const { data: commissionerLeagues, error: commError } = await supabase
         .from('leagues')
         .select('*')
         .eq('commissioner_id', userId)
+        .neq('id', '00000000-0000-0000-0000-000000000001') // Exclude demo league
         .order('created_at', { ascending: false });
 
       if (commError) throw commError;
 
-      // Get leagues where user owns a team
+      // Get leagues where user owns a team (exclude demo league teams)
       const { data: userTeams } = await supabase
         .from('teams')
         .select('league_id')
-        .eq('owner_id', userId);
+        .eq('owner_id', userId)
+        .neq('league_id', '00000000-0000-0000-0000-000000000001'); // Exclude demo league
 
       const leagueIds = userTeams?.map(t => t.league_id) || [];
       
@@ -304,6 +306,7 @@ export const LeagueService = {
           .from('leagues')
           .select('*')
           .in('id', leagueIds)
+          .neq('id', '00000000-0000-0000-0000-000000000001') // Exclude demo league
           .order('created_at', { ascending: false });
 
         if (ownerError) throw ownerError;
@@ -1169,6 +1172,26 @@ export const LeagueService = {
     ir: (string | number)[], 
     slotAssignments: Record<string, string> 
   }) {
+    // Read-only guard: Block all lineup saves for demo league EXCEPT during initialization
+    // Check if this is initialization (no lineup exists yet) vs user modification (lineup exists)
+    if (leagueId === '00000000-0000-0000-0000-000000000001') {
+      // Check if lineup already exists - if yes, block (user trying to modify)
+      // If no, allow (initialization)
+      const { data: existingLineup } = await supabase
+        .from('team_lineups')
+        .select('id')
+        .eq('league_id', leagueId)
+        .eq('team_id', String(teamId))
+        .maybeSingle();
+      
+      if (existingLineup) {
+        // Lineup exists - user trying to modify, block it
+        console.warn('[saveLineup] Demo league is read-only. Sign up to create your own league!');
+        return; // Silently fail - demo league is read-only
+      }
+      // No lineup exists - this is initialization, allow it
+    }
+
     // Convert all IDs to strings for consistency
     const lineupToSave = {
       starters: lineup.starters.map(id => String(id)),
@@ -1570,6 +1593,14 @@ export const LeagueService = {
     playerId: string,
     source: string = 'Roster Tab'
   ): Promise<{ success: boolean; error: any }> {
+    // Read-only guard: Block all drops for demo league
+    if (leagueId === '00000000-0000-0000-0000-000000000001') {
+      return { 
+        success: false, 
+        error: new Error('Demo league is read-only. Sign up to create your own league!') 
+      };
+    }
+
     try {
       const { data, error } = await supabase.rpc('handle_roster_transaction', {
         p_league_id: leagueId,
@@ -1616,6 +1647,14 @@ export const LeagueService = {
     playerId: string,
     source: string = 'Roster Tab'
   ): Promise<{ success: boolean; error: any }> {
+    // Read-only guard: Block all adds for demo league
+    if (leagueId === '00000000-0000-0000-0000-000000000001') {
+      return { 
+        success: false, 
+        error: new Error('Demo league is read-only. Sign up to create your own league!') 
+      };
+    }
+
     try {
       // First check roster size limit
       const { league, error: leagueError } = await this.getLeague(leagueId);

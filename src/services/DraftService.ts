@@ -256,6 +256,27 @@ export const DraftService = {
     sessionId?: string,
     teamsCount?: number
   ): Promise<{ pick: DraftPick | null; error: any; isComplete?: boolean }> {
+    // Read-only guard: Block user-initiated picks for demo league
+    // But allow initialization (when no picks exist yet)
+    if (leagueId === '00000000-0000-0000-0000-000000000001') {
+      // Check if this is initialization (no picks exist yet)
+      const { count: existingPicksCount } = await supabase
+        .from('draft_picks')
+        .select('*', { count: 'exact', head: true })
+        .eq('league_id', leagueId)
+        .is('deleted_at', null);
+      
+      // If picks already exist, block (user trying to modify)
+      // If no picks exist, allow (initialization)
+      if (existingPicksCount && existingPicksCount > 0) {
+        return { 
+          pick: null, 
+          error: new Error('Demo league is read-only. Sign up to create your own league!') 
+        };
+      }
+      // Otherwise, allow the pick (initialization phase)
+    }
+
     try {
       const { sessionId: activeSessionId } = await this.getActiveDraftSession(leagueId);
       const targetSessionId = sessionId || activeSessionId;

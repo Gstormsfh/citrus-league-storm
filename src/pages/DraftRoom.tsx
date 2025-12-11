@@ -2385,21 +2385,21 @@ const DraftRoom = () => {
                 {/* Disable navigation buttons in demo state */}
                 {userLeagueState === 'active-user' ? (
                   <>
-                    <Button onClick={() => navigate(`/roster?league=${leagueId}`)}>
-                      View My Roster
-                    </Button>
-                    <Button variant="outline" onClick={() => navigate(`/standings?league=${leagueId}`)}>
-                      View Standings
-                    </Button>
-                    <Button 
-                      variant="default" 
-                      onClick={handleViewDraftSnapshot}
-                      disabled={savingSnapshot}
-                      className="bg-fantasy-primary hover:bg-fantasy-primary/90"
-                    >
-                      <Camera className="h-4 w-4 mr-2" />
-                      {savingSnapshot ? 'Saving...' : 'View Draft Results'}
-                    </Button>
+                <Button onClick={() => navigate(`/roster?league=${leagueId}`)}>
+                  View My Roster
+                </Button>
+                <Button variant="outline" onClick={() => navigate(`/standings?league=${leagueId}`)}>
+                  View Standings
+                </Button>
+                <Button 
+                  variant="default" 
+                  onClick={handleViewDraftSnapshot}
+                  disabled={savingSnapshot}
+                  className="bg-fantasy-primary hover:bg-fantasy-primary/90"
+                >
+                  <Camera className="h-4 w-4 mr-2" />
+                  {savingSnapshot ? 'Saving...' : 'View Draft Results'}
+                </Button>
                   </>
                 ) : (
                   <>

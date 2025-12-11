@@ -3,7 +3,8 @@ import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, closestCenter } 
 import { arrayMove } from '@dnd-kit/sortable';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { useLeague } from '@/contexts/LeagueContext';
+import { useLeague, isDemoLeague } from '@/contexts/LeagueContext';
+import { DEMO_LEAGUE_ID } from '@/services/DemoLeagueService';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import { LeagueCreationCTA, InlineCTA } from '@/components/LeagueCreationCTA';
@@ -28,6 +29,7 @@ import { LeagueService, Transaction } from '@/services/LeagueService';
 import { DraftService } from '@/services/DraftService';
 import { CitrusPuckService } from '@/services/CitrusPuckService';
 import { ScheduleService } from '@/services/ScheduleService';
+import { MatchupService } from '@/services/MatchupService';
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { supabase } from '@/integrations/supabase/client';
 
@@ -214,7 +216,7 @@ interface RosterState {
 
 const Roster = () => {
   const { user, profile } = useAuth();
-  const { userLeagueState, loading: leagueLoading, activeLeagueId } = useLeague();
+  const { userLeagueState, loading: leagueLoading, activeLeagueId, demoLeagueId } = useLeague();
   const { toast } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedPlayer, setSelectedPlayer] = useState<HockeyPlayer | null>(null);
@@ -341,39 +343,145 @@ const Roster = () => {
         // - Changes in demo state NEVER affect logged-in state
         // ═══════════════════════════════════════════════════════════════════
         if (userLeagueState === 'guest' || userLeagueState === 'logged-in-no-league') {
-          // Show demo team (Team 3) from database
+          // Show demo team from real demo league in database
           if (allPlayers.length === 0) {
-            console.error('[Roster] ERROR: No players loaded! Cannot initialize demo league.');
+            console.error('[Roster] ERROR: No players loaded! Cannot load demo league.');
             setLoading(false);
             return;
           }
           
-          // Ensure league is initialized - this distributes players to teams
-          try {
-            // Add timeout to prevent hanging
-            const initPromise = LeagueService.initializeLeague(allPlayers);
-            const timeoutPromise = new Promise((_, reject) => 
-              setTimeout(() => reject(new Error('League initialization timeout after 30s')), 30000)
-            );
-            await Promise.race([initPromise, timeoutPromise]);
-          } catch (error: any) {
-            console.error('[Roster] League initialization error:', error);
-            // Continue anyway - cachedLeagueState might still be populated
+          // Ensure demo league exists in database and is populated
+          // First check if it exists and has picks
+          const { count: existingPicksCount, error: countError } = await supabase
+            .from('draft_picks')
+            .select('*', { count: 'exact', head: true })
+            .eq('league_id', DEMO_LEAGUE_ID)
+            .is('deleted_at', null);
+          
+          // If no picks exist, initialize
+          if (!existingPicksCount || existingPicksCount === 0) {
+            // Show loading message
+            setLoading(true);
+            
+            const initResult = await DemoLeagueService.initializeDemoLeague();
+            if (!initResult.success) {
+              // Try force reinitialize as fallback
+              const forceResult = await DemoLeagueService.forceReinitialize();
+              if (!forceResult.success) {
+                toast({
+                  title: "Demo League Initialization Failed",
+                  description: forceResult.error?.message || "Could not initialize demo league. Please refresh the page.",
+                  variant: "destructive",
+                });
+                setLoading(false);
+                return;
+              }
+            }
+            
+            // Wait and verify picks were created (retry up to 5 times)
+            let verifyCount = 0;
+            for (let retry = 0; retry < 5; retry++) {
+              await new Promise(resolve => setTimeout(resolve, 1000));
+              const { count } = await supabase
+                .from('draft_picks')
+                .select('*', { count: 'exact', head: true })
+                .eq('league_id', DEMO_LEAGUE_ID)
+                .is('deleted_at', null);
+              verifyCount = count || 0;
+              if (verifyCount > 0) break;
+            }
+            
+            if (verifyCount === 0) {
+              toast({
+                title: "Demo League Not Ready",
+                description: "Demo league initialization is still in progress. Please wait a moment and refresh.",
+                variant: "destructive",
+              });
+              setLoading(false);
+              return;
+            }
           }
           
-          // Get demo team (Team 3) players
-          try {
-            dbPlayers = await LeagueService.getMyTeam(allPlayers);
-          } catch (error: any) {
-            console.error('[Roster] getMyTeam error:', error);
-            dbPlayers = [];
+          // Get demo team (Team 3 - Citrus Crushers) from database
+          // Demo teams have IDs like: `${DEMO_LEAGUE_ID}-team-3`
+          const demoTeamId = `${DEMO_LEAGUE_ID}-team-3`;
+          console.log('[Roster] Looking for demo team:', demoTeamId);
+          
+          // Get team data from database first
+          const { data: demoTeamData, error: teamError } = await supabase
+            .from('teams')
+            .select('id, league_id, team_name')
+            .eq('id', demoTeamId)
+            .single();
+          
+          if (teamError || !demoTeamData) {
+            console.error('[Roster] Demo team not found:', teamError);
+            console.log('[Roster] Checking all demo teams...');
+            const { data: allDemoTeams } = await supabase
+              .from('teams')
+              .select('id, league_id, team_name')
+              .eq('league_id', DEMO_LEAGUE_ID);
+            console.log('[Roster] Found demo teams:', allDemoTeams);
+            setLoading(false);
+            return;
           }
           
-          teamId = 3; // Demo team ID
-          setUserTeamId(3);
-          // Set demo team data for display
-          if (userLeagueState === 'guest') {
-            setUserTeam({ id: '3', league_id: 'demo-league', team_name: 'Citrus Crushers' });
+          console.log('[Roster] Demo team found:', demoTeamData);
+          teamId = demoTeamData.id;
+          setUserTeamId(demoTeamData.id);
+          setUserTeam(demoTeamData);
+          
+          // Get draft picks for this team directly from database
+          const { data: teamPicks, error: picksError } = await supabase
+            .from('draft_picks')
+            .select('*')
+            .eq('league_id', DEMO_LEAGUE_ID)
+            .eq('team_id', demoTeamId)
+            .is('deleted_at', null)
+            .order('pick_number', { ascending: true });
+          
+          if (picksError) {
+            console.error('[Roster] Error fetching draft picks:', picksError);
+          }
+          
+          console.log('[Roster] Draft picks for team:', teamPicks?.length || 0);
+          
+          // If we have draft picks, use them directly (more reliable)
+          if (teamPicks && teamPicks.length > 0) {
+            const playerIds = teamPicks.map(p => p.player_id);
+            dbPlayers = allPlayers.filter(p => playerIds.includes(p.id));
+            console.log('[Roster] Loaded', dbPlayers.length, 'players from draft picks');
+          } else {
+            // Fallback: try MatchupService
+            console.log('[Roster] No draft picks found, trying MatchupService...');
+            const demoRoster = await MatchupService.getTeamRoster(demoTeamId, DEMO_LEAGUE_ID, allPlayers);
+            
+            if (demoRoster.length > 0) {
+              const playerIds = demoRoster.map(p => p.id);
+              dbPlayers = allPlayers.filter(p => playerIds.includes(p.id));
+              console.log('[Roster] Loaded', dbPlayers.length, 'players from MatchupService');
+            } else {
+              // No roster found - show error
+              console.error('[Roster] No roster found for demo team');
+              toast({
+                title: "Demo Roster Not Available",
+                description: "The demo league is still initializing. Please refresh the page in a moment.",
+                variant: "destructive",
+              });
+              setLoading(false);
+              return;
+            }
+          }
+          
+          if (dbPlayers.length === 0) {
+            console.error('[Roster] No players found after all attempts');
+            toast({
+              title: "No Players Found",
+              description: "Demo roster is empty. Please try refreshing the page.",
+              variant: "destructive",
+            });
+            setLoading(false);
+            return;
           }
         } else if (userLeagueState === 'active-user' && user) {
           // Logged-in users with leagues: Get their actual team from Supabase
@@ -547,7 +655,7 @@ const Roster = () => {
         } else if (teamId && typeof teamId === 'number' && teamId <= 10 && !user) {
           // Demo team for non-logged-in users only - try demo league fallback with error handling
           try {
-            savedLineup = await LeagueService.getLineup(teamId, 'demo-league-id');
+            savedLineup = await LeagueService.getLineup(teamId, DEMO_LEAGUE_ID);
           } catch (error) {
             // Silently ignore demo league errors - demo teams don't need saved lineups
             console.debug('Demo league lineup lookup skipped (expected for demo teams)');
@@ -646,8 +754,8 @@ const Roster = () => {
           const initialRoster = { starters, bench, ir, slotAssignments: allSlotAssignments };
           setRoster(initialRoster);
           
-          // Save initial lineup (only for logged-in users with actual teams)
-          if (userTeamId && user && userTeam?.league_id) {
+          // Save initial lineup (only for logged-in users with actual teams, not demo league)
+          if (userTeamId && user && userTeam?.league_id && !isDemoLeague(userTeam.league_id)) {
             await LeagueService.saveLineup(userTeamId, userTeam.league_id, {
               starters: starters.map(p => p.id),
               bench: bench.map(p => p.id),
@@ -689,7 +797,7 @@ const Roster = () => {
   useEffect(() => {
     // For guests, load immediately. For logged-in users, wait for league context
     if (userLeagueState === 'guest' || !leagueLoading) {
-      loadRoster();
+    loadRoster();
     }
   }, [loadRoster, userLeagueState, leagueLoading]);
 
@@ -998,8 +1106,8 @@ const Roster = () => {
         slotAssignments: newAssignments
       };
       
-      // Save lineup to Supabase (only for logged-in users)
-      if (userTeamId && user && userTeam?.league_id) {
+      // Save lineup to Supabase (only for logged-in users, not demo league)
+      if (userTeamId && user && userTeam?.league_id && !isDemoLeague(userTeam.league_id)) {
         LeagueService.saveLineup(userTeamId, userTeam.league_id, {
           starters: newStarters.map(p => p.id),
           bench: newBench.map(p => p.id),
@@ -1078,6 +1186,16 @@ const Roster = () => {
     const { active, over } = event;
     setActiveId(null);
 
+    // Read-only guard: Block drag-and-drop for demo league
+    if (userTeam && isDemoLeague(userTeam.league_id)) {
+      toast({
+        title: "Demo League - Read Only",
+        description: "Sign up to create your own league and make changes!",
+        variant: "default",
+      });
+      return;
+    }
+
     if (!over) return;
 
     const playerId = active.id as string | number;
@@ -1122,8 +1240,8 @@ const Roster = () => {
           const newBench = arrayMove(prev.bench, oldIndex, newIndex);
           const updatedRoster = { ...prev, bench: newBench };
           
-          // Save lineup to Supabase (only for logged-in users)
-          if (userTeamId && user && userTeam?.league_id) {
+          // Save lineup to Supabase (only for logged-in users, not demo league)
+          if (userTeamId && user && userTeam?.league_id && !isDemoLeague(userTeam.league_id)) {
             LeagueService.saveLineup(userTeamId, userTeam.league_id, {
               starters: prev.starters.map(p => p.id),
               bench: newBench.map(p => p.id),
@@ -1280,8 +1398,8 @@ const Roster = () => {
 
         const updatedRoster = { starters: newStarters, bench: newBench, ir: newIR, slotAssignments: newAssignments };
         
-        // Save lineup to Supabase (only for logged-in users)
-        if (userTeamId && user && userTeam?.league_id) {
+        // Save lineup to Supabase (only for logged-in users, not demo league)
+        if (userTeamId && user && userTeam?.league_id && !isDemoLeague(userTeam.league_id)) {
           const lineupToSave = {
             starters: newStarters.map(p => p.id),
             bench: newBench.map(p => p.id),
@@ -1352,10 +1470,10 @@ const Roster = () => {
 
               <div>
                 {userLeagueState === 'active-user' ? (
-                  <Button onClick={handleAutoLineup} variant="outline" className="flex gap-2">
-                    <Wand2 className="w-4 h-4" />
-                    Auto Lineup
-                  </Button>
+                <Button onClick={handleAutoLineup} variant="outline" className="flex gap-2">
+                  <Wand2 className="w-4 h-4" />
+                  Auto Lineup
+                </Button>
                 ) : userLeagueState === 'logged-in-no-league' ? (
                   <Button onClick={() => window.location.href = '/create-league'} variant="default" className="flex gap-2">
                     <Trophy className="w-4 h-4" />
@@ -1401,6 +1519,18 @@ const Roster = () => {
               </TabsList>
 
               <TabsContent value="roster" className="m-0 p-6">
+                {/* Read-only banner for demo league */}
+                {userTeam && isDemoLeague(userTeam.league_id) && (
+                  <div className="mb-4 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
+                    <div className="flex items-center gap-2 text-yellow-600 dark:text-yellow-400">
+                      <Shield className="w-4 h-4" />
+                      <span className="text-sm font-medium">Demo League - Read Only</span>
+                    </div>
+                    <p className="text-xs text-yellow-600/80 dark:text-yellow-400/80 mt-1">
+                      Sign up to create your own league and make changes!
+                    </p>
+                  </div>
+                )}
                 <div className="flex justify-between items-center mb-4">
                     <h2 className="text-xl font-bold">Lineup</h2>
                     <ToggleGroup type="single" value={statView} onValueChange={(v) => v && setStatView(v as any)} className="bg-muted/50 p-1 rounded-lg">
@@ -1439,6 +1569,27 @@ const Roster = () => {
                     <p className="text-muted-foreground mb-4">Your roster is empty. Complete your draft to add players.</p>
                   </div>
                 ) : (
+                  // Disable drag-and-drop for demo league
+                  userTeam && isDemoLeague(userTeam.league_id) ? (
+                    <div className="space-y-8">
+                      <StartersGrid 
+                        players={roster.starters}
+                        slotAssignments={roster.slotAssignments}
+                        onPlayerClick={handlePlayerClick}
+                      />
+                      
+                      <BenchGrid 
+                        players={roster.bench}
+                        onPlayerClick={handlePlayerClick}
+                      />
+                      
+                      <IRSlot 
+                        players={roster.ir}
+                        slotAssignments={roster.slotAssignments}
+                        onPlayerClick={handlePlayerClick}
+                      />
+                    </div>
+                  ) : (
                   <DndContext
                     collisionDetection={closestCenter}
                     onDragStart={handleDragStart}
@@ -1474,6 +1625,7 @@ const Roster = () => {
                       ) : null}
                     </DragOverlay>
                   </DndContext>
+                  )
                 )}
               </TabsContent>
 
