@@ -419,7 +419,8 @@ const DraftRoom = () => {
       return;
     }
 
-    if (!user) {
+    // Don't redirect guests - they should see demo draft room
+    if (!user && userLeagueState !== 'guest' && userLeagueState !== 'logged-in-no-league') {
       // Small delay to ensure component has rendered loading state
       const timer = setTimeout(() => {
         navigate('/auth');
@@ -1835,15 +1836,19 @@ const DraftRoom = () => {
 
 
       <main className="pt-20 min-h-[80vh]">
-        {/* Loading State - Always show if loading or auth is loading OR if no user (waiting for redirect) */}
-        {(loading || authLoading || !user) && (
+        {/* Loading State - Show if loading or auth is loading, but NOT for demo state */}
+        {(loading || authLoading || (!user && userLeagueState !== 'guest' && userLeagueState !== 'logged-in-no-league')) && (
           <div className="container mx-auto px-4 py-20 flex flex-col items-center justify-center min-h-[60vh]">
             <Loader2 className="h-8 w-8 animate-spin mb-4 text-primary" />
             <p className="text-muted-foreground">
-              {authLoading ? 'Checking authentication...' : !user ? 'Redirecting to login...' : 'Loading draft room...'}
+              {authLoading ? 'Checking authentication...' : !user && userLeagueState !== 'guest' && userLeagueState !== 'logged-in-no-league' ? 'Redirecting to login...' : 'Loading draft room...'}
             </p>
-            <p className="text-xs text-muted-foreground mt-2">League ID: {leagueId || 'Finding your league...'}</p>
-            {!leagueId && !authLoading && (
+            <p className="text-xs text-muted-foreground mt-2">
+              {userLeagueState === 'guest' || userLeagueState === 'logged-in-no-league' 
+                ? 'Loading demo draft room...' 
+                : `League ID: ${leagueId || 'Finding your league...'}`}
+            </p>
+            {!leagueId && !authLoading && userLeagueState !== 'guest' && userLeagueState !== 'logged-in-no-league' && (
               <p className="text-xs text-muted-foreground mt-1">Please wait while we locate your league...</p>
             )}
           </div>
