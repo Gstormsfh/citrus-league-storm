@@ -239,11 +239,38 @@ export const DemoDataService = {
     const opponentTeamRoster = opponentTeamPlayers.map(p => MatchupService.transformToHockeyPlayer(p));
     
     // Get starting lineups for both teams
-    const myTeamLineup = await LeagueService.getLineup('3', 'demo-league-id');
-    const opponentTeamLineup = await LeagueService.getLineup('1', 'demo-league-id');
+    // Wait a bit for lineups to be initialized (they're created asynchronously)
+    let myTeamLineup = await LeagueService.getLineup('3', 'demo-league-id');
+    let opponentTeamLineup = await LeagueService.getLineup('1', 'demo-league-id');
+    
+    // If lineups don't exist yet, wait a bit and retry (lineups are initialized asynchronously)
+    if (!myTeamLineup || !opponentTeamLineup || !myTeamLineup.starters || !opponentTeamLineup.starters) {
+      console.log('[DemoDataService] Lineups not ready yet, waiting for initialization...');
+      // Wait up to 3 seconds for lineups to be initialized
+      for (let i = 0; i < 6; i++) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+        myTeamLineup = await LeagueService.getLineup('3', 'demo-league-id');
+        opponentTeamLineup = await LeagueService.getLineup('1', 'demo-league-id');
+        if (myTeamLineup?.starters && opponentTeamLineup?.starters && 
+            myTeamLineup.starters.length > 0 && opponentTeamLineup.starters.length > 0) {
+          console.log('[DemoDataService] Lineups loaded after wait');
+          break;
+        }
+      }
+    }
+    
+    console.log('[DemoDataService] Lineup data:', {
+      myTeamLineup: myTeamLineup ? { starters: myTeamLineup.starters?.length || 0, bench: myTeamLineup.bench?.length || 0 } : null,
+      opponentTeamLineup: opponentTeamLineup ? { starters: opponentTeamLineup.starters?.length || 0, bench: opponentTeamLineup.bench?.length || 0 } : null
+    });
     
     const myTeamStarters = new Set((myTeamLineup?.starters || []).map(id => String(id)));
     const opponentTeamStarters = new Set((opponentTeamLineup?.starters || []).map(id => String(id)));
+    
+    console.log('[DemoDataService] Starter sets:', {
+      myTeamStarterCount: myTeamStarters.size,
+      opponentTeamStarterCount: opponentTeamStarters.size
+    });
     
     // Get current week for schedule data
     const now = new Date();
@@ -268,10 +295,16 @@ export const DemoDataService = {
     const myTeamMatchupPlayers = myTeamRoster.map((player) => {
       const teamAbbrev = player.team || '';
       const games = gamesByTeam.get(teamAbbrev) || [];
+      const isStarter = myTeamStarters.has(String(player.id));
+      
+      // Debug log for first few players
+      if (myTeamMatchupPlayers.length < 3) {
+        console.log(`[DemoDataService] Player ${player.name} (ID: ${player.id}): isStarter=${isStarter}, inStartersSet=${myTeamStarters.has(String(player.id))}`);
+      }
       
       return MatchupService.transformToMatchupPlayerWithGames(
         player,
-        myTeamStarters.has(String(player.id)),
+        isStarter,
         weekStart,
         weekEnd,
         'America/Denver',
@@ -282,15 +315,23 @@ export const DemoDataService = {
     const opponentTeamMatchupPlayers = opponentTeamRoster.map((player) => {
       const teamAbbrev = player.team || '';
       const games = gamesByTeam.get(teamAbbrev) || [];
+      const isStarter = opponentTeamStarters.has(String(player.id));
       
       return MatchupService.transformToMatchupPlayerWithGames(
         player,
-        opponentTeamStarters.has(String(player.id)),
+        isStarter,
         weekStart,
         weekEnd,
         'America/Denver',
         games
       );
+    });
+    
+    console.log('[DemoDataService] Matchup players with starter status:', {
+      myTeamStarters: myTeamMatchupPlayers.filter(p => p.isStarter).length,
+      myTeamBench: myTeamMatchupPlayers.filter(p => !p.isStarter).length,
+      opponentTeamStarters: opponentTeamMatchupPlayers.filter(p => p.isStarter).length,
+      opponentTeamBench: opponentTeamMatchupPlayers.filter(p => !p.isStarter).length
     });
     
     console.log('[DemoDataService] Demo matchup players transformed:', {
