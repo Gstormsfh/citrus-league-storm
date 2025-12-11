@@ -9,11 +9,12 @@ import { StartersGrid, BenchGrid, IRSlot } from '@/components/roster';
 import { HockeyPlayer } from '@/components/roster/HockeyPlayerCard';
 import { useState, useEffect } from 'react';
 import { PlayerService } from '@/services/PlayerService';
-import { LeagueService, Team } from '@/services/LeagueService';
+import { LeagueService, Team, LEAGUE_TEAMS_DATA } from '@/services/LeagueService';
 import { DraftService } from '@/services/DraftService';
 import { ScheduleService } from '@/services/ScheduleService';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLeague } from '@/contexts/LeagueContext';
 import PlayerStatsModal from '@/components/PlayerStatsModal';
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -34,6 +35,8 @@ const getFantasyPosition = (position: string): 'C' | 'LW' | 'RW' | 'D' | 'G' | '
 const OtherTeam = () => {
   const { teamId } = useParams();
   const navigate = useNavigate();
+  const { user, profile } = useAuth();
+  const { userLeagueState } = useLeague();
   const [loading, setLoading] = useState(true);
   const [roster, setRoster] = useState<{
     starters: HockeyPlayer[];
@@ -62,6 +65,189 @@ const OtherTeam = () => {
 
       setLoading(true);
       try {
+        // ═══════════════════════════════════════════════════════════════════
+        // DEMO STATE: Check if this is a demo team (IDs 1-10)
+        // ═══════════════════════════════════════════════════════════════════
+        const teamIdNum = parseInt(teamId || '0');
+        const isDemoTeam = (userLeagueState === 'guest' || userLeagueState === 'logged-in-no-league') 
+          && teamIdNum >= 1 && teamIdNum <= 10;
+        
+        if (isDemoTeam) {
+          // Load demo team data
+          const demoTeam = LEAGUE_TEAMS_DATA.find(t => t.id === teamIdNum);
+          if (!demoTeam) {
+            console.error(`Demo team ${teamIdNum} not found in LEAGUE_TEAMS_DATA`);
+            setLoading(false);
+            return;
+          }
+          
+          // Create a Team-like object for demo teams
+          const demoTeamData: Team = {
+            id: String(teamIdNum),
+            league_id: 'demo-league-id',
+            team_name: demoTeam.name,
+            owner_id: null, // Demo teams don't have real owners
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          };
+          
+          setTeam(demoTeamData);
+          setOwnerName(demoTeam.owner);
+          
+          // Get all players and initialize demo league
+          const allPlayers = await PlayerService.getAllPlayers();
+          await LeagueService.initializeLeague(allPlayers);
+          
+          // Get demo team roster from cachedLeagueState
+          const demoRoster = await LeagueService.getTeamRoster(teamIdNum, allPlayers);
+          
+          if (demoRoster.length === 0) {
+            console.error(`Demo team ${teamIdNum} has no players in roster`);
+            setRoster({ starters: [], bench: [], ir: [], slotAssignments: {} });
+            setLoading(false);
+            return;
+          }
+          
+          // Transform demo players to HockeyPlayer format
+          const transformedPlayers: HockeyPlayer[] = demoRoster.map((p) => ({
+            id: p.id,
+            name: p.full_name,
+            position: p.position,
+            number: parseInt(p.jersey_number || '0'),
+            starter: false,
+            stats: {
+              gamesPlayed: p.games_played || 0,
+              goals: p.goals || 0,
+              assists: p.assists || 0,
+              points: p.points || 0,
+              plusMinus: p.plus_minus || 0,
+              shots: p.shots || 0,
+              hits: p.hits || 0,
+              blockedShots: p.blocks || 0,
+              xGoals: p.xGoals || 0,
+              corsi: p.corsi || 0,
+              fenwick: p.fenwick || 0,
+              wins: p.wins || 0,
+              losses: p.losses || 0,
+              otl: p.ot_losses || 0,
+              gaa: p.goals_against_average || 0,
+              savePct: p.save_percentage || 0,
+              shutouts: 0
+            },
+            team: p.team,
+            teamAbbreviation: p.team,
+            status: p.status === 'injured' ? 'IR' : (p.status === 'active' ? null : 'WVR'),
+            image: p.headshot_url || undefined,
+            nextGame: undefined,
+            projectedPoints: (p.points || 0) / 20
+          }));
+          
+          // Load schedule data for demo players
+          const userTimezone = 'America/Denver';
+          for (const player of transformedPlayers) {
+            const { game: nextGame } = await ScheduleService.getNextGameForTeam(player.teamAbbreviation || player.team || '');
+            const hasGameToday = await ScheduleService.hasGameToday(player.teamAbbreviation || player.team || '');
+            const gameInfo = ScheduleService.getGameInfo(nextGame, player.teamAbbreviation || player.team || '', userTimezone);
+            
+            if (gameInfo) {
+              player.nextGame = {
+                opponent: gameInfo.opponent,
+                isToday: hasGameToday
+              };
+            }
+          }
+          
+          // Get saved lineup for demo team (if exists)
+          const savedLineup = await LeagueService.getLineup(teamIdNum, 'demo-league-id');
+          
+          if (savedLineup && savedLineup.starters.length >= 10 && savedLineup.bench.length > 0) {
+            // Use saved lineup
+            const playerMap = new Map(transformedPlayers.map(p => [String(p.id), p]));
+            const uniqueIds = (ids: string[]) => Array.from(new Set(ids));
+            
+            const starters = uniqueIds(savedLineup.starters)
+              .map(id => {
+                const player = playerMap.get(id);
+                return player ? { ...player, starter: true } : null;
+              })
+              .filter((p): p is HockeyPlayer => !!p);
+            
+            const bench = uniqueIds(savedLineup.bench)
+              .map(id => playerMap.get(id))
+              .filter((p): p is HockeyPlayer => !!p);
+            
+            const ir = uniqueIds(savedLineup.ir)
+              .map(id => playerMap.get(id))
+              .filter((p): p is HockeyPlayer => !!p);
+            
+            // Add any new players to bench
+            transformedPlayers.forEach(player => {
+              if (!savedLineup.starters.includes(String(player.id)) 
+                  && !savedLineup.bench.includes(String(player.id))
+                  && !savedLineup.ir.includes(String(player.id))) {
+                bench.push(player);
+              }
+            });
+            
+            setRoster({ 
+              starters, 
+              bench, 
+              ir, 
+              slotAssignments: savedLineup.slotAssignments || {} 
+            });
+          } else {
+            // Auto-assign lineup for demo team
+            const starters: HockeyPlayer[] = [];
+            const bench: HockeyPlayer[] = [];
+            const ir: HockeyPlayer[] = [];
+            const assignments: Record<string, string> = {};
+            
+            const slotsNeeded = { 'C': 2, 'LW': 2, 'RW': 2, 'D': 4, 'G': 2, 'UTIL': 1 };
+            const slotsFilled = { 'C': 0, 'LW': 0, 'RW': 0, 'D': 0, 'G': 0, 'UTIL': 0 };
+            let irSlotIndex = 1;
+            
+            transformedPlayers.forEach(p => {
+              if (p.status === 'IR' || p.status === 'SUSP') {
+                if (irSlotIndex <= 3) {
+                  ir.push(p);
+                  assignments[p.id] = `ir-slot-${irSlotIndex}`;
+                  irSlotIndex++;
+                } else {
+                  bench.push(p);
+                }
+                return;
+              }
+              
+              const pos = getFantasyPosition(p.position);
+              let assigned = false;
+              
+              if (pos !== 'UTIL' && slotsFilled[pos] < slotsNeeded[pos]) {
+                slotsFilled[pos]++;
+                assigned = true;
+                assignments[p.id] = `slot-${pos}-${slotsFilled[pos]}`;
+              } else if (pos !== 'G' && slotsFilled['UTIL'] < slotsNeeded['UTIL']) {
+                slotsFilled['UTIL']++;
+                assigned = true;
+                assignments[p.id] = 'slot-UTIL';
+              }
+              
+              if (assigned) {
+                starters.push({ ...p, starter: true });
+              } else {
+                bench.push(p);
+              }
+            });
+            
+            setRoster({ starters, bench, ir, slotAssignments: assignments });
+          }
+          
+          setLoading(false);
+          return; // Exit early for demo teams
+        }
+        
+        // ═══════════════════════════════════════════════════════════════════
+        // ACTIVE USER STATE: Load real team from database
+        // ═══════════════════════════════════════════════════════════════════
         // Get team from Supabase (handles UUID team IDs)
         const { data: teamData, error: teamError } = await supabase
           .from('teams')
@@ -349,6 +535,11 @@ const OtherTeam = () => {
     );
   }
 
+  // Check if this is a demo team for conditional rendering
+  const teamIdNum = parseInt(teamId || '0');
+  const isDemoTeam = (userLeagueState === 'guest' || userLeagueState === 'logged-in-no-league') 
+    && teamIdNum >= 1 && teamIdNum <= 10;
+
   return (
     <ErrorBoundary>
     <div className="min-h-screen bg-background">
@@ -379,14 +570,27 @@ const OtherTeam = () => {
               </div>
             </div>
 
-            <Button 
-              size="lg" 
-              className="w-full md:w-auto shadow-md hover:shadow-lg transition-all"
-              onClick={() => navigate(`/trade-analyzer?partner=${team.id}`)}
-            >
-              <ArrowRightLeft className="w-4 h-4 mr-2" />
-              Propose Trade
-            </Button>
+            {/* Only show trade button for active users, not demo teams */}
+            {userLeagueState === 'active-user' && (
+              <Button 
+                size="lg" 
+                className="w-full md:w-auto shadow-md hover:shadow-lg transition-all"
+                onClick={() => navigate(`/trade-analyzer?partner=${team.id}`)}
+              >
+                <ArrowRightLeft className="w-4 h-4 mr-2" />
+                Propose Trade
+              </Button>
+            )}
+            {isDemoTeam && (
+              <Button 
+                size="lg" 
+                variant="outline"
+                className="w-full md:w-auto"
+                onClick={() => navigate('/auth')}
+              >
+                Sign Up to Create Your League
+              </Button>
+            )}
           </div>
         </div>
 
