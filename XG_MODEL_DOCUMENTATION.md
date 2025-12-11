@@ -2,7 +2,7 @@
 
 ## 🎯 Model Overview
 
-This pipeline includes **two separate XGBoost models**:
+This pipeline includes **multiple XGBoost models**:
 
 ### Expected Goals (xG) Model
 Predicts the probability that a shot will result in a goal. The model outputs a value between 0 and 1, where:
@@ -15,6 +15,12 @@ Predicts the probability that a pass will result in a goal (from the pass perspe
 - **0.0** = 0% chance pass leads to goal
 - **1.0** = 100% chance pass leads to goal
 - **0.20** = 20% chance pass leads to goal (good assist opportunity)
+
+### Expected Rebounds Model
+Predicts the probability that a shot will generate a rebound. This is a separate XGBoost classifier that uses the same features as the xG model.
+- **0.0** = 0% chance of generating a rebound
+- **1.0** = 100% chance of generating a rebound
+- **0.15** = 15% chance shot creates a rebound opportunity
 
 ### Dual-Tracking System
 - **Shooters** get xG credit (probability their shot becomes a goal)
@@ -461,12 +467,109 @@ The xA model predicts the probability that a pass will result in a goal. It's ca
 - ✅ **Dual-tracking system** (xG for shooters, xA for passers)
 - ✅ Model calibration (two-stage: power function + scale factor)
 - ✅ Database validation (compared against staging_2025_skaters)
+- ✅ **Expected Rebounds model** - Predicts rebound probability from shots
+- ✅ **Expected Goals of Expected Rebounds** - Credits players for generating rebound opportunities
+- ✅ **Shooting Talent Adjusted xG** - Bayesian adjustment for individual player shooting skill
+- ✅ **Created Expected Goals** - Credits players for creating opportunities (non-rebound xG + xGoals of xRebounds)
 
 ### Current Data Coverage:
 - **Games Processed**: 13 games from December 7, 2025
 - **Player/Game Records**: 395 unique combinations
 - **Average xG/Game**: 0.180 (validated against staging: 0.200)
 - **Validation Status**: ✅ Aligned with staging data
+
+## 🎯 Shooting Talent Adjusted Expected Goals
+
+### Overview
+Shooting Talent Adjusted Expected Goals adjusts each shot's xG value based on the shooter's historical shooting performance using Bayesian statistics (MoneyPuck methodology).
+
+### How It Works
+1. **Historical Data Aggregation**: For each player, calculate:
+   - Total goals scored
+   - Total xG accumulated
+   - Goals above expected = Goals - xG
+   - Shooting percentage above expected = (Goals - xG) / xG × 100
+
+2. **Bayesian Talent Estimation**: 
+   - Define talent levels (e.g., -20%, -10%, 0%, +10%, +20% above average)
+   - Calculate posterior probability distribution over talent levels
+   - Use prior distribution from historical NHL data
+   - Calculate expected shooting talent (weighted average)
+
+3. **Talent Multiplier**: Convert expected talent to a multiplier
+   - 1.0 = Average shooter (no adjustment)
+   - 1.15 = 15% above average (elite shooter)
+   - 0.85 = 15% below average (poor shooter)
+
+4. **Adjustment**: Apply multiplier to flurry-adjusted xG
+   ```
+   shooting_talent_adjusted_xg = flurry_adjusted_xg × shooting_talent_multiplier
+   ```
+
+### Example
+- **Player**: Elite shooter with 1.15 multiplier
+- **Shot**: 0.20 xG (flurry-adjusted)
+- **Adjusted xG**: 0.20 × 1.15 = 0.23 xG
+
+### Benefits
+- Accounts for individual player shooting skill
+- Improves fantasy projections (better players get more credit)
+- Uses Bayesian statistics to handle small sample sizes gracefully
+
+---
+
+## 🏒 Expected Rebounds Model
+
+### Overview
+The Expected Rebounds model predicts the probability that a shot will generate a rebound opportunity. This is a separate XGBoost classifier trained on the same features as the xG model.
+
+### Model Details
+- **Algorithm**: XGBoost Classifier (binary classification)
+- **Target**: `shot_generated_rebound` (1 = rebound generated, 0 = no rebound)
+- **Features**: Same as xG model (distance, angle, shot_type, speed, location, etc.)
+- **Output**: Rebound probability (0-1)
+
+### Expected Goals of Expected Rebounds
+For shots that generate rebounds, we calculate:
+```
+xGoals_of_xRebounds = Rebound_Probability × Estimated_Rebound_Shot_xG
+```
+
+This credits players for shots that create rebound opportunities, even if the rebound doesn't actually occur.
+
+### Example
+- **Shot**: 0.15 xG, 0.20 rebound probability
+- **Estimated rebound shot xG**: 0.15 × 1.5 = 0.225 (rebounds are more dangerous)
+- **xGoals of xRebounds**: 0.20 × 0.225 = 0.045
+
+---
+
+## 🎨 Created Expected Goals
+
+### Overview
+Created Expected Goals credits players for generating scoring opportunities, not just taking shots.
+
+### Formula
+```
+Created_xG = xG_from_non_rebound_shots + xGoals_of_xRebounds
+```
+
+### Logic
+- **Non-rebound shots**: Get full xG credit
+- **Shots that generate rebounds**: Get xG credit + xGoals of xRebounds
+- **Rebound shots themselves**: Get 0 direct credit (credit goes to shot that created rebound)
+
+### Example
+- **Player takes shot**: 0.20 xG (non-rebound)
+- **Shot generates rebound**: +0.045 xGoals of xRebounds
+- **Created xG**: 0.20 + 0.045 = 0.245
+
+### Benefits
+- Rewards players who create opportunities (defensemen shooting from point to generate rebounds)
+- Punishes players who just feed on rebounds
+- Better reflects player contribution to team offense
+
+---
 
 ## 🚀 Future Improvements
 
@@ -478,5 +581,5 @@ The xA model predicts the probability that a pass will result in a goal. It's ca
    - Time remaining in period
    - Rush vs. set play
    - Shot location zone (offensive/defensive/neutral)
-5. **Player-Specific Models**: Different xG rates for different players (some players are better shooters)
+5. ✅ **Player-Specific Models**: Implemented! Shooting Talent Adjusted xG now accounts for individual player skill
 

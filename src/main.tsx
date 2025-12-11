@@ -1,17 +1,14 @@
+// Import React first to ensure it's available
+import React from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './App.tsx'
 import './index.css'
 import { ErrorBoundary } from './components/ErrorBoundary'
 
-// Show immediate feedback that JS is loading
-const rootElement = document.getElementById("root");
-if (rootElement) {
-  rootElement.innerHTML = '<div style="padding: 20px; font-family: sans-serif; text-align: center; min-height: 100vh; display: flex; align-items: center; justify-content: center;"><div><div style="border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto 20px;"></div><p>Loading application...</p></div></div><style>@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }</style>';
-}
-
 console.log("🚀 Starting app initialization...");
 
 // Ensure root element exists
+const rootElement = document.getElementById("root");
 if (!rootElement) {
   console.error("❌ Root element not found!");
   document.body.innerHTML = '<div style="padding: 20px; font-family: sans-serif;"><h1 style="color: red;">Error: Root element not found!</h1></div>';
@@ -26,23 +23,37 @@ try {
   console.log("✅ React root created");
   
   console.log("🔄 Rendering app...");
+  
+  // Render with a timeout to catch hanging renders
+  const renderTimeout = setTimeout(() => {
+    console.warn("⚠️ React render is taking longer than expected...");
+  }, 5000);
+  
   root.render(
     <ErrorBoundary>
       <App />
     </ErrorBoundary>
   );
-  console.log("✅ App rendered successfully!");
+  
+  // Clear timeout after a short delay to ensure render started
+  setTimeout(() => {
+    clearTimeout(renderTimeout);
+    console.log("✅ App render initiated!");
+  }, 100);
+  
 } catch (error) {
   console.error("❌ Failed to render app:", error);
   if (rootElement) {
     rootElement.innerHTML = `
-      <div style="padding: 20px; font-family: sans-serif; background: white; min-height: 100vh;">
-        <h1 style="color: red; font-size: 24px; margin-bottom: 16px;">🚨 Critical Error</h1>
-        <p style="color: #666; margin-bottom: 16px;">The application failed to start. Check the console for details.</p>
-        <pre style="background: #f5f5f5; padding: 16px; border-radius: 4px; overflow: auto; border: 1px solid #ddd;">
-          <strong>Error:</strong> ${error instanceof Error ? error.message : String(error)}
-          ${error instanceof Error && error.stack ? `\n\n<strong>Stack:</strong>\n${error.stack}` : ''}
-        </pre>
+      <div style="padding: 20px; font-family: sans-serif; background: white; min-height: 100vh; display: flex; align-items: center; justify-content: center;">
+        <div style="max-width: 600px;">
+          <h1 style="color: red; font-size: 24px; margin-bottom: 16px;">🚨 Critical Error</h1>
+          <p style="color: #666; margin-bottom: 16px;">The application failed to start. Check the console for details.</p>
+          <pre style="background: #f5f5f5; padding: 16px; border-radius: 4px; overflow: auto; border: 1px solid #ddd; font-size: 12px;">
+            <strong>Error:</strong> ${error instanceof Error ? error.message : String(error)}
+            ${error instanceof Error && error.stack ? `\n\n<strong>Stack:</strong>\n${error.stack}` : ''}
+          </pre>
+        </div>
       </div>
     `;
   }

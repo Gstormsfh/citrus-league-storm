@@ -86,6 +86,16 @@ try:
         print("WARNING: xa_model.joblib not found. Expected Assists calculation will be skipped.")
         XA_MODEL = None
         XA_MODEL_FEATURES = None
+    
+    # Load the Rebound model (for Expected Rebounds)
+    try:
+        REBOUND_MODEL = joblib.load('rebound_model.joblib')
+        REBOUND_MODEL_FEATURES = joblib.load('rebound_model_features.joblib')
+        print("✅ Rebound model loaded successfully.")
+    except FileNotFoundError:
+        print("WARNING: rebound_model.joblib not found. Expected Rebounds calculation will be skipped.")
+        REBOUND_MODEL = None
+        REBOUND_MODEL_FEATURES = None
 except FileNotFoundError:
     print("ERROR: No xG model found! Please run retrain_xg_with_moneypuck.py first!")
     exit()
@@ -2127,6 +2137,88 @@ def scrape_pbp_and_process(date_str='2025-12-07'):
         SCALE_FACTOR = 0.19
         df_shots['xG_Value'] = df_shots['xG_Value'] * SCALE_FACTOR
     
+    # 2.5. Predict Expected Rebounds (rebound probability)
+    if REBOUND_MODEL and REBOUND_MODEL_FEATURES:
+        try:
+            print("  🔧 Predicting rebound probabilities...")
+            # Prepare features for rebound model
+            # Filter to shots on goal (types 505, 506) - rebounds only occur after saves
+            rebound_mask = df_shots['shot_type_code'].isin([505, 506])
+            df_rebound_shots = df_shots[rebound_mask].copy()
+            
+            if len(df_rebound_shots) > 0:
+                # Add missing features BEFORE selecting (same approach as test_rebound_model.py)
+                for feature in REBOUND_MODEL_FEATURES:
+                    if feature not in df_rebound_shots.columns:
+                        # Add missing feature with default value
+                        if feature in ['is_power_play', 'is_empty_net', 'is_rebound']:
+                            df_rebound_shots[feature] = 0
+                        elif feature == 'defending_team_skaters_on_ice':
+                            df_rebound_shots[feature] = 5
+                        elif 'encoded' in feature.lower() or 'log' in feature.lower() or 'interaction' in feature.lower():
+                            # Derived/encoded features - set to 0
+                            df_rebound_shots[feature] = 0.0
+                        else:
+                            df_rebound_shots[feature] = 0.0
+                
+                # Now select features (all should exist now)
+                X_rebound = df_rebound_shots[REBOUND_MODEL_FEATURES].copy()
+                
+                # Fill missing values
+                for feature in REBOUND_MODEL_FEATURES:
+                    if X_rebound[feature].isna().any():
+                        if feature in ['is_power_play', 'is_empty_net', 'is_rebound']:
+                            X_rebound[feature] = X_rebound[feature].fillna(0)
+                        elif feature == 'defending_team_skaters_on_ice':
+                            X_rebound[feature] = X_rebound[feature].fillna(5)
+                        else:
+                            median_val = X_rebound[feature].median()
+                            X_rebound[feature] = X_rebound[feature].fillna(median_val if not pd.isna(median_val) else 0)
+                
+                # Ensure all features are numeric
+                for col in X_rebound.columns:
+                    if X_rebound[col].dtype == 'object':
+                        X_rebound[col] = pd.to_numeric(X_rebound[col], errors='coerce').fillna(0)
+                
+                # Predict rebound probability
+                rebound_probs = REBOUND_MODEL.predict_proba(X_rebound)[:, 1]
+                
+                # Initialize column for all shots
+                df_shots['expected_rebound_probability'] = 0.0
+                
+                # Set rebound probabilities for shots on goal
+                df_shots.loc[rebound_mask, 'expected_rebound_probability'] = rebound_probs
+                
+                print(f"  ✅ Predicted rebound probabilities for {len(df_rebound_shots):,} shots on goal")
+            else:
+                df_shots['expected_rebound_probability'] = 0.0
+                print("  ⚠️  No shots on goal found for rebound prediction")
+        except Exception as e:
+            print(f"  ⚠️  Error predicting rebounds: {e}")
+            import traceback
+            traceback.print_exc()
+            df_shots['expected_rebound_probability'] = 0.0
+    else:
+        df_shots['expected_rebound_probability'] = 0.0
+        print("  ⚠️  Rebound model not loaded - skipping rebound prediction")
+    
+    # 2.6. Calculate Expected Goals of Expected Rebounds
+    try:
+        from feature_calculations import calculate_expected_goals_of_expected_rebounds
+        print("  🔧 Calculating expected goals of expected rebounds...")
+        df_shots = calculate_expected_goals_of_expected_rebounds(
+            df_shots,
+            rebound_prob_col='expected_rebound_probability',
+            xg_col='xG_Value'
+        )
+        print("  ✅ Expected goals of expected rebounds calculated")
+    except ImportError:
+        print("  ⚠️  feature_calculations.py not found - skipping xGoals of xRebounds")
+        df_shots['expected_goals_of_expected_rebounds'] = 0.0
+    except Exception as e:
+        print(f"  ⚠️  Error calculating xGoals of xRebounds: {e}")
+        df_shots['expected_goals_of_expected_rebounds'] = 0.0
+    
     # 3. Apply Flurry Adjusted Expected Goals (MoneyPuck post-processing)
     try:
         from feature_calculations import calculate_flurry_adjusted_xg
@@ -2147,7 +2239,58 @@ def scrape_pbp_and_process(date_str='2025-12-07'):
     except Exception as e:
         print(f"  ⚠️  Error applying flurry adjustment: {e}")
         print("  Continuing with regular xG values only...")
-        df_shots['flurry_adjusted_xg'] = df_shots['xG_Value']  # Fallback to regular xG 
+        df_shots['flurry_adjusted_xg'] = df_shots['xG_Value']  # Fallback to regular xG
+    
+    # 3.5. Apply Shooting Talent Adjusted Expected Goals
+    try:
+        from feature_calculations import calculate_shooting_talent_adjusted_xg
+        import joblib
+        
+        # Load player shooting talent dictionary
+        try:
+            player_talent_dict = joblib.load('player_shooting_talent.joblib')
+            print("  🔧 Applying shooting talent adjustment to xG values...")
+            df_shots = calculate_shooting_talent_adjusted_xg(
+                df_shots,
+                player_talent_dict=player_talent_dict,
+                xg_column='flurry_adjusted_xg'  # Apply to flurry-adjusted xG
+            )
+            print("  ✅ Shooting talent adjustment applied")
+        except FileNotFoundError:
+            print("  ⚠️  player_shooting_talent.joblib not found - skipping shooting talent adjustment")
+            print("     Run calculate_shooting_talent.py first to generate talent multipliers")
+            df_shots['shooting_talent_adjusted_xg'] = df_shots['flurry_adjusted_xg']
+            df_shots['shooting_talent_multiplier'] = 1.0
+        except Exception as e:
+            print(f"  ⚠️  Error loading shooting talent: {e}")
+            df_shots['shooting_talent_adjusted_xg'] = df_shots['flurry_adjusted_xg']
+            df_shots['shooting_talent_multiplier'] = 1.0
+    except ImportError:
+        print("  ⚠️  feature_calculations.py not found - skipping shooting talent adjustment")
+        df_shots['shooting_talent_adjusted_xg'] = df_shots['flurry_adjusted_xg']
+        df_shots['shooting_talent_multiplier'] = 1.0
+    except Exception as e:
+        print(f"  ⚠️  Error applying shooting talent adjustment: {e}")
+        df_shots['shooting_talent_adjusted_xg'] = df_shots['flurry_adjusted_xg']
+        df_shots['shooting_talent_multiplier'] = 1.0
+    
+    # 3.6. Calculate Created Expected Goals
+    try:
+        from feature_calculations import calculate_created_expected_goals
+        print("  🔧 Calculating created expected goals...")
+        df_shots = calculate_created_expected_goals(
+            df_shots,
+            xg_col='xG_Value',
+            is_rebound_col='is_rebound',
+            xgoals_of_xrebounds_col='expected_goals_of_expected_rebounds'
+        )
+        print("  ✅ Created expected goals calculated")
+    except ImportError:
+        print("  ⚠️  feature_calculations.py not found - skipping created expected goals")
+        df_shots['created_expected_goals'] = df_shots['xG_Value']  # Fallback to regular xG
+    except Exception as e:
+        print(f"  ⚠️  Error calculating created expected goals: {e}")
+        df_shots['created_expected_goals'] = df_shots['xG_Value']  # Fallback to regular xG 
 
     # --- EXPECTED ASSISTS (xA) PREDICTION ---
     # Only calculate xA for shots that have passes before them
@@ -2239,6 +2382,11 @@ def scrape_pbp_and_process(date_str='2025-12-07'):
                     'xg_value': float(row['xG_Value']),
                     'flurry_adjusted_xg': float(row['flurry_adjusted_xg']) if pd.notna(row.get('flurry_adjusted_xg')) else float(row['xG_Value']),
                     'xa_value': float(row['xA_Value']) if pd.notna(row['xA_Value']) and row['xA_Value'] > 0 else None,
+                    'expected_rebound_probability': float(row['expected_rebound_probability']) if pd.notna(row.get('expected_rebound_probability')) else 0.0,
+                    'expected_goals_of_expected_rebounds': float(row['expected_goals_of_expected_rebounds']) if pd.notna(row.get('expected_goals_of_expected_rebounds')) else 0.0,
+                    'shooting_talent_adjusted_xg': float(row['shooting_talent_adjusted_xg']) if pd.notna(row.get('shooting_talent_adjusted_xg')) else float(row.get('flurry_adjusted_xg', row['xG_Value'])),
+                    'shooting_talent_multiplier': float(row['shooting_talent_multiplier']) if pd.notna(row.get('shooting_talent_multiplier')) else 1.0,
+                    'created_expected_goals': float(row['created_expected_goals']) if pd.notna(row.get('created_expected_goals')) else float(row.get('xG_Value', 0.0)),
                     'shot_type_encoded': int(row['shot_type_encoded']),
                     'pass_zone_encoded': int(row['pass_zone_encoded']) if pd.notna(row['pass_zone_encoded']) else None,
                     # ENHANCED FEATURES (matching MoneyPuck)
@@ -2330,6 +2478,8 @@ def scrape_pbp_and_process(date_str='2025-12-07'):
                                  'pass_zone', 'pass_immediacy_score', 'goalie_movement_score', 'pass_quality_score', 
                                  'time_before_shot', 'pass_angle', 'xa_value', 'pass_zone_encoded', 
                                  'normalized_lateral_distance', 'zone_relative_distance', 'score_differential',
+                                 'expected_rebound_probability', 'expected_goals_of_expected_rebounds',
+                                 'shooting_talent_adjusted_xg', 'shooting_talent_multiplier', 'created_expected_goals',
                                  # Enhanced features (nullable)
                                  'home_skaters_on_ice', 'away_skaters_on_ice', 'penalty_length', 'penalty_time_left',
                                  'last_event_category', 'last_event_x', 'last_event_y', 'last_event_team',

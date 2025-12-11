@@ -19,7 +19,10 @@
 ✅ **Training R²:** 0.8679 (vs MoneyPuck xG)  
 ✅ **Test R²:** 0.6141 (vs MoneyPuck xG)  
 ✅ **Feature Importance:** All 15 MoneyPuck features now have non-zero importance  
-✅ **Data Quality:** 97-99% of shots have properly calculated speed/distance/time features
+✅ **Data Quality:** 97-99% of shots have properly calculated speed/distance/time features  
+✅ **Expected Rebounds Model:** Trained and integrated (predicts rebound probability)  
+✅ **Shooting Talent Adjusted xG:** Bayesian adjustment for individual player skill  
+✅ **Created Expected Goals:** Credits players for generating rebound opportunities
 
 ---
 
@@ -282,11 +285,42 @@
 
 2. **High xG Refinement:** The Flurry Adjustment fix should partially address high xG overestimation. Monitor results and consider additional calibration if needed.
 
-3. **Player Shooting Talent Model:** Consider implementing a separate Bayesian model for "Shooting Talent Adjusted Expected Goals" that accounts for individual player shooting skill. This would be a second-layer adjustment separate from the core xG model.
+3. ✅ **Player Shooting Talent Model:** IMPLEMENTED - Bayesian model for "Shooting Talent Adjusted Expected Goals" now accounts for individual player shooting skill. This is a second-layer adjustment separate from the core xG model.
+
+---
+
+## New Features (January 2025)
+
+### Expected Rebounds Model
+- **Status**: ✅ Implemented
+- **Purpose**: Predicts probability that a shot will generate a rebound
+- **Model Type**: XGBoost Classifier
+- **Features**: Same as xG model (distance, angle, shot_type, speed, location, etc.)
+- **Output**: `expected_rebound_probability` (0-1)
+
+### Expected Goals of Expected Rebounds
+- **Status**: ✅ Implemented
+- **Purpose**: Credits players for shots that generate rebound opportunities
+- **Formula**: `Rebound_Probability × Estimated_Rebound_Shot_xG`
+- **Output**: `expected_goals_of_expected_rebounds`
+
+### Shooting Talent Adjusted Expected Goals
+- **Status**: ✅ Implemented
+- **Purpose**: Adjusts xG based on individual player shooting skill
+- **Methodology**: Bayesian statistics (MoneyPuck approach)
+- **Output**: `shooting_talent_adjusted_xg`, `shooting_talent_multiplier`
+- **Benefits**: Improves fantasy projections by accounting for player skill
+
+### Created Expected Goals
+- **Status**: ✅ Implemented
+- **Purpose**: Credits players for generating opportunities, not just taking shots
+- **Formula**: `xG_from_non_rebound_shots + xGoals_of_xRebounds`
+- **Output**: `created_expected_goals`
+- **Benefits**: Better reflects player contribution (rewards opportunity creators, punishes rebound feeders)
 
 ---
 
 **Report Generated:** January 2025  
-**Model Version:** MoneyPuck-Aligned XGBoost  
+**Model Version:** MoneyPuck-Aligned XGBoost + Shooting Talent + Expected Rebounds  
 **Data Source:** NHL API + MoneyPuck
 

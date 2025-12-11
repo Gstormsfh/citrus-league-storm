@@ -21,12 +21,26 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { LeagueService, Transaction } from '@/services/LeagueService';
 
 const Navbar = () => {
+  console.log("✅ Navbar component rendering");
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [notifications, setNotifications] = useState<Transaction[]>([]);
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, profile, signOut } = useAuth();
+  
+  // Get auth - handle gracefully if context not ready
+  let user, profile, signOut;
+  try {
+    const auth = useAuth();
+    user = auth?.user ?? null;
+    profile = auth?.profile ?? null;
+    signOut = auth?.signOut ?? (async () => {});
+  } catch (error) {
+    console.warn("Auth context not ready yet:", error);
+    user = null;
+    profile = null;
+    signOut = async () => {};
+  }
   
   useEffect(() => {
     const handleScroll = () => {

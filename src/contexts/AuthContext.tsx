@@ -70,15 +70,32 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   useEffect(() => {
+    let mounted = true;
+    const timeout = setTimeout(() => {
+      if (mounted) {
+        console.warn("⚠️ Auth initialization taking longer than expected, setting loading to false");
+        setLoading(false);
+      }
+    }, 5000); // 5 second timeout
+
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!mounted) return;
+      clearTimeout(timeout);
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
-        fetchProfile(session.user.id).finally(() => setLoading(false));
+        fetchProfile(session.user.id).finally(() => {
+          if (mounted) setLoading(false);
+        });
       } else {
         setLoading(false);
       }
+    }).catch((error) => {
+      if (!mounted) return;
+      clearTimeout(timeout);
+      console.error("Error getting session:", error);
+      setLoading(false);
     });
 
     // Listen for auth changes
@@ -94,7 +111,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signIn = async (email: string, password: string) => {

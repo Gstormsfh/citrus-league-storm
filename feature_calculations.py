@@ -649,3 +649,142 @@ def calculate_flurry_adjusted_xg(df_shots, xg_column='xG_Value', game_id_col='ga
     
     return df
 
+
+def calculate_expected_goals_of_expected_rebounds(df_shots, rebound_prob_col='expected_rebound_probability',
+                                                   xg_col='xG_Value'):
+    """
+    Calculate Expected Goals of Expected Rebounds (xGoals of xRebounds).
+    
+    This metric credits players for shots that are likely to generate rebounds,
+    even if the rebound doesn't actually occur. It's calculated as:
+    
+    xGoals_of_xRebounds = Probability_of_Rebound × Expected_Goals_of_Potential_Rebound_Shot
+    
+    For simplicity, we estimate the rebound shot's xG as a function of the original shot's xG
+    and location. Rebounds typically occur closer to the net with better angles.
+    
+    Args:
+        df_shots: DataFrame with shot data including rebound probabilities and xG values
+        rebound_prob_col: Column name for rebound probability
+        xg_col: Column name for xG values
+    
+    Returns:
+        DataFrame with 'expected_goals_of_expected_rebounds' column added
+    """
+    df = df_shots.copy()
+    
+    # Initialize column
+    df['expected_goals_of_expected_rebounds'] = 0.0
+    
+    # For shots that could generate rebounds, estimate the xG of the potential rebound shot
+    # Rebounds typically occur:
+    # - Closer to the net (distance reduced by ~30-50%)
+    # - With better angles (angle reduced by ~20-40%)
+    # - Higher base xG due to goalie being out of position
+    
+    # Estimate rebound shot xG as a multiplier of original xG
+    # This is a simplified approach - MoneyPuck likely has more sophisticated logic
+    REBOUND_XG_MULTIPLIER = 1.5  # Rebounds are typically more dangerous
+    
+    # Calculate: rebound_prob × (estimated rebound shot xG)
+    # Cap rebound shot xG at 0.5 (50% max probability)
+    rebound_shot_xg = (df[xg_col] * REBOUND_XG_MULTIPLIER).clip(upper=0.5)
+    
+    # Expected goals of expected rebounds = P(rebound) × xG(rebound shot)
+    df['expected_goals_of_expected_rebounds'] = (
+        df[rebound_prob_col] * rebound_shot_xg
+    )
+    
+    return df
+
+
+def calculate_shooting_talent_adjusted_xg(df_shots, player_talent_dict, xg_column='flurry_adjusted_xg',
+                                           player_id_col='playerId'):
+    """
+    Apply shooting talent multipliers to xG values.
+    
+    This adjusts xG based on individual player shooting talent, using Bayesian
+    estimates from historical performance. Players with above-average shooting
+    talent get a multiplier > 1.0, while below-average shooters get < 1.0.
+    
+    Args:
+        df_shots: DataFrame with shot data
+        player_talent_dict: Dictionary mapping player_id -> talent_multiplier
+        xg_column: Column name for xG values to adjust
+        player_id_col: Column name for player ID
+    
+    Returns:
+        DataFrame with 'shooting_talent_adjusted_xg' and 'shooting_talent_multiplier' columns
+    """
+    df = df_shots.copy()
+    
+    # Initialize columns
+    df['shooting_talent_multiplier'] = 1.0
+    df['shooting_talent_adjusted_xg'] = df[xg_column].copy()
+    
+    # Apply talent multipliers
+    # Default to 1.0 (average) if player not in dictionary
+    df['shooting_talent_multiplier'] = df[player_id_col].map(
+        lambda pid: player_talent_dict.get(int(pid), 1.0)
+    )
+    
+    # Apply multiplier to xG
+    df['shooting_talent_adjusted_xg'] = (
+        df[xg_column] * df['shooting_talent_multiplier']
+    )
+    
+    # Cap adjusted xG at 0.50 (50% max probability)
+    df['shooting_talent_adjusted_xg'] = df['shooting_talent_adjusted_xg'].clip(upper=0.50)
+    
+    return df
+
+
+def calculate_created_expected_goals(df_shots, xg_col='xG_Value', is_rebound_col='is_rebound',
+                                     xgoals_of_xrebounds_col='expected_goals_of_expected_rebounds'):
+    """
+    Calculate Created Expected Goals (cXG).
+    
+    Created Expected Goals = Non-Rebound xG + Expected Goals of Expected Rebounds
+    
+    This metric credits players for:
+    1. Their direct shot attempts (non-rebound shots)
+    2. The expected value of rebounds their shots are likely to generate
+    
+    This is MoneyPuck's "Created Expected Goals" metric, which captures both
+    direct scoring chances and rebound opportunities created.
+    
+    Args:
+        df_shots: DataFrame with shot data
+        xg_col: Column name for base xG values
+        is_rebound_col: Column name for rebound flag (True/False or 1/0)
+        xgoals_of_xrebounds_col: Column name for expected goals of expected rebounds
+    
+    Returns:
+        DataFrame with 'created_expected_goals' column added
+    """
+    df = df_shots.copy()
+    
+    # Initialize column
+    df['created_expected_goals'] = 0.0
+    
+    # For non-rebound shots, use the base xG
+    # For rebound shots, we don't count the xG (it was already counted for the original shot)
+    # Instead, we add the xGoals of xRebounds from the original shot
+    
+    # Non-rebound shots contribute their xG
+    non_rebound_mask = ~df[is_rebound_col].astype(bool)
+    df.loc[non_rebound_mask, 'created_expected_goals'] = df.loc[non_rebound_mask, xg_col]
+    
+    # All shots (including rebounds) contribute their xGoals of xRebounds
+    # This credits the shooter for creating rebound opportunities
+    if xgoals_of_xrebounds_col in df.columns:
+        df['created_expected_goals'] = (
+            df['created_expected_goals'] + 
+            df[xgoals_of_xrebounds_col].fillna(0.0)
+        )
+    else:
+        # Fallback: if column doesn't exist, just use non-rebound xG
+        pass
+    
+    return df
+
