@@ -403,7 +403,7 @@ const DraftRoom = () => {
       setDraftPhase(DraftPhase.LOBBY);
       // Don't redirect on error - show error message instead
     }
-  }, [leagueId, user, navigate, userLeagueState, generateDemoDraftPicks, loadDraftState]);
+  }, [leagueId, user, navigate, userLeagueState, generateDemoDraftPicks]);
 
   useEffect(() => {
     // Wait for auth to finish loading before proceeding
