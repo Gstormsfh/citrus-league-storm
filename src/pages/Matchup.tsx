@@ -49,15 +49,36 @@ const Matchup = () => {
   const [opponentDailyPoints, setOpponentDailyPoints] = useState<number[]>([]);
 
   // Demo data - shown to guests and logged-in users without leagues
-  // Use useMemo to recalculate when userLeagueState changes
-  const demoMyTeam = React.useMemo(() => {
-    if (userLeagueState === 'active-user') return [];
-    return DemoDataService.getDemoMyTeam();
-  }, [userLeagueState]);
+  // Load from actual demo rosters instead of static data
+  const [demoMyTeam, setDemoMyTeam] = useState<MatchupPlayer[]>([]);
+  const [demoOpponentTeam, setDemoOpponentTeam] = useState<MatchupPlayer[]>([]);
   
-  const demoOpponentTeam = React.useMemo(() => {
-    if (userLeagueState === 'active-user') return [];
-    return DemoDataService.getDemoOpponentTeam();
+  // Load demo matchup data from actual rosters
+  useEffect(() => {
+    if (userLeagueState === 'active-user') {
+      setDemoMyTeam([]);
+      setDemoOpponentTeam([]);
+      setLoading(false);
+      return;
+    }
+    
+    const loadDemoMatchup = async () => {
+      try {
+        setLoading(true);
+        const matchupData = await DemoDataService.getDemoMatchupData();
+        setDemoMyTeam(matchupData.myTeam);
+        setDemoOpponentTeam(matchupData.opponentTeam);
+        setLoading(false);
+      } catch (error) {
+        console.error('Error loading demo matchup data:', error);
+        // Fallback to static data if loading fails
+        setDemoMyTeam(DemoDataService.getDemoMyTeam());
+        setDemoOpponentTeam(DemoDataService.getDemoOpponentTeam());
+        setLoading(false);
+      }
+    };
+    
+    loadDemoMatchup();
   }, [userLeagueState]);
 
   const toHockeyPlayer = (p: MatchupPlayer): HockeyPlayer => ({
@@ -141,6 +162,7 @@ const Matchup = () => {
   // For demo/non-logged-in users, use empty arrays (will show empty state)
   const displayMyDailyPoints = user ? myDailyPoints : [];
   const displayOpponentDailyPoints = user ? opponentDailyPoints : [];
+
 
   // Load real matchup data for logged-in users with leagues
   useEffect(() => {
@@ -459,9 +481,14 @@ const Matchup = () => {
              )}
           </div>
           
-          {loading && userLeagueState === 'active-user' && (
+          {loading && (
             <div className="flex items-center justify-center py-20">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <p className="ml-3 text-muted-foreground">
+                {userLeagueState === 'guest' || userLeagueState === 'logged-in-no-league' 
+                  ? 'Loading demo matchup...' 
+                  : 'Loading matchup...'}
+              </p>
             </div>
           )}
           
@@ -471,7 +498,7 @@ const Matchup = () => {
             </div>
           )}
           
-          {userLeagueState === 'logged-in-no-league' && (
+          {userLeagueState === 'logged-in-no-league' && !loading && (
             <div className="py-12">
               <LeagueCreationCTA 
                 title="Your Matchup Awaits"
@@ -480,7 +507,7 @@ const Matchup = () => {
             </div>
           )}
 
-          {(userLeagueState === 'guest' || (userLeagueState === 'active-user' && !loading && !error)) && (
+          {!loading && (userLeagueState === 'guest' || (userLeagueState === 'active-user' && !error) || (userLeagueState === 'logged-in-no-league' && (demoMyTeam.length > 0 || demoOpponentTeam.length > 0))) && (
             <>
           
           <ScoreCard

@@ -209,4 +209,83 @@ export const DemoDataService = {
     const { LeagueService } = await import('./LeagueService');
     return LeagueService.getMyTeam(allPlayers);
   },
+
+  /**
+   * Get demo matchup data from actual demo rosters
+   * Uses Team 3 (Citrus Crushers) as "My Team" and Team 1 as opponent
+   * Transforms actual roster players into MatchupPlayer format
+   */
+  async getDemoMatchupData(): Promise<{ myTeam: MatchupPlayer[]; opponentTeam: MatchupPlayer[] }> {
+    const { LeagueService } = await import('./LeagueService');
+    const { MatchupService } = await import('./MatchupService');
+    const { PlayerService } = await import('./PlayerService');
+    
+    // Ensure demo league is initialized
+    const allPlayers = await PlayerService.getAllPlayers();
+    await LeagueService.initializeLeague(allPlayers);
+    
+    // Get rosters for Team 3 (My Team) and Team 1 (Opponent)
+    const myTeamRoster = await LeagueService.getTeamRoster(3, allPlayers);
+    const opponentTeamRoster = await LeagueService.getTeamRoster(1, allPlayers);
+    
+    // Get starting lineups for both teams
+    const myTeamLineup = await LeagueService.getLineup('3', 'demo-league-id');
+    const opponentTeamLineup = await LeagueService.getLineup('1', 'demo-league-id');
+    
+    const myTeamStarters = new Set((myTeamLineup?.starters || []).map(id => String(id)));
+    const opponentTeamStarters = new Set((opponentTeamLineup?.starters || []).map(id => String(id)));
+    
+    // Get current week for schedule data
+    const now = new Date();
+    const weekStart = new Date(now);
+    weekStart.setDate(now.getDate() - now.getDay() + 1); // Monday
+    weekStart.setHours(0, 0, 0, 0);
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 6); // Sunday
+    weekEnd.setHours(23, 59, 59, 999);
+    
+    // Get all unique teams from both rosters for batch schedule query
+    const allTeams = Array.from(new Set([
+      ...myTeamRoster.map(p => p.team || '').filter(t => t),
+      ...opponentTeamRoster.map(p => p.team || '').filter(t => t)
+    ]));
+    
+    // Batch fetch games for all teams at once (more efficient)
+    const { ScheduleService } = await import('./ScheduleService');
+    const { gamesByTeam } = await ScheduleService.getGamesForTeams(allTeams, weekStart, weekEnd);
+    
+    // Transform rosters to MatchupPlayer format
+    const myTeamMatchupPlayers = myTeamRoster.map((player) => {
+      const teamAbbrev = player.team || '';
+      const games = gamesByTeam.get(teamAbbrev) || [];
+      
+      return MatchupService.transformToMatchupPlayerWithGames(
+        player,
+        myTeamStarters.has(String(player.id)),
+        weekStart,
+        weekEnd,
+        'America/Denver',
+        games
+      );
+    });
+    
+    const opponentTeamMatchupPlayers = opponentTeamRoster.map((player) => {
+      const teamAbbrev = player.team || '';
+      const games = gamesByTeam.get(teamAbbrev) || [];
+      
+      return MatchupService.transformToMatchupPlayerWithGames(
+        player,
+        opponentTeamStarters.has(String(player.id)),
+        weekStart,
+        weekEnd,
+        'America/Denver',
+        games
+      );
+    });
+    
+    return {
+      myTeam: myTeamMatchupPlayers,
+      opponentTeam: opponentTeamMatchupPlayers
+    };
+  },
 };
