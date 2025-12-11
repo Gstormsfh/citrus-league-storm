@@ -52,16 +52,12 @@ const Matchup = () => {
   // Use useMemo to recalculate when userLeagueState changes
   const demoMyTeam = React.useMemo(() => {
     if (userLeagueState === 'active-user') return [];
-    const demo = DemoDataService.getDemoMyTeam();
-    console.log('[Matchup] Demo my team loaded:', demo.length, 'players');
-    return demo;
+    return DemoDataService.getDemoMyTeam();
   }, [userLeagueState]);
   
   const demoOpponentTeam = React.useMemo(() => {
     if (userLeagueState === 'active-user') return [];
-    const demo = DemoDataService.getDemoOpponentTeam();
-    console.log('[Matchup] Demo opponent team loaded:', demo.length, 'players');
-    return demo;
+    return DemoDataService.getDemoOpponentTeam();
   }, [userLeagueState]);
 
   const toHockeyPlayer = (p: MatchupPlayer): HockeyPlayer => ({

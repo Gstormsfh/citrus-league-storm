@@ -727,13 +727,6 @@ export const LeagueService = {
     cachedLeagueState = leagueRosters;
     cachedFreeAgents = availablePlayers;
     
-    // Log roster distribution for debugging
-    console.log('initializeLeague: Roster distribution complete');
-    Object.keys(leagueRosters).forEach(teamId => {
-      console.log(`  Team ${teamId}: ${leagueRosters[Number(teamId)].length} players`);
-    });
-    console.log(`  Team 3 (demo): ${leagueRosters[3]?.length || 0} players`);
-    
     // Initialize default lineups for all demo teams (only once per session)
     // This ensures all 10 demo teams have full starting lineups for non-logged-in users
     // NOTE: Do this asynchronously so it doesn't block roster loading
@@ -915,18 +908,7 @@ export const LeagueService = {
 
   async getMyTeam(allPlayers: Player[]): Promise<Player[]> {
     await this.initializeLeague(allPlayers);
-    const team3Players = cachedLeagueState?.[3] || [];
-    console.log('[LeagueService.getMyTeam] Team 3 players:', team3Players.length);
-    if (team3Players.length === 0) {
-      console.warn('[LeagueService.getMyTeam] WARNING: Team 3 roster is empty!');
-      console.log('[LeagueService.getMyTeam] Cached league state keys:', Object.keys(cachedLeagueState || {}));
-      if (cachedLeagueState) {
-        Object.keys(cachedLeagueState).forEach(teamId => {
-          console.log(`[LeagueService.getMyTeam] Team ${teamId}: ${cachedLeagueState[Number(teamId)].length} players`);
-        });
-      }
-    }
-    return team3Players; // User is Team 3
+    return cachedLeagueState?.[3] || []; // User is Team 3
   },
 
   async getTeamRoster(teamId: number, allPlayers: Player[]): Promise<Player[]> {

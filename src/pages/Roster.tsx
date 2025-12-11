@@ -331,9 +331,6 @@ const Roster = () => {
         // State 3: Active user - show real data
         if (userLeagueState === 'guest' || userLeagueState === 'logged-in-no-league') {
           // Show demo team (Team 3) from database
-          console.log('[Roster] Loading demo data for state:', userLeagueState);
-          console.log('[Roster] All players available:', allPlayers.length);
-          
           if (allPlayers.length === 0) {
             console.error('[Roster] ERROR: No players loaded! Cannot initialize demo league.');
             setLoading(false);
@@ -341,7 +338,6 @@ const Roster = () => {
           }
           
           // Ensure league is initialized - this distributes players to teams
-          console.log('[Roster] Starting league initialization...');
           try {
             // Add timeout to prevent hanging
             const initPromise = LeagueService.initializeLeague(allPlayers);
@@ -349,32 +345,17 @@ const Roster = () => {
               setTimeout(() => reject(new Error('League initialization timeout after 30s')), 30000)
             );
             await Promise.race([initPromise, timeoutPromise]);
-            console.log('[Roster] League initialization complete');
           } catch (error: any) {
             console.error('[Roster] League initialization error:', error);
             // Continue anyway - cachedLeagueState might still be populated
           }
           
           // Get demo team (Team 3) players
-          console.log('[Roster] Calling getMyTeam...');
           try {
             dbPlayers = await LeagueService.getMyTeam(allPlayers);
-            console.log('[Roster] getMyTeam returned, players count:', dbPlayers.length);
           } catch (error: any) {
             console.error('[Roster] getMyTeam error:', error);
             dbPlayers = [];
-          }
-          if (dbPlayers.length > 0) {
-            console.log('[Roster] First few demo players:', dbPlayers.slice(0, 3).map(p => p.full_name || p.id));
-          } else {
-            console.error('[Roster] ERROR: Demo players array is empty after initialization!');
-            console.error('[Roster] This might indicate an issue with league initialization.');
-            // Try to get all teams to see if any have players
-            const allTeams = await LeagueService.getAllTeamsWithRosters(allPlayers);
-            console.log('[Roster] All teams loaded:', allTeams.length);
-            allTeams.forEach(team => {
-              console.log(`[Roster] Team ${team.id} (${team.name}): ${team.roster.length} players`);
-            });
           }
           
           teamId = 3; // Demo team ID
@@ -466,7 +447,6 @@ const Roster = () => {
         
         // Transform players from staging files to HockeyPlayer format
         // All data (names, stats, positions, teams) comes from staging files via PlayerService
-        console.log('[Roster] Transforming', dbPlayers.length, 'players to HockeyPlayer format');
         const transformedPlayers: HockeyPlayer[] = dbPlayers.map((p) => ({
           id: p.id,
           name: p.full_name,
@@ -653,7 +633,6 @@ const Roster = () => {
           // Merge IR slot assignments with starter assignments
           const allSlotAssignments = { ...starterSlotAssignments, ...irSlotAssignments };
           const initialRoster = { starters, bench, ir, slotAssignments: allSlotAssignments };
-          console.log('[Roster] Setting roster with', starters.length, 'starters,', bench.length, 'bench,', ir.length, 'IR');
           setRoster(initialRoster);
           
           // Save initial lineup (only for logged-in users with actual teams)
