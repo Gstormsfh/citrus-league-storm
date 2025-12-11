@@ -899,7 +899,18 @@ export const LeagueService = {
 
   async getMyTeam(allPlayers: Player[]): Promise<Player[]> {
     await this.initializeLeague(allPlayers);
-    return cachedLeagueState?.[3] || []; // User is Team 3
+    const team3Players = cachedLeagueState?.[3] || [];
+    console.log('[LeagueService.getMyTeam] Team 3 players:', team3Players.length);
+    if (team3Players.length === 0) {
+      console.warn('[LeagueService.getMyTeam] WARNING: Team 3 roster is empty!');
+      console.log('[LeagueService.getMyTeam] Cached league state keys:', Object.keys(cachedLeagueState || {}));
+      if (cachedLeagueState) {
+        Object.keys(cachedLeagueState).forEach(teamId => {
+          console.log(`[LeagueService.getMyTeam] Team ${teamId}: ${cachedLeagueState[Number(teamId)].length} players`);
+        });
+      }
+    }
+    return team3Players; // User is Team 3
   },
 
   async getTeamRoster(teamId: number, allPlayers: Player[]): Promise<Player[]> {

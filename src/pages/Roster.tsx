@@ -341,12 +341,14 @@ const Roster = () => {
           }
           
           // Ensure league is initialized - this distributes players to teams
+          console.log('[Roster] Starting league initialization...');
           await LeagueService.initializeLeague(allPlayers);
+          console.log('[Roster] League initialization complete');
           
           // Get demo team (Team 3) players
+          console.log('[Roster] Calling getMyTeam...');
           dbPlayers = await LeagueService.getMyTeam(allPlayers);
-          
-          console.log('[Roster] Demo players loaded:', dbPlayers.length);
+          console.log('[Roster] getMyTeam returned, players count:', dbPlayers.length);
           if (dbPlayers.length > 0) {
             console.log('[Roster] First few demo players:', dbPlayers.slice(0, 3).map(p => p.full_name || p.id));
           } else {
