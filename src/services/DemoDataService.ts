@@ -291,15 +291,26 @@ export const DemoDataService = {
     const { ScheduleService } = await import('./ScheduleService');
     const { gamesByTeam } = await ScheduleService.getGamesForTeams(allTeams, weekStart, weekEnd);
     
+    // Debug: Log sample player IDs and starter IDs to check for matching
+    console.log('[DemoDataService] Sample player IDs from roster:', {
+      myTeamSample: myTeamRoster.slice(0, 3).map(p => ({ name: p.name, id: p.id, idType: typeof p.id })),
+      opponentTeamSample: opponentTeamRoster.slice(0, 3).map(p => ({ name: p.name, id: p.id, idType: typeof p.id }))
+    });
+    console.log('[DemoDataService] Sample starter IDs from lineup:', {
+      myTeamStartersSample: Array.from(myTeamStarters).slice(0, 5),
+      opponentTeamStartersSample: Array.from(opponentTeamStarters).slice(0, 5)
+    });
+    
     // Transform rosters to MatchupPlayer format
-    const myTeamMatchupPlayers = myTeamRoster.map((player) => {
+    const myTeamMatchupPlayers = myTeamRoster.map((player, index) => {
       const teamAbbrev = player.team || '';
       const games = gamesByTeam.get(teamAbbrev) || [];
-      const isStarter = myTeamStarters.has(String(player.id));
+      const playerIdStr = String(player.id);
+      const isStarter = myTeamStarters.has(playerIdStr);
       
       // Debug log for first few players
-      if (myTeamMatchupPlayers.length < 3) {
-        console.log(`[DemoDataService] Player ${player.name} (ID: ${player.id}): isStarter=${isStarter}, inStartersSet=${myTeamStarters.has(String(player.id))}`);
+      if (index < 3) {
+        console.log(`[DemoDataService] My Team Player ${player.name} (ID: ${playerIdStr}, type: ${typeof player.id}): isStarter=${isStarter}, inStartersSet=${myTeamStarters.has(playerIdStr)}`);
       }
       
       return MatchupService.transformToMatchupPlayerWithGames(
@@ -312,10 +323,16 @@ export const DemoDataService = {
       );
     });
     
-    const opponentTeamMatchupPlayers = opponentTeamRoster.map((player) => {
+    const opponentTeamMatchupPlayers = opponentTeamRoster.map((player, index) => {
       const teamAbbrev = player.team || '';
       const games = gamesByTeam.get(teamAbbrev) || [];
-      const isStarter = opponentTeamStarters.has(String(player.id));
+      const playerIdStr = String(player.id);
+      const isStarter = opponentTeamStarters.has(playerIdStr);
+      
+      // Debug log for first few players
+      if (index < 3) {
+        console.log(`[DemoDataService] Opponent Team Player ${player.name} (ID: ${playerIdStr}, type: ${typeof player.id}): isStarter=${isStarter}, inStartersSet=${opponentTeamStarters.has(playerIdStr)}`);
+      }
       
       return MatchupService.transformToMatchupPlayerWithGames(
         player,
@@ -328,8 +345,10 @@ export const DemoDataService = {
     });
     
     console.log('[DemoDataService] Matchup players with starter status:', {
+      myTeamTotal: myTeamMatchupPlayers.length,
       myTeamStarters: myTeamMatchupPlayers.filter(p => p.isStarter).length,
       myTeamBench: myTeamMatchupPlayers.filter(p => !p.isStarter).length,
+      opponentTeamTotal: opponentTeamMatchupPlayers.length,
       opponentTeamStarters: opponentTeamMatchupPlayers.filter(p => p.isStarter).length,
       opponentTeamBench: opponentTeamMatchupPlayers.filter(p => !p.isStarter).length
     });
