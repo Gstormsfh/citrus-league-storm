@@ -1,8 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLeague } from '@/contexts/LeagueContext';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
+import { LeagueCreationCTA } from '@/components/LeagueCreationCTA';
+import { DemoDataService } from '@/services/DemoDataService';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -27,6 +30,7 @@ interface StandingsTeam {
 
 const Standings = () => {
   const { user } = useAuth();
+  const { userLeagueState } = useLeague();
   const { toast } = useToast();
   const [season, setSeason] = useState("2025");
   const [loading, setLoading] = useState(true);
@@ -39,9 +43,10 @@ const Standings = () => {
   // Load user's leagues and teams
   useEffect(() => {
     const loadStandings = async () => {
-      if (!user) {
-        // Not logged in - use demo data
-        const demoTeams = LeagueService.getAllTeams();
+      // State 1: Guest - show demo data
+      // State 2: Logged in, no league - show demo data (will show CTAs in UI)
+      if (userLeagueState === 'guest' || userLeagueState === 'logged-in-no-league') {
+        const demoTeams = DemoDataService.getDemoTeams();
         const standingsTeams: StandingsTeam[] = demoTeams.map(t => ({
           id: String(t.id),
           name: t.name,
@@ -58,29 +63,21 @@ const Standings = () => {
         return;
       }
 
-      try {
-        setLoading(true);
-        
-        // Get user's leagues
-        const { leagues: userLeagues, error: leaguesError } = await LeagueService.getUserLeagues(user.id);
-        if (leaguesError) throw leaguesError;
+      // State 3: Active user - load real data
+      if (userLeagueState === 'active-user' && user) {
+        try {
+          setLoading(true);
+          
+          // Get user's leagues
+          const { leagues: userLeagues, error: leaguesError } = await LeagueService.getUserLeagues(user.id);
+          if (leaguesError) throw leaguesError;
 
-        if (userLeagues.length === 0) {
-          // No leagues - show empty state or demo data
-          const demoTeams = LeagueService.getAllTeams();
-          const standingsTeams: StandingsTeam[] = demoTeams.map(t => ({
-            id: String(t.id),
-            name: t.name,
-            owner: t.owner,
-            logo: t.logo,
-            record: t.record,
-            points: t.points,
-            streak: t.streak,
-          }));
-          setTeams(standingsTeams);
-          setLoading(false);
-          return;
-        }
+          if (userLeagues.length === 0) {
+            // This shouldn't happen if userLeagueState is 'active-user', but handle gracefully
+            setTeams([]);
+            setLoading(false);
+            return;
+          }
 
         setLeagues(userLeagues);
         const leagueToUse = selectedLeagueId || userLeagues[0].id;
@@ -173,7 +170,7 @@ const Standings = () => {
     };
 
     loadStandings();
-  }, [user, selectedLeagueId, toast]);
+  }, [user, selectedLeagueId, toast, userLeagueState]);
 
   // Animation observer setup
   useEffect(() => {
@@ -222,13 +219,22 @@ const Standings = () => {
             <p className="text-lg text-muted-foreground">Track your team's position in the league rankings.</p>
           </div>
           
+          {userLeagueState === 'logged-in-no-league' && (
+            <div className="max-w-3xl mx-auto mb-12">
+              <LeagueCreationCTA 
+                title="Your Standings Awaits"
+                description="Create your league to start tracking your team's position, competing for the top spot, and climbing the rankings."
+              />
+            </div>
+          )}
+
           <div className="flex flex-col md:flex-row items-center justify-between max-w-5xl mx-auto mb-8">
             <div className="mb-4 md:mb-0 animated-element">
               <h2 className="text-2xl font-bold text-foreground">
-                {selectedLeague ? selectedLeague.name : 'CitrusSports League'}
+                {userLeagueState === 'active-user' && selectedLeague ? selectedLeague.name : 'CitrusSports League'}
               </h2>
               <p className="text-muted-foreground">Regular Season Standings</p>
-              {leagues.length > 1 && (
+              {userLeagueState === 'active-user' && leagues.length > 1 && (
                 <Select value={selectedLeagueId || ''} onValueChange={setSelectedLeagueId}>
                   <SelectTrigger className="w-64 mt-2">
                     <SelectValue placeholder="Select League" />

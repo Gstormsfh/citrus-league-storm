@@ -3,8 +3,11 @@ import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, closestCenter } 
 import { arrayMove } from '@dnd-kit/sortable';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLeague } from '@/contexts/LeagueContext';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
+import { LeagueCreationCTA, InlineCTA } from '@/components/LeagueCreationCTA';
+import { DemoDataService } from '@/services/DemoDataService';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -211,6 +214,7 @@ interface RosterState {
 
 const Roster = () => {
   const { user, profile } = useAuth();
+  const { userLeagueState, loading: leagueLoading, activeLeagueId } = useLeague();
   const { toast } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedPlayer, setSelectedPlayer] = useState<HockeyPlayer | null>(null);
@@ -298,6 +302,11 @@ const Roster = () => {
   // Fetch and adapt players from staging files (SINGLE SOURCE OF TRUTH)
   // Extract loadRoster so it can be called manually for refresh
   const loadRoster = useCallback(async (keepCurrentRoster = false) => {
+    // Wait for league context to finish loading before making decisions
+    if (user && leagueLoading) {
+      return; // Don't load roster until we know the user's league state
+    }
+
     // Only set loading if not keeping current roster (prevents flash during refresh)
     if (!keepCurrentRoster) {
       setLoading(true);
@@ -315,18 +324,28 @@ const Roster = () => {
         let teamId: string | number | null = null;
         let userTeamData: { id: string; league_id: string; team_name: string } | null = null;
 
-        if (!user) {
-          // Non-logged-in users see demo team (Team 3) from database
+        // State 1: Guest - show demo data
+        // State 2: Logged in, no league - show demo data (will show CTAs in UI)
+        // State 3: Active user - show real data
+        if (userLeagueState === 'guest' || userLeagueState === 'logged-in-no-league') {
+          // Show demo team (Team 3) from database
           dbPlayers = await LeagueService.getMyTeam(allPlayers);
           teamId = 3; // Demo team ID
           setUserTeamId(3);
-        } else {
-          // Logged-in users: Get their actual team from Supabase
-          const { data: teamData, error: teamError } = await supabase
+        } else if (userLeagueState === 'active-user' && user) {
+          // Logged-in users with leagues: Get their actual team from Supabase
+          // If activeLeagueId is set, prefer that league's team, otherwise get any team
+          let teamQuery = supabase
             .from('teams')
             .select('id, league_id, team_name')
-            .eq('owner_id', user.id)
-            .maybeSingle();
+            .eq('owner_id', user.id);
+          
+          // If we have an active league, prefer that team
+          if (activeLeagueId) {
+            teamQuery = teamQuery.eq('league_id', activeLeagueId);
+          }
+          
+          const { data: teamData, error: teamError } = await teamQuery.maybeSingle();
 
           if (teamError || !teamData) {
             // User doesn't have a team yet - show empty roster
@@ -621,7 +640,7 @@ const Roster = () => {
         // Always set loading to false at the end
         setLoading(false);
       }
-  }, [user, profile, toast]);
+  }, [user, profile, toast, userLeagueState, leagueLoading, activeLeagueId]);
 
   // Initial load on mount
   useEffect(() => {
@@ -1282,10 +1301,21 @@ const Roster = () => {
               </div>
 
               <div>
-                <Button onClick={handleAutoLineup} variant="outline" className="flex gap-2">
-                  <Wand2 className="w-4 h-4" />
-                  Auto Lineup
-                </Button>
+                {userLeagueState === 'active-user' ? (
+                  <Button onClick={handleAutoLineup} variant="outline" className="flex gap-2">
+                    <Wand2 className="w-4 h-4" />
+                    Auto Lineup
+                  </Button>
+                ) : userLeagueState === 'logged-in-no-league' ? (
+                  <Button onClick={() => window.location.href = '/create-league'} variant="default" className="flex gap-2">
+                    <Trophy className="w-4 h-4" />
+                    Create League
+                  </Button>
+                ) : (
+                  <Button onClick={() => window.location.href = '/auth'} variant="outline" className="flex gap-2">
+                    Sign In
+                  </Button>
+                )}
               </div>
             </div>
           </div>
@@ -1331,19 +1361,28 @@ const Roster = () => {
                     </ToggleGroup>
                 </div>
 
-                {loading ? (
+                {(loading || (user && leagueLoading)) ? (
                   <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
                     <Loader2 className="w-10 h-10 animate-spin mb-4 text-primary" />
                     <p>Loading your roster...</p>
                   </div>
-                ) : !userTeamId ? (
-                  <div className="flex flex-col items-center justify-center py-20 text-center">
-                    <Trophy className="w-16 h-16 text-muted-foreground mb-4 opacity-50" />
-                    <h3 className="text-xl font-semibold mb-2">No Team Yet</h3>
-                    <p className="text-muted-foreground mb-4">Join or create a league to start building your roster.</p>
-                    <Button asChild>
-                      <a href="/create-league">Create or Join a League</a>
-                    </Button>
+                ) : !userTeamId || userLeagueState === 'logged-in-no-league' ? (
+                  <div className="py-8">
+                    {userLeagueState === 'logged-in-no-league' ? (
+                      <LeagueCreationCTA 
+                        title="Your Roster Awaits"
+                        description="Create your league to start building your roster, making trades, and competing with friends."
+                      />
+                    ) : (
+                      <div className="flex flex-col items-center justify-center py-20 text-center">
+                        <Trophy className="w-16 h-16 text-muted-foreground mb-4 opacity-50" />
+                        <h3 className="text-xl font-semibold mb-2">No Team Yet</h3>
+                        <p className="text-muted-foreground mb-4">Join or create a league to start building your roster.</p>
+                        <Button asChild>
+                          <a href="/create-league">Create or Join a League</a>
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 ) : roster.starters.length === 0 && roster.bench.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-20 text-center">

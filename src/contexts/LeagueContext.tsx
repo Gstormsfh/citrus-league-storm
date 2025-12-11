@@ -3,6 +3,8 @@ import { useAuth } from './AuthContext';
 import { LeagueService, League } from '@/services/LeagueService';
 import { useSearchParams, useLocation } from 'react-router-dom';
 
+export type UserLeagueState = 'guest' | 'logged-in-no-league' | 'active-user';
+
 interface LeagueContextType {
   activeLeagueId: string | null;
   activeLeague: League | null;
@@ -11,6 +13,7 @@ interface LeagueContextType {
   loading: boolean;
   error: string | null;
   refreshLeagues: () => Promise<void>;
+  userLeagueState: UserLeagueState;
 }
 
 const LeagueContext = createContext<LeagueContextType | undefined>(undefined);
@@ -127,6 +130,18 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
     await loadUserLeagues();
   };
 
+  // Determine user league state
+  // If user has ANY leagues, they're an active user (activeLeagueId is just for navigation)
+  const userLeagueState: UserLeagueState = React.useMemo(() => {
+    if (!user) {
+      return 'guest';
+    }
+    if (userLeagues.length === 0) {
+      return 'logged-in-no-league';
+    }
+    return 'active-user';
+  }, [user, userLeagues.length]);
+
   // Load leagues on mount and when user changes
   useEffect(() => {
     loadUserLeagues();
@@ -152,6 +167,7 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
     loading,
     error,
     refreshLeagues,
+    userLeagueState,
   };
 
   return <LeagueContext.Provider value={value}>{children}</LeagueContext.Provider>;
