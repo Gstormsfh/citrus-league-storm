@@ -44,6 +44,7 @@ const Blog = lazyWithErrorHandling(() => import("./pages/Blog"));
 const Podcasts = lazyWithErrorHandling(() => import("./pages/Podcasts"));
 const Guides = lazyWithErrorHandling(() => import("./pages/Guides"));
 const Matchup = lazyWithErrorHandling(() => import("./pages/Matchup"));
+const PlayoffBracket = lazyWithErrorHandling(() => import("./pages/PlayoffBracket"));
 const FreeAgents = lazyWithErrorHandling(() => import("./pages/FreeAgents"));
 const GMOffice = lazyWithErrorHandling(() => import("./pages/GMOffice"));
 const StormyAssistant = lazyWithErrorHandling(() => import("./pages/StormyAssistant"));
@@ -121,7 +122,9 @@ const App = () => {
                 <Route path="/blog" element={<Blog />} />
                 <Route path="/podcasts" element={<Podcasts />} />
                 <Route path="/guides" element={<Guides />} />
-                <Route path="/matchup" element={<Matchup />} />
+                    <Route path="/matchup/:leagueId/:weekId?" element={<Matchup />} />
+                    <Route path="/matchup" element={<Matchup />} /> {/* Fallback for /matchup without params */}
+                    <Route path="/league/:leagueId/playoffs" element={<ProtectedRoute><PlayoffBracket /></ProtectedRoute>} />
                 <Route path="/free-agents" element={<FreeAgents />} />
                 <Route path="/gm-office" element={<GMOffice />} />
                 <Route path="/gm-office/stormy" element={<StormyAssistant />} />

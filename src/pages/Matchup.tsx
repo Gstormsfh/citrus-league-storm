@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from '@/contexts/AuthContext';
 import { useLeague } from '@/contexts/LeagueContext';
 import Navbar from '../components/Navbar';
@@ -7,23 +8,33 @@ import { LeagueCreationCTA } from '@/components/LeagueCreationCTA';
 import { DemoDataService } from '@/services/DemoDataService';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TeamCard } from "@/components/matchup/TeamCard";
+import { MatchupComparison } from "@/components/matchup/MatchupComparison";
+import { MatchupScheduleSelector } from "@/components/matchup/MatchupScheduleSelector";
 import { ScoreCard } from "@/components/matchup/ScoreCard";
 import { DailyPointsChart } from "@/components/matchup/DailyPointsChart";
 import { MatchupHistory } from "@/components/matchup/MatchupHistory";
 import { LiveUpdates } from "@/components/matchup/LiveUpdates";
+import LeagueNotifications from "@/components/matchup/LeagueNotifications";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { MatchupPlayer } from "@/components/matchup/types";
 import { HockeyPlayer } from '@/components/roster/HockeyPlayerCard';
 import PlayerStatsModal from '@/components/PlayerStatsModal';
 import { LeagueService, League, Team } from '@/services/LeagueService';
 import { MatchupService, Matchup } from '@/services/MatchupService';
 import { PlayerService } from '@/services/PlayerService';
-import { getDraftCompletionDate, getFirstWeekStartDate, getCurrentWeekNumber, getAvailableWeeks, getWeekLabel } from '@/utils/weekCalculator';
+import { getDraftCompletionDate, getFirstWeekStartDate, getCurrentWeekNumber, getAvailableWeeks, getWeekLabel, getWeekDateLabel } from '@/utils/weekCalculator';
 import { Loader2 } from 'lucide-react';
+import LoadingScreen from '@/components/LoadingScreen';
 
 const Matchup = () => {
   const { user, profile } = useAuth();
   const { userLeagueState } = useLeague();
+  const { leagueId: urlLeagueId, weekId: urlWeekId } = useParams<{ leagueId?: string; weekId?: string }>();
+  const navigate = useNavigate();
+  
+  // Debug: Log URL parameters
+  console.log('[Matchup] URL parameters:', { urlLeagueId, urlWeekId });
   const [activeTab, setActiveTab] = useState("lineup");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -239,24 +250,45 @@ const Matchup = () => {
     }
 
     const loadMatchupData = async () => {
-      // Clear roster cache to ensure fresh data when navigating from roster page
-      MatchupService.clearRosterCache();
       try {
         setLoading(true);
         setError(null);
 
-        // Get user's leagues
-        const { leagues: userLeagues, error: leaguesError } = await LeagueService.getUserLeagues(user.id);
-        if (leaguesError) throw leaguesError;
+        // Determine which league to use (from URL or first available)
+        let targetLeagueId = urlLeagueId;
+        
+        if (!targetLeagueId) {
+          // Get user's leagues if no leagueId in URL
+          const { leagues: userLeagues, error: leaguesError } = await LeagueService.getUserLeagues(user.id);
+          if (leaguesError) throw leaguesError;
 
-        if (userLeagues.length === 0) {
-          setError('You are not in any leagues');
+          if (userLeagues.length === 0) {
+            setError('You are not in any leagues');
+            setLoading(false);
+            return;
+          }
+
+          // Use first league and redirect to URL with leagueId
+          const currentLeague = userLeagues[0];
+          targetLeagueId = currentLeague.id;
+          
+          // Redirect to URL with leagueId (and weekId if available)
+          const weekParam = urlWeekId ? `/${urlWeekId}` : '';
+          navigate(`/matchup/${targetLeagueId}${weekParam}`, { replace: true });
+          return;
+        }
+
+        // Get league data
+        const { leagues: userLeagues, error: leagueError } = await LeagueService.getUserLeagues(user.id);
+        if (leagueError) throw leagueError;
+        
+        const currentLeague = userLeagues.find((l: League) => l.id === targetLeagueId);
+        if (!currentLeague) {
+          setError('League not found');
           setLoading(false);
           return;
         }
 
-        // Use first league (or allow selection later)
-        const currentLeague = userLeagues[0];
         setLeague(currentLeague);
 
         // Check if draft is completed
@@ -289,19 +321,121 @@ const Matchup = () => {
         // Get available weeks
         const currentYear = new Date().getFullYear();
         const weeks = getAvailableWeeks(firstWeek, currentYear);
+        console.log(`[Matchup] Calculated ${weeks.length} available weeks:`, weeks);
         setAvailableWeeks(weeks);
 
-        // Get current week number
-        const currentWeek = getCurrentWeekNumber(firstWeek);
-        const weekToShow = weeks.includes(currentWeek) ? currentWeek : weeks[0] || 1;
+        // Determine which week to show (from URL or current week)
+        let weekToShow: number;
+        if (urlWeekId) {
+          weekToShow = parseInt(urlWeekId);
+          if (isNaN(weekToShow) || !weeks.includes(weekToShow)) {
+            // Invalid week in URL, use current week
+            const currentWeek = getCurrentWeekNumber(firstWeek);
+            weekToShow = weeks.includes(currentWeek) ? currentWeek : weeks[0] || 1;
+            navigate(`/matchup/${targetLeagueId}/${weekToShow}`, { replace: true });
+          }
+        } else {
+          // No week in URL, use current week
+          const currentWeek = getCurrentWeekNumber(firstWeek);
+          weekToShow = weeks.includes(currentWeek) ? currentWeek : weeks[0] || 1;
+          navigate(`/matchup/${targetLeagueId}/${weekToShow}`, { replace: true });
+        }
+
         setSelectedWeek(weekToShow);
 
-        // Generate matchups if they don't exist
-        const { teams: leagueTeams } = await LeagueService.getLeagueTeams(currentLeague.id);
-        await MatchupService.generateMatchupsForLeague(currentLeague.id, leagueTeams, firstWeek);
+        // Quick check: Does a matchup exist for this week? If yes, skip generation entirely
+        const { matchup: existingMatchup } = await MatchupService.getUserMatchup(
+          currentLeague.id,
+          user.id,
+          weekToShow
+        );
+        
+        if (!existingMatchup) {
+          // Only generate matchups if they don't exist for this week
+          console.log('[Matchup] No matchup found for week', weekToShow, '- generating matchups for entire season...');
+          const { teams: leagueTeams } = await LeagueService.getLeagueTeams(currentLeague.id);
+          
+          // For existing leagues that were drafted before this update, generate ALL weeks
+          // Check if this is an existing league with no matchups (drafted before auto-generation)
+          const { matchup: week1Matchup } = await MatchupService.getMatchup(currentLeague.id, 1);
+          
+          const hasAnyMatchups = week1Matchup !== null;
+          
+          // If no matchups exist at all, generate for all available weeks (complete season)
+          // Otherwise, just generate missing weeks
+          const { error: genError } = await MatchupService.generateMatchupsForLeague(
+            currentLeague.id, 
+            leagueTeams, 
+            firstWeek,
+            !hasAnyMatchups // Force regenerate if no matchups exist (existing league fix)
+          );
+          if (genError) {
+            console.error('[Matchup] Error generating matchups:', genError);
+            // Don't throw - continue to try loading the matchup anyway
+          } else {
+            console.log('[Matchup] Matchup generation completed successfully');
+          }
+        } else {
+          console.log('[Matchup] Matchup already exists for week', weekToShow, '- skipping generation');
+        }
 
-        // Load matchup for selected week (pass userTeamData to avoid race condition)
-        await loadMatchupForWeek(currentLeague.id, user.id, weekToShow, firstWeek, userTeamData);
+        // Load matchup data using unified method
+        const userTimezone = profile?.timezone || 'America/Denver';
+        console.log('[Matchup] Calling getMatchupData with:', {
+          leagueId: targetLeagueId,
+          userId: user.id,
+          weekNumber: weekToShow,
+          timezone: userTimezone
+        });
+        const { data: matchupData, error: matchupError } = await MatchupService.getMatchupData(
+          targetLeagueId,
+          user.id,
+          weekToShow,
+          userTimezone
+        );
+
+        if (matchupError) {
+          console.error('[Matchup] Error getting matchup data:', matchupError);
+          // If it's a "no matchup found" error, the matchups may not have been generated yet
+          if (matchupError.message?.includes('No matchup found')) {
+            console.log('[Matchup] No matchup found for week', weekToShow, '- matchups may need to be generated');
+            setError(`No matchup found for week ${weekToShow}. Please try refreshing the page.`);
+            setLoading(false);
+            return;
+          }
+          throw matchupError;
+        }
+        if (!matchupData) {
+          setError(`No matchup found for week ${weekToShow}`);
+          setLoading(false);
+          return;
+        }
+
+        // Check if this is a playoff week and redirect
+        if (matchupData.isPlayoffWeek) {
+          navigate(`/league/${targetLeagueId}/playoffs`);
+          return;
+        }
+
+        // Set state from unified data
+        setCurrentMatchup(matchupData.matchup);
+        setMyTeam(matchupData.userTeam.roster);
+        setOpponentTeamPlayers(matchupData.opponentTeam?.roster || []);
+        setMyTeamSlotAssignments(matchupData.userTeam.slotAssignments);
+        setOpponentTeamSlotAssignments(matchupData.opponentTeam?.slotAssignments || {});
+        setMyTeamRecord(matchupData.userTeam.record);
+        setOpponentTeamRecord(matchupData.opponentTeam?.record || { wins: 0, losses: 0 });
+        setMyDailyPoints(matchupData.userTeam.dailyPoints);
+        setOpponentDailyPoints(matchupData.opponentTeam?.dailyPoints || []);
+
+        // Get opponent team object for display
+        if (matchupData.opponentTeam) {
+          const { teams } = await LeagueService.getLeagueTeams(targetLeagueId);
+          const oppTeam = teams.find(t => t.id === matchupData.opponentTeam!.id);
+          setOpponentTeam(oppTeam || null);
+        } else {
+          setOpponentTeam(null);
+        }
 
       } catch (err: any) {
         console.error('Error loading matchup data:', err);
@@ -312,251 +446,88 @@ const Matchup = () => {
     };
 
     loadMatchupData();
-  }, [user]);
+  }, [user, userLeagueState, urlLeagueId, urlWeekId, navigate, profile]);
 
   // Refresh matchup when page becomes visible (e.g., navigating back from roster page)
   useEffect(() => {
-    if (!user || !league || !firstWeekStart || !userTeam) return;
+    if (!user || !league || !userTeam || !urlLeagueId || !urlWeekId) return;
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
-        // Page became visible - refresh matchup to get latest lineup changes
+        // Page became visible - clear cache and reload by triggering URL change
         console.log('[Matchup] Page visible, refreshing matchup data...');
         MatchupService.clearRosterCache(userTeam.id, league.id);
-        loadMatchupForWeek(league.id, user.id, selectedWeek, firstWeekStart, userTeam).catch(err => {
-          console.error('Error refreshing matchup:', err);
-        });
+        // Trigger reload by navigating to same URL
+        navigate(`/matchup/${urlLeagueId}/${urlWeekId}`, { replace: true });
       }
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [user, league, firstWeekStart, userTeam, selectedWeek]);
+  }, [user, league, userTeam, urlLeagueId, urlWeekId, navigate]);
 
-  const loadMatchupForWeek = async (leagueId: string, userId: string, weekNumber: number, firstWeekStart: Date, userTeamData?: Team) => {
-    try {
-      // Use passed userTeamData or fall back to state
-      const effectiveUserTeam = userTeamData || userTeam;
-      
-      // Get matchup for this week
-      const { matchup, error: matchupError } = await MatchupService.getUserMatchup(leagueId, userId, weekNumber);
-      if (matchupError) throw matchupError;
 
-      if (!matchup) {
-        setError(`No matchup found for week ${weekNumber}`);
-        return;
-      }
-
-      // Store current matchup for daily points calculation
-      setCurrentMatchup(matchup);
-
-      // Validate: Ensure team1_id !== team2_id (prevent duplicate teams)
-      if (matchup.team2_id && matchup.team1_id === matchup.team2_id) {
-        setError(`Invalid matchup: Both teams are the same (${matchup.team1_id}). Please contact the commissioner to fix this matchup.`);
-        return;
-      }
-
-      // Determine which team the user is (team1 or team2)
-      const isTeam1 = matchup.team1_id === effectiveUserTeam?.id;
-      const opponentTeamId = isTeam1 ? matchup.team2_id : matchup.team1_id;
-      
-      // Get opponent team object - this is the actual opponent, never swapped
-      let opponentTeamObj: Team | null = null;
-      if (opponentTeamId) {
-        const { teams } = await LeagueService.getLeagueTeams(leagueId);
-        opponentTeamObj = teams.find(t => t.id === opponentTeamId) || null;
-      }
-      
-      // DEBUG: Log team identification
-      console.log('Matchup team identification:', {
-        userTeamId: effectiveUserTeam?.id,
-        userTeamName: effectiveUserTeam?.team_name,
-        matchupTeam1Id: matchup.team1_id,
-        matchupTeam2Id: matchup.team2_id,
-        isTeam1,
-        opponentTeamId,
-        opponentTeamName: opponentTeamObj?.team_name
-      });
-      
-      // Validate: Ensure opponentTeam is different from userTeam
-      if (opponentTeamObj && effectiveUserTeam && opponentTeamObj.id === effectiveUserTeam.id) {
-        console.error('ERROR: Opponent team is the same as user team!', {
-          userTeamId: effectiveUserTeam.id,
-          userTeamName: effectiveUserTeam.team_name,
-          opponentTeamId: opponentTeamObj.id,
-          opponentTeamName: opponentTeamObj.team_name
-        });
-        setError('Invalid matchup: Opponent team cannot be the same as your team.');
-        return;
-      }
-      
-      // ALWAYS set opponentTeam to the actual opponent (not swapped)
-      // userTeam is already set correctly (always the user's team, never swapped)
-      setOpponentTeam(opponentTeamObj);
-
-      // Load all players
-      const allPlayers = await PlayerService.getAllPlayers();
-
-      // Get rosters for both teams with slot assignments
-      // Get user timezone from profile (default to Mountain Time)
-      const userTimezone = profile?.timezone || 'America/Denver';
-      const { 
-        team1Roster, 
-        team2Roster, 
-        team1SlotAssignments, 
-        team2SlotAssignments, 
-        error: rostersError 
-      } = await MatchupService.getMatchupRosters(matchup, allPlayers, userTimezone);
-      
-      if (rostersError) {
-        // Provide helpful error message
-        const errorMessage = rostersError.message || 'Failed to load matchup rosters';
-        if (errorMessage.includes('no lineup')) {
-          setError(`${errorMessage}. Rosters may need to be initialized. Please ensure the draft is completed and rosters are set up.`);
-        } else {
-          setError(errorMessage);
-        }
-        return;
-      }
-
-      // CRITICAL: ALWAYS ensure user's team data is in myTeam/myStarters/myBench (LEFT side)
-      // and opponent's team data is in opponentTeamPlayers/opponentStarters/opponentBench (RIGHT side)
-      // This ensures consistent display regardless of whether user is team1 or team2
-      if (isTeam1) {
-        // User is team1 - team1 data goes to myTeam (left), team2 data goes to opponent (right)
-        setMyTeam(team1Roster);
-        setOpponentTeamPlayers(team2Roster);
-        setMyTeamSlotAssignments(team1SlotAssignments);
-        setOpponentTeamSlotAssignments(team2SlotAssignments);
-      } else {
-        // User is team2 - swap rosters so user's team (team2) goes to myTeam (left)
-        // and opponent (team1) goes to opponentTeamPlayers (right)
-        setMyTeam(team2Roster);
-        setOpponentTeamPlayers(team1Roster);
-        setMyTeamSlotAssignments(team2SlotAssignments);
-        setOpponentTeamSlotAssignments(team1SlotAssignments);
-      }
-
-      // Get team records from matchup history
-      // Always fetch records for user's team and opponent team (correctly identified above)
-      if (effectiveUserTeam) {
-        const myRecord = await MatchupService.getTeamRecord(effectiveUserTeam.id, leagueId);
-        setMyTeamRecord(myRecord);
-      }
-      if (opponentTeamObj) {
-        const oppRecord = await MatchupService.getTeamRecord(opponentTeamObj.id, leagueId);
-        setOpponentTeamRecord(oppRecord);
-      } else {
-        // Bye week - set default record
-        setOpponentTeamRecord({ wins: 0, losses: 0 });
-      }
-
-      // Calculate daily points if matchup has data
-      const matchupStatus = matchup.status;
-      const team1Score = parseFloat(String(matchup.team1_score)) || 0;
-      const team2Score = parseFloat(String(matchup.team2_score)) || 0;
-      const hasScores = team1Score > 0 || team2Score > 0;
-      const shouldCalculatePoints = (matchupStatus === 'in_progress' || matchupStatus === 'completed') && hasScores;
-
-      if (shouldCalculatePoints) {
-        // For now, distribute points evenly across the week
-        // TODO: Implement actual daily calculation based on game schedules
-        const myTotalPoints = isTeam1 ? team1Score : team2Score;
-        const oppTotalPoints = isTeam1 ? team2Score : team1Score;
-        
-        // Simple distribution: divide by 7 days
-        const myDaily = Array(7).fill(myTotalPoints / 7);
-        const oppDaily = Array(7).fill(oppTotalPoints / 7);
-        
-        setMyDailyPoints(myDaily);
-        setOpponentDailyPoints(oppDaily);
-      } else {
-        // No data yet - set empty arrays
-        setMyDailyPoints([]);
-        setOpponentDailyPoints([]);
-      }
-
-    } catch (err: any) {
-      console.error('Error loading matchup for week:', err);
-      setError(err.message || 'Failed to load matchup');
+  // Handle week selection - updates URL which triggers data reload
+  const handleWeekChange = (weekNumber: number) => {
+    if (!league) {
+      console.warn('[Matchup] handleWeekChange called but league is not set');
+      return;
     }
-  };
-
-  // Handle week selection
-  const handleWeekChange = async (weekNumber: number) => {
-    if (!league || !user || !firstWeekStart) return;
-    setSelectedWeek(weekNumber);
-    // Clear cache before loading to ensure fresh lineup data
-    if (userTeam) {
-      MatchupService.clearRosterCache(userTeam.id, league.id);
-    }
-    await loadMatchupForWeek(league.id, user.id, weekNumber, firstWeekStart, userTeam);
+    console.log('[Matchup] handleWeekChange called, navigating to week:', weekNumber, 'for league:', league.id);
+    // Update URL, which will trigger useEffect to reload data
+    navigate(`/matchup/${league.id}/${weekNumber}`);
   };
   
   // Refresh matchup data (useful after making lineup changes on roster page)
-  const refreshMatchup = async () => {
-    if (!league || !user || !firstWeekStart || !userTeam) return;
+  const refreshMatchup = () => {
+    if (!league || !userTeam || !urlLeagueId || !urlWeekId) return;
     // Clear all caches to force fresh data
     MatchupService.clearRosterCache();
-    await loadMatchupForWeek(league.id, user.id, selectedWeek, firstWeekStart, userTeam);
+    // Reload by navigating to same URL
+    navigate(`/matchup/${urlLeagueId}/${urlWeekId}`, { replace: true });
   };
 
   return (
-    <div className="min-h-screen bg-background relative overflow-hidden">
+    <div className="min-h-screen bg-background relative overflow-hidden w-full">
       {/* Decorative elements to match Home page */}
       <div className="absolute top-0 right-0 w-96 h-96 bg-[hsl(var(--vibrant-yellow))] rounded-full opacity-10 blur-3xl -z-10"></div>
       <div className="absolute bottom-0 left-0 w-96 h-96 bg-[hsl(var(--vibrant-green))] rounded-full opacity-10 blur-3xl -z-10"></div>
 
       <Navbar />
-      <main className="container mx-auto px-4 pt-28 pb-16">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
-             <div>
-               <h1 className="text-4xl font-bold mb-2 citrus-gradient-text">Matchup</h1>
-               {loading ? (
-                 <p className="text-muted-foreground text-lg">Loading...</p>
-               ) : error ? (
-                 <p className="text-destructive text-lg">{error}</p>
-               ) : userLeagueState === 'active-user' && firstWeekStart ? (
-                 <p className="text-muted-foreground text-lg">
-                   {getWeekLabel(selectedWeek, firstWeekStart)} • {userTeam?.team_name || 'My Team'} vs {opponentTeam?.team_name || 'Bye Week'}
-                 </p>
-               ) : (
-                 <p className="text-muted-foreground text-lg">Week 12 • Citrus Crushers vs Thunder Titans</p>
-               )}
-             </div>
-             {userLeagueState === 'active-user' && availableWeeks.length > 0 && (
-               <div className="flex gap-2 flex-wrap">
-                 {availableWeeks.map((week) => (
-                   <Button
-                     key={week}
-                     variant={week === selectedWeek ? "default" : "outline"}
-                     className={`rounded-full ${week === selectedWeek ? 'bg-primary hover:bg-primary/90 text-white shadow-md' : 'border-primary/20 hover:bg-primary/5 hover:text-primary'}`}
-                     onClick={() => handleWeekChange(week)}
-                   >
-                     {firstWeekStart ? getWeekLabel(week, firstWeekStart).split(' • ')[0] : `Week ${week}`}
-                   </Button>
-                 ))}
-               </div>
-             )}
-             {(userLeagueState === 'guest' || userLeagueState === 'logged-in-no-league') && (
-               <div className="flex gap-2">
-                 <Button variant="outline" className="rounded-full border-primary/20 hover:bg-primary/5 hover:text-primary">Week 11</Button>
-                 <Button className="rounded-full bg-primary hover:bg-primary/90 text-white shadow-md">Week 12</Button>
-                 <Button variant="outline" className="rounded-full border-primary/20 hover:bg-primary/5 hover:text-primary">Week 13</Button>
-               </div>
-             )}
-          </div>
+      <main className="w-full pt-28 pb-16 m-0 p-0">
+        <div className="w-full m-0 p-0">
+          {/* Sidebar, Content, and Notifications Grid - Sidebar at bottom on mobile, left on desktop; Notifications on right on desktop */}
+          <div className="flex flex-col lg:grid lg:grid-cols-[240px_1fr_300px] gap-6 lg:gap-8">
+            {/* Main Content - Scrollable - Full Width - Appears first on mobile */}
+            <div className="min-w-0 max-h-[calc(100vh-12rem)] overflow-y-auto px-2 lg:px-4 order-1 lg:order-2">
+              {/* Header Section - Clean and Professional with Citrus Colors */}
+              <div className="mb-6">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+                  {/* Week Selector */}
+                  {userLeagueState === 'active-user' && availableWeeks.length > 0 && firstWeekStart && (
+                    <MatchupScheduleSelector
+                      currentWeek={selectedWeek}
+                      scheduleLength={availableWeeks.length}
+                      availableWeeks={availableWeeks}
+                      onWeekChange={handleWeekChange}
+                      firstWeekStart={firstWeekStart}
+                    />
+                  )}
+                  {(userLeagueState === 'guest' || userLeagueState === 'logged-in-no-league') && (
+                    <div className="flex gap-1.5 bg-primary/10 p-1 rounded-lg border border-primary/20 flex-wrap">
+                      <Button variant="ghost" size="sm" className="h-8 px-3 text-xs font-medium text-muted-foreground hover:text-fantasy-primary hover:bg-fantasy-primary/10">Dec 1-7</Button>
+                      <Button variant="ghost" size="sm" className="h-8 px-3 text-xs font-medium bg-fantasy-primary text-white shadow-sm hover:bg-fantasy-primary/90">Dec 8-14</Button>
+                      <Button variant="ghost" size="sm" className="h-8 px-3 text-xs font-medium text-muted-foreground hover:text-fantasy-primary hover:bg-fantasy-primary/10">Dec 15-21</Button>
+                    </div>
+                  )}
+                </div>
+              </div>
           
           {loading && (
-            <div className="flex items-center justify-center py-20">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              <p className="ml-3 text-muted-foreground">
-                {userLeagueState === 'guest' || userLeagueState === 'logged-in-no-league' 
-                  ? 'Loading demo matchup...' 
-                  : 'Loading matchup...'}
-              </p>
-            </div>
+            <LoadingScreen
+              character="citrus"
+              message="Loading NHL Matchups..."
+            />
           )}
           
           {!loading && error && userLeagueState === 'active-user' && (
@@ -590,69 +561,51 @@ const Matchup = () => {
             opponentTeamPoints={opponentTeamPoints}
           />
           
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-8">
-            <TabsList className="w-full justify-start border-b bg-transparent p-0 rounded-none h-auto gap-6">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
+            <TabsList className="w-full justify-start border-b-2 border-primary/20 bg-transparent p-0 rounded-none h-auto gap-1">
               <TabsTrigger 
                 value="lineup" 
-                className="rounded-none border-b-2 border-transparent px-4 py-3 text-muted-foreground data-[state=active]:border-fantasy-secondary data-[state=active]:text-fantasy-secondary data-[state=active]:bg-transparent data-[state=active]:shadow-none transition-all hover:text-fantasy-secondary/80"
+                className="rounded-t-md border-b-3 border-transparent px-4 py-2.5 text-sm font-medium text-muted-foreground data-[state=active]:border-fantasy-primary data-[state=active]:text-fantasy-primary data-[state=active]:bg-transparent transition-all hover:text-fantasy-primary/80"
               >
                 Lineup
               </TabsTrigger>
               <TabsTrigger 
                 value="dailyPoints" 
-                className="rounded-none border-b-2 border-transparent px-4 py-3 text-muted-foreground data-[state=active]:border-fantasy-secondary data-[state=active]:text-fantasy-secondary data-[state=active]:bg-transparent data-[state=active]:shadow-none transition-all hover:text-fantasy-secondary/80"
+                className="rounded-t-md border-b-3 border-transparent px-4 py-2.5 text-sm font-medium text-muted-foreground data-[state=active]:border-fantasy-secondary data-[state=active]:text-fantasy-secondary data-[state=active]:bg-transparent transition-all hover:text-fantasy-secondary/80"
               >
                 Daily Points
               </TabsTrigger>
               <TabsTrigger 
                 value="matchupHistory" 
-                className="rounded-none border-b-2 border-transparent px-4 py-3 text-muted-foreground data-[state=active]:border-fantasy-secondary data-[state=active]:text-fantasy-secondary data-[state=active]:bg-transparent data-[state=active]:shadow-none transition-all hover:text-fantasy-secondary/80"
+                className="rounded-t-md border-b-3 border-transparent px-4 py-2.5 text-sm font-medium text-muted-foreground data-[state=active]:border-fantasy-tertiary data-[state=active]:text-fantasy-tertiary data-[state=active]:bg-transparent transition-all hover:text-fantasy-tertiary/80"
               >
                 History
               </TabsTrigger>
             </TabsList>
             
-            <TabsContent value="lineup" className="mt-6">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                {/* User's Team - Always on the LEFT - First in DOM order */}
-                <div className="order-1 lg:order-1">
-                {userLeagueState === 'logged-in-no-league' ? (
+            <TabsContent value="lineup" className="mt-6 matchup-wrapper" style={{ boxSizing: 'border-box', padding: 0, margin: 0 }}>
+              {userLeagueState === 'logged-in-no-league' ? (
+                <div className="grid gap-6 lg:gap-8 matchup-grid" style={{ gridTemplateColumns: '1fr 1fr', width: '100%', display: 'grid', boxSizing: 'border-box', margin: 0, padding: 0 }}>
                   <LeagueCreationCTA 
                     title="Your Team Here"
                     description="Create your league to start building your roster and competing in matchups."
                     variant="compact"
                   />
-                ) : (
-                  <TeamCard
-                    title={userLeagueState === 'active-user' ? (userTeam?.team_name || 'My Team') : 'Citrus Crushers'}
-                    starters={myStarters}
-                    bench={myBench}
-                    slotAssignments={displayMyTeamSlotAssignments}
-                    gradientClass="border-t-4 border-fantasy-secondary"
-                    onPlayerClick={handlePlayerClick}
-                  />
-                )}
-                </div>
-                {/* Opponent Team - Always on the RIGHT - Second in DOM order */}
-                <div className="order-2 lg:order-2">
-                {userLeagueState === 'logged-in-no-league' ? (
                   <LeagueCreationCTA 
                     title="Opponent Team"
                     description="Create your league to see your matchups and compete against other teams."
                     variant="compact"
                   />
-                ) : (
-                  <TeamCard
-                    title={userLeagueState === 'active-user' ? (opponentTeam?.team_name || 'Bye Week') : 'Thunder Titans'}
-                    starters={opponentStarters}
-                    bench={opponentBench}
-                    slotAssignments={displayOpponentTeamSlotAssignments}
-                    gradientClass="border-t-4 border-fantasy-primary"
-                    onPlayerClick={handlePlayerClick}
-                  />
-                )}
                 </div>
-              </div>
+              ) : (
+                <MatchupComparison
+                  userStarters={myStarters}
+                  opponentStarters={opponentStarters}
+                  userSlotAssignments={displayMyTeamSlotAssignments}
+                  opponentSlotAssignments={displayOpponentTeamSlotAssignments}
+                  onPlayerClick={handlePlayerClick}
+                />
+              )}
             </TabsContent>
             
             <TabsContent value="dailyPoints" className="mt-8">
@@ -679,6 +632,79 @@ const Matchup = () => {
           <LiveUpdates updates={updates} />
             </>
           )}
+            </div>
+
+            {/* Sidebar - At bottom on mobile, left on desktop - World-Class Ad Space */}
+            <aside className="w-full lg:w-auto order-2 lg:order-1">
+              <div className="lg:sticky lg:top-32 space-y-4 lg:space-y-6">
+                {/* Matchup Options Section */}
+                <div className="bg-card border rounded-lg p-4 shadow-sm">
+                  <h3 className="text-sm font-semibold mb-3 text-foreground">Matchup Options</h3>
+                  <div className="space-y-2">
+                    <button className="w-full text-left px-3 py-2 text-sm rounded-md hover:bg-muted transition-colors">
+                      View Full Stats
+                    </button>
+                    <button className="w-full text-left px-3 py-2 text-sm rounded-md hover:bg-muted transition-colors">
+                      Compare Teams
+                    </button>
+                    <button className="w-full text-left px-3 py-2 text-sm rounded-md hover:bg-muted transition-colors">
+                      Export Matchup
+                    </button>
+                  </div>
+                </div>
+
+                {/* Ad Placeholder 1 - Mobile Optimized */}
+                <div className="bg-muted/30 border border-dashed border-muted-foreground/20 rounded-lg p-6 flex flex-col items-center justify-center min-h-[180px] lg:min-h-[200px]">
+                  <div className="text-muted-foreground text-xs text-center space-y-2">
+                    <div className="w-12 h-12 mx-auto bg-muted rounded flex items-center justify-center mb-2">
+                      <span className="text-2xl">📢</span>
+                    </div>
+                    <p className="font-medium">Ad Space</p>
+                    <p className="text-xs opacity-70">300x250</p>
+                  </div>
+                </div>
+
+                {/* Quick Stats Placeholder */}
+                <div className="bg-card border rounded-lg p-4 shadow-sm">
+                  <h3 className="text-sm font-semibold mb-3 text-foreground">Quick Stats</h3>
+                  <div className="space-y-3 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Projected</span>
+                      <span className="font-semibold">142.5</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Best Player</span>
+                      <span className="font-semibold">Connor McDavid</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Matchup %</span>
+                      <span className="font-semibold text-primary">52%</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Ad Placeholder 2 - Mobile Optimized */}
+                <div className="bg-muted/30 border border-dashed border-muted-foreground/20 rounded-lg p-6 flex flex-col items-center justify-center min-h-[180px] lg:min-h-[200px]">
+                  <div className="text-muted-foreground text-xs text-center space-y-2">
+                    <div className="w-12 h-12 mx-auto bg-muted rounded flex items-center justify-center mb-2">
+                      <span className="text-2xl">📢</span>
+                    </div>
+                    <p className="font-medium">Ad Space</p>
+                    <p className="text-xs opacity-70">300x250</p>
+                  </div>
+                </div>
+              </div>
+            </aside>
+
+            {/* Notifications Panel - Right side on desktop, hidden on mobile */}
+            {userLeagueState === 'active-user' && league?.id && (
+              <aside className="hidden lg:block order-3">
+                <div className="lg:sticky lg:top-32 h-[calc(100vh-12rem)] bg-card border rounded-lg shadow-sm overflow-hidden">
+                  <LeagueNotifications leagueId={league.id} />
+                </div>
+              </aside>
+            )}
+          </div>
         </div>
         
         <PlayerStatsModal

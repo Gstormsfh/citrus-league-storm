@@ -63,11 +63,11 @@ export default {
 					border: 'hsl(var(--sidebar-border))',
 					ring: 'hsl(var(--sidebar-ring))'
 				},
-				// Citrus fantasy sports theme colors
+				// Citrus fantasy sports theme colors - Soft colorful versions
 				fantasy: {
-					primary: '#FF7A00',     // Bright orange
-					secondary: '#7CB518',   // Lime green
-					tertiary: '#FFB700',    // Golden yellow
+					primary: '#FFA366',     // Soft orange (more colorful than pastel)
+					secondary: '#9BCF4A',   // Soft lime green (more colorful)
+					tertiary: '#FFCC33',    // Soft golden yellow (more colorful)
 					light: '#FFF1DB',      // Light cream
 					dark: '#1E293B',       // Slate dark
 					muted: '#94A3B8',      // Slate gray

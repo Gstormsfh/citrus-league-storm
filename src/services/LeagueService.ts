@@ -1314,11 +1314,19 @@ export const LeagueService = {
         const key = `lineup_team_${teamId}`;
         localStorage.removeItem(key);
         console.log('[getLineup] Loaded from Supabase, cleared stale localStorage');
+        
+        // Normalize slot assignment keys to strings for consistency
+        const rawSlotAssignments = (data.slot_assignments || {}) as Record<string | number, string>;
+        const normalizedSlotAssignments: Record<string, string> = {};
+        Object.entries(rawSlotAssignments).forEach(([playerId, slotId]) => {
+          normalizedSlotAssignments[String(playerId)] = slotId;
+        });
+        
         return {
           starters: (data.starters || []) as string[],
           bench: (data.bench || []) as string[],
           ir: (data.ir || []) as string[],
-          slotAssignments: (data.slot_assignments || {}) as Record<string, string>
+          slotAssignments: normalizedSlotAssignments
         };
       }
       

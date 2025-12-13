@@ -242,5 +242,132 @@ export const PlayerService = {
     const all = await this.getAllPlayers();
     const lowerQuery = query.toLowerCase();
     return all.filter(p => p.full_name.toLowerCase().includes(lowerQuery));
+  },
+
+  /**
+   * Get players by their IDs - optimized to only load specific players
+   * This is more efficient than loading all players and filtering
+   */
+  async getPlayersByIds(playerIds: string[]): Promise<Player[]> {
+    if (playerIds.length === 0) return [];
+    
+    try {
+      // Fetch skaters
+      const { data: skaters, error: skaterError } = await supabase
+        .from('staging_2025_skaters')
+        .select('*')
+        .eq('situation', 'all')
+        .in('playerId', playerIds.map(id => parseInt(id)).filter(id => !isNaN(id)));
+      
+      if (skaterError) throw skaterError;
+
+      // Fetch goalies
+      const { data: goalies, error: goalieError } = await supabase
+        .from('staging_2025_goalies')
+        .select('*')
+        .eq('situation', 'all')
+        .in('playerId', playerIds.map(id => parseInt(id)).filter(id => !isNaN(id)));
+      
+      if (goalieError) throw goalieError;
+
+      // Map skaters (same mapping logic as getAllPlayers)
+      const mappedSkaters = (skaters || []).map((s: any) => {
+        if (!s.playerId) return null;
+        const pri = typeof s.I_F_primaryAssists === 'string' ? parseFloat(s.I_F_primaryAssists) : (s.I_F_primaryAssists || 0);
+        const sec = typeof s.I_F_secondaryAssists === 'string' ? parseFloat(s.I_F_secondaryAssists) : (s.I_F_secondaryAssists || 0);
+        const totalAssists = pri + sec;
+
+        return {
+          id: s.playerId.toString(),
+          full_name: s.name,
+          position: s.position,
+          team: s.team,
+          jersey_number: null,
+          status: 'active',
+          headshot_url: `https://assets.nhle.com/mugs/nhl/20242025/${s.team}/${s.playerId}.png`,
+          last_updated: new Date().toISOString(),
+          games_played: typeof s.games_played === 'string' ? parseInt(s.games_played) : (s.games_played || 0),
+          goals: typeof s.I_F_goals === 'string' ? parseFloat(s.I_F_goals) : (s.I_F_goals || 0),
+          assists: totalAssists,
+          points: typeof s.I_F_points === 'string' ? parseFloat(s.I_F_points) : (s.I_F_points || 0),
+          plus_minus: 0,
+          shots: typeof s.I_F_shotsOnGoal === 'string' ? parseFloat(s.I_F_shotsOnGoal) : (s.I_F_shotsOnGoal || 0),
+          hits: typeof s.I_F_hits === 'string' ? parseFloat(s.I_F_hits) : (s.I_F_hits || 0),
+          blocks: typeof s.shotsBlockedByPlayer === 'string' ? parseFloat(s.shotsBlockedByPlayer) : (s.shotsBlockedByPlayer || 0),
+          xGoals: typeof s.I_F_xGoals === 'string' ? parseFloat(s.I_F_xGoals) : (s.I_F_xGoals || 0),
+          corsi: typeof s.onIce_corsiPercentage === 'string' ? parseFloat(s.onIce_corsiPercentage) : (s.onIce_corsiPercentage || 0),
+          fenwick: typeof s.onIce_fenwickPercentage === 'string' ? parseFloat(s.onIce_fenwickPercentage) : (s.onIce_fenwickPercentage || 0),
+          highDangerSavePct: 0,
+          goalsSavedAboveExpected: 0,
+          wins: null,
+          losses: null,
+          ot_losses: null,
+          saves: null,
+          goals_against_average: null,
+          save_percentage: null
+        };
+      });
+
+      // Map goalies (same mapping logic as getAllPlayers)
+      const mappedGoalies = (goalies || []).map((g: any) => {
+        if (!g.playerId) return null;
+        return {
+          id: g.playerId.toString(),
+          full_name: g.name,
+          position: 'G',
+          team: g.team,
+          jersey_number: null,
+          status: 'active',
+          headshot_url: `https://assets.nhle.com/mugs/nhl/20242025/${g.team}/${g.playerId}.png`,
+          last_updated: new Date().toISOString(),
+          games_played: typeof g.games_played === 'string' ? parseInt(g.games_played) : (g.games_played || 0),
+          goals: 0,
+          assists: 0,
+          points: 0,
+          plus_minus: 0,
+          shots: 0,
+          hits: 0,
+          blocks: 0,
+          xGoals: 0,
+          corsi: 0,
+          fenwick: 0,
+          highDangerSavePct: parseFloat(g.highDangerShots) > 0
+              ? (parseFloat(g.highDangerShots) - parseFloat(g.highDangerGoals)) / parseFloat(g.highDangerShots)
+              : 0,
+          goalsSavedAboveExpected: (parseFloat(g.xGoals) - parseFloat(g.goals)) || 0,
+          wins: 0,
+          losses: 0,
+          ot_losses: 0,
+          saves: (parseFloat(g.ongoal) - parseFloat(g.goals)) || 0,
+          goals_against_average: parseFloat(g.icetime) > 0 
+              ? (parseFloat(g.goals) * 3600) / parseFloat(g.icetime) 
+              : 0,
+          save_percentage: parseFloat(g.ongoal) > 0 
+              ? (parseFloat(g.ongoal) - parseFloat(g.goals)) / parseFloat(g.ongoal) 
+              : 0,
+        };
+      });
+
+      const validSkaters = mappedSkaters.filter((p): p is Player => p !== null);
+      const validGoalies = mappedGoalies.filter((p): p is Player => p !== null);
+      
+      const allPlayers = [...validSkaters, ...validGoalies];
+      
+      // Deduplicate by player ID
+      const uniquePlayers = new Map<string, Player>();
+      allPlayers.forEach(p => {
+        if (!uniquePlayers.has(p.id)) {
+          uniquePlayers.set(p.id, p);
+        }
+      });
+
+      // Return sorted by points
+      return Array.from(uniquePlayers.values()).sort((a, b) => b.points - a.points);
+    } catch (error) {
+      console.error('Error fetching players by IDs:', error);
+      // Fallback to getAllPlayers and filter
+      const all = await this.getAllPlayers();
+      return all.filter(p => playerIds.includes(p.id));
+    }
   }
 };

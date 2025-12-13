@@ -15,6 +15,7 @@ import { DraftService } from '@/services/DraftService';
 import { PlayerService } from '@/services/PlayerService';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import LoadingScreen from '@/components/LoadingScreen';
 
 interface StandingsTeam {
   id: string;
@@ -291,9 +292,11 @@ const Standings = () => {
                 <tbody className="divide-y divide-border/40">
                   {loading ? (
                     <tr>
-                      <td colSpan={7} className="px-6 py-12 text-center">
-                        <Loader2 className="h-6 w-6 animate-spin mx-auto" />
-                        <p className="mt-2 text-muted-foreground">Loading standings...</p>
+                      <td colSpan={7} className="p-0">
+                        <LoadingScreen
+                          character="narwhal"
+                          message="Loading Standings..."
+                        />
                       </td>
                     </tr>
                   ) : sortedTeams.length === 0 ? (

@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { TrendingUp, TrendingDown, Wand2, Trophy, Activity, ArrowUpRight, Users, Loader2, Calendar, Target, Shield, Skull, Zap, BarChart3, PieChart } from 'lucide-react';
+import LoadingScreen from '@/components/LoadingScreen';
 import { 
   Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer,
   BarChart, Bar, XAxis, YAxis, Tooltip, Legend, Cell
@@ -265,7 +266,8 @@ const Roster = () => {
   const posStats = useMemo(() => calculateTeamCategoryStats(roster.starters), [roster.starters]);
 
   // Calculate slots helper
-  const calculateInitialSlotAssignments = (starters: HockeyPlayer[]) => {
+  // Optional parameter: assignedSlots - Set of slot IDs already taken (to avoid conflicts)
+  const calculateInitialSlotAssignments = (starters: HockeyPlayer[], assignedSlots?: Set<string>) => {
     const assignments: Record<string, string> = {};
     const playersByPos: Record<string, HockeyPlayer[]> = {
       'C': [], 'LW': [], 'RW': [], 'D': [], 'G': [], 'UTIL': []
@@ -276,28 +278,49 @@ const Roster = () => {
       if (pos !== 'UTIL') playersByPos[pos].push(p);
     });
     
+    // Helper to check if a slot is available
+    const isSlotAvailable = (slotId: string) => !assignedSlots || !assignedSlots.has(slotId);
+    
     // Assign C, LW, RW to first 2 slots
     ['C', 'LW', 'RW'].forEach(pos => {
-      playersByPos[pos].slice(0, 2).forEach((p, i) => {
-        assignments[p.id] = `slot-${pos}-${i + 1}`;
-      });
+      let slotIndex = 1;
+      for (const p of playersByPos[pos]) {
+        if (slotIndex > 2) break;
+        const slotId = `slot-${pos}-${slotIndex}`;
+        if (isSlotAvailable(slotId)) {
+          assignments[p.id] = slotId;
+          slotIndex++;
+        }
+      }
     });
 
     // Assign D to first 4 slots
-    playersByPos['D'].slice(0, 4).forEach((p, i) => {
-      assignments[p.id] = `slot-D-${i + 1}`;
-    });
+    let dSlotIndex = 1;
+    for (const p of playersByPos['D']) {
+      if (dSlotIndex > 4) break;
+      const slotId = `slot-D-${dSlotIndex}`;
+      if (isSlotAvailable(slotId)) {
+        assignments[p.id] = slotId;
+        dSlotIndex++;
+      }
+    }
 
     // Assign G to first 2 slots
-    playersByPos['G'].slice(0, 2).forEach((p, i) => {
-      assignments[p.id] = `slot-G-${i + 1}`;
-    });
+    let gSlotIndex = 1;
+    for (const p of playersByPos['G']) {
+      if (gSlotIndex > 2) break;
+      const slotId = `slot-G-${gSlotIndex}`;
+      if (isSlotAvailable(slotId)) {
+        assignments[p.id] = slotId;
+        gSlotIndex++;
+      }
+    }
     
-    // Assign remaining non-goalie starters to UTIL if not already assigned
-    const assignedIds = new Set(Object.keys(assignments));
+    // Assign remaining non-goalie starters to UTIL if not already assigned and UTIL slot is available
+    const assignedIds = new Set(Object.keys(assignments).map(id => String(id)));
     const unassigned = starters.filter(p => !assignedIds.has(String(p.id)));
     const utilPlayer = unassigned.find(p => getFantasyPosition(p.position) !== 'G');
-    if (utilPlayer) {
+    if (utilPlayer && isSlotAvailable('slot-UTIL')) {
         assignments[utilPlayer.id] = 'slot-UTIL';
     }
     
@@ -665,21 +688,74 @@ const Roster = () => {
           
           // Ensure all slot assignments are valid (player still exists)
           const validSlotAssignments: Record<string, string> = {};
-          Object.entries(savedLineup.slotAssignments).forEach(([playerId, slotId]) => {
+          Object.entries(savedLineup.slotAssignments || {}).forEach(([playerId, slotId]) => {
             if (playerMap.has(playerId)) {
               validSlotAssignments[playerId] = slotId;
             }
           });
           
           // Recalculate slot assignments for any newly added starters
-          const newStarters = starters.filter(s => !validSlotAssignments[s.id]);
+          // Convert IDs to strings for consistent comparison
+          const newStarters = starters.filter(s => !validSlotAssignments[String(s.id)]);
           if (newStarters.length > 0) {
-            const newSlotAssignments = calculateInitialSlotAssignments(newStarters);
-            Object.assign(validSlotAssignments, newSlotAssignments);
+            // Get already assigned slots to avoid conflicts
+            const assignedSlots = new Set(Object.values(validSlotAssignments));
+            const newSlotAssignments = calculateInitialSlotAssignments(newStarters, assignedSlots);
+            // Merge new assignments, converting IDs to strings
+            Object.entries(newSlotAssignments).forEach(([playerId, slotId]) => {
+              validSlotAssignments[String(playerId)] = slotId;
+            });
           }
           
-          console.log('[Roster] Setting roster from saved lineup:', { starters: starters.length, bench: bench.length, ir: ir.length });
-          setRoster({ starters, bench, ir, slotAssignments: validSlotAssignments });
+          // Ensure UTIL slot is assigned if we have 13 starters but no UTIL assignment
+          const hasUtilSlot = Object.values(validSlotAssignments).includes('slot-UTIL');
+          if (starters.length >= 13 && !hasUtilSlot) {
+            // Count how many players are in each position slot
+            const positionSlots = ['slot-C-1', 'slot-C-2', 'slot-LW-1', 'slot-LW-2', 'slot-RW-1', 'slot-RW-2', 
+                                   'slot-D-1', 'slot-D-2', 'slot-D-3', 'slot-D-4', 'slot-G-1', 'slot-G-2'];
+            const positionSlotCount = positionSlots.filter(slot => Object.values(validSlotAssignments).includes(slot)).length;
+            
+            // If we have 12 position slots filled, we need UTIL
+            // If we have 13 starters but only 12 position slots, one should be UTIL
+            if (positionSlotCount >= 12) {
+              // Find a starter that's not in a position-specific slot and not a goalie
+              const starterInUtilSlot = starters.find(s => {
+                const slot = validSlotAssignments[String(s.id)];
+                const pos = getFantasyPosition(s.position);
+                return !slot || (!positionSlots.includes(slot) && pos !== 'G');
+              });
+              
+              if (starterInUtilSlot) {
+                validSlotAssignments[String(starterInUtilSlot.id)] = 'slot-UTIL';
+              } else {
+                // Fallback: find any non-goalie starter without a slot
+                const unassignedStarter = starters.find(s => {
+                  const slot = validSlotAssignments[String(s.id)];
+                  const pos = getFantasyPosition(s.position);
+                  return !slot && pos !== 'G';
+                });
+                if (unassignedStarter) {
+                  validSlotAssignments[String(unassignedStarter.id)] = 'slot-UTIL';
+                }
+              }
+            }
+          }
+          
+          // Normalize all slot assignment keys to strings for consistency
+          const normalizedSlotAssignments: Record<string, string> = {};
+          Object.entries(validSlotAssignments).forEach(([playerId, slotId]) => {
+            normalizedSlotAssignments[String(playerId)] = slotId;
+          });
+          
+          console.log('[Roster] Setting roster from saved lineup:', { 
+            starters: starters.length, 
+            bench: bench.length, 
+            ir: ir.length,
+            slotAssignments: Object.keys(normalizedSlotAssignments).length,
+            hasUtilSlot: Object.values(normalizedSlotAssignments).includes('slot-UTIL'),
+            utilSlotPlayer: Object.entries(normalizedSlotAssignments).find(([_, slot]) => slot === 'slot-UTIL')?.[0]
+          });
+          setRoster({ starters, bench, ir, slotAssignments: normalizedSlotAssignments });
         } else {
           // No saved lineup - use EXACT SAME LOGIC AS OtherTeam.tsx
           const starters: HockeyPlayer[] = [];
@@ -731,7 +807,7 @@ const Roster = () => {
               starters: starters.map(p => p.id),
               bench: bench.map(p => p.id),
               ir: ir.map(p => p.id),
-              slotAssignments: allSlotAssignments
+              slotAssignments: assignments
             });
           }
         }
@@ -1621,10 +1697,10 @@ const Roster = () => {
                 </div>
 
                 {loading ? (
-                  <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
-                    <Loader2 className="w-10 h-10 animate-spin mb-4 text-primary" />
-                    <p>{userLeagueState === 'guest' ? 'Loading demo roster...' : 'Loading your roster...'}</p>
-                  </div>
+                  <LoadingScreen
+                    character="narwhal"
+                    message="Loading Your Roster..."
+                  />
                 ) : userLeagueState === 'logged-in-no-league' ? (
                   <div className="py-8">
                     <LeagueCreationCTA 

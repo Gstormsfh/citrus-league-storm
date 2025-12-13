@@ -391,6 +391,47 @@ export const DraftService = {
             logger.error('Error initializing rosters:', rosterError);
             // Don't fail the draft completion if roster init fails
           }
+          
+          // Generate matchups for the entire season immediately after draft completion
+          try {
+            logger.log('Generating matchups for the entire season...');
+            const { MatchupService } = await import('./MatchupService');
+            const { LeagueService } = await import('./LeagueService');
+            const { getFirstWeekStartDate, getDraftCompletionDate } = await import('@/utils/weekCalculator');
+            
+            // Get league data to determine first week start
+            const { league } = await LeagueService.getLeague(leagueId);
+            if (league) {
+              const draftCompletionDate = getDraftCompletionDate(league);
+              if (draftCompletionDate) {
+                const firstWeekStart = getFirstWeekStartDate(draftCompletionDate);
+                
+                // Get all teams
+                const { teams } = await LeagueService.getLeagueTeams(leagueId);
+                
+                // Generate matchups for all weeks
+                const { error: matchupError } = await MatchupService.generateMatchupsForLeague(
+                  leagueId,
+                  teams,
+                  firstWeekStart,
+                  false // Don't force regenerate
+                );
+                
+                if (matchupError) {
+                  logger.error('Error generating matchups:', matchupError);
+                } else {
+                  logger.log('Matchups generated successfully for entire season');
+                }
+              } else {
+                logger.warn('Could not determine draft completion date, skipping matchup generation');
+              }
+            } else {
+              logger.warn('Could not load league data, skipping matchup generation');
+            }
+          } catch (matchupGenError) {
+            logger.error('Error generating matchups after draft completion:', matchupGenError);
+            // Don't fail the draft completion if matchup generation fails
+          }
         }
       }
 

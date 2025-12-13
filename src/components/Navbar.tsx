@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLeague } from '@/contexts/LeagueContext';
 import { 
   NavigationMenu, 
   NavigationMenuContent, 
@@ -18,13 +19,12 @@ import {
 } from "@/components/ui/navigation-menu";
 import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { LeagueService, Transaction } from '@/services/LeagueService';
+import { useNotificationStore } from '@/stores/notificationStore';
 
 const Navbar = () => {
   console.log("✅ Navbar component rendering");
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [notifications, setNotifications] = useState<Transaction[]>([]);
   const location = useLocation();
   const navigate = useNavigate();
   
@@ -40,6 +40,18 @@ const Navbar = () => {
     user = null;
     profile = null;
     signOut = async () => {};
+  }
+
+  // Get active league and notification count
+  let activeLeagueId: string | null = null;
+  let unreadCount = 0;
+  try {
+    const league = useLeague();
+    activeLeagueId = league?.activeLeagueId ?? null;
+    const notificationStore = useNotificationStore();
+    unreadCount = activeLeagueId ? (notificationStore.unreadCounts.get(activeLeagueId) || 0) : 0;
+  } catch (error) {
+    // League context not ready
   }
   
   useEffect(() => {
@@ -58,20 +70,18 @@ const Navbar = () => {
     };
   }, []);
 
-  // Fetch real notifications from transactions
+  // Load notifications for active league when it changes
   useEffect(() => {
-    const loadNotifications = async () => {
-      if (user?.id) {
-        const recentTransactions = await LeagueService.fetchRecentTransactionsForNotifications(user.id);
-        setNotifications(recentTransactions);
-      }
-    };
-
-    loadNotifications();
-    // Refresh notifications every 30 seconds
-    const interval = setInterval(loadNotifications, 30000);
-    return () => clearInterval(interval);
-  }, [user?.id]);
+    if (user?.id && activeLeagueId) {
+      const notificationStore = useNotificationStore.getState();
+      notificationStore.loadNotifications(activeLeagueId, user.id);
+      notificationStore.subscribe(activeLeagueId, user.id);
+      
+      return () => {
+        notificationStore.unsubscribe(activeLeagueId);
+      };
+    }
+  }, [user?.id, activeLeagueId]);
 
   const closeMobileMenu = () => {
     setMobileMenuOpen(false);
@@ -244,39 +254,104 @@ const Navbar = () => {
                 
                 <Popover>
                   <PopoverTrigger asChild>
-                    <Button variant="ghost" size="icon" className="text-foreground hover:text-primary hover:bg-primary/5 relative h-9 w-9 rounded-md">
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="text-foreground hover:text-primary hover:bg-primary/5 relative h-9 w-9 rounded-md"
+                      onClick={() => {
+                        // Navigate to matchup page with notifications panel visible
+                        if (activeLeagueId) {
+                          navigate(`/matchup/${activeLeagueId}`);
+                        }
+                      }}
+                    >
                       <Bell className="h-4 w-4" />
-                      <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[9px] text-white">2</span>
+                      {unreadCount > 0 && (
+                        <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[9px] font-medium text-white">
+                          {unreadCount > 9 ? '9+' : unreadCount}
+                        </span>
+                      )}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent align="end" className="w-64 p-0">
                     <div className="flex flex-col">
                       <div className="flex items-center justify-between p-3 border-b border-border/30">
                         <h4 className="font-medium text-xs">Notifications</h4>
-                        <Button variant="ghost" className="text-[10px] h-auto p-0 hover:bg-transparent hover:text-primary">
-                          Clear all
-                        </Button>
+                        {activeLeagueId && unreadCount > 0 && (
+                          <Button 
+                            variant="ghost" 
+                            className="text-[10px] h-auto p-0 hover:bg-transparent hover:text-primary"
+                            onClick={async () => {
+                              if (user?.id && activeLeagueId) {
+                                const notificationStore = useNotificationStore.getState();
+                                await notificationStore.markAllAsRead(activeLeagueId, user.id);
+                              }
+                            }}
+                          >
+                            Mark all read
+                          </Button>
+                        )}
                       </div>
                       <div className="max-h-[250px] overflow-y-auto">
-                        {[1, 2].map((i) => (
-                          <div key={i} className="flex gap-2 p-2.5 hover:bg-accent/5 cursor-pointer border-b border-border/10">
-                            <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center text-primary shrink-0">
-                              {i === 1 ? <Bell className="h-3 w-3" /> : <User className="h-3 w-3" />}
-                            </div>
-                            <div className="flex-1">
-                              <p className="text-xs font-medium">
-                                {i === 1 ? "Trade offer received" : "New player available"}
-                              </p>
-                              <p className="text-[10px] text-muted-foreground">
-                                {i === 1 ? "2 mins ago" : "1 hour ago"}
-                              </p>
-                            </div>
+                        {activeLeagueId && user?.id ? (
+                          (() => {
+                            const notificationStore = useNotificationStore.getState();
+                            const leagueNotifications = notificationStore.notifications.get(activeLeagueId) || [];
+                            const recentNotifications = leagueNotifications.slice(0, 3);
+                            
+                            if (recentNotifications.length === 0) {
+                              return (
+                                <div className="p-4 text-center">
+                                  <p className="text-xs text-muted-foreground">No notifications</p>
+                                </div>
+                              );
+                            }
+                            
+                            return recentNotifications.map((notification) => (
+                              <div 
+                                key={notification.id} 
+                                className="flex gap-2 p-2.5 hover:bg-accent/5 cursor-pointer border-b border-border/10"
+                                onClick={() => {
+                                  if (activeLeagueId) {
+                                    navigate(`/matchup/${activeLeagueId}`);
+                                  }
+                                }}
+                              >
+                                <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center text-primary shrink-0">
+                                  <Bell className="h-3 w-3" />
+                                </div>
+                                <div className="flex-1">
+                                  <p className={`text-xs font-medium ${notification.read_status ? 'text-muted-foreground' : 'text-foreground'}`}>
+                                    {notification.title}
+                                  </p>
+                                  <p className="text-[10px] text-muted-foreground line-clamp-1">
+                                    {notification.message}
+                                  </p>
+                                </div>
+                                {!notification.read_status && (
+                                  <div className="w-2 h-2 bg-primary rounded-full shrink-0 mt-1.5" />
+                                )}
+                              </div>
+                            ));
+                          })()
+                        ) : (
+                          <div className="p-4 text-center">
+                            <p className="text-xs text-muted-foreground">Join a league to see notifications</p>
                           </div>
-                        ))}
+                        )}
                       </div>
-                      <div className="p-2.5">
-                        <Button variant="outline" size="sm" className="w-full text-xs h-7">View all</Button>
-                      </div>
+                      {activeLeagueId && (
+                        <div className="p-2.5">
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="w-full text-xs h-7"
+                            onClick={() => navigate(`/matchup/${activeLeagueId}`)}
+                          >
+                            View all
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   </PopoverContent>
                 </Popover>
@@ -434,22 +509,49 @@ const Navbar = () => {
                       <div className="flex items-center gap-3 mb-2">
                         <Bell className="h-4 w-4 text-primary" />
                         <span className="text-sm font-medium">Recent Activity</span>
+                        {unreadCount > 0 && (
+                          <span className="ml-auto bg-primary text-white text-[10px] font-medium px-1.5 py-0.5 rounded-full">
+                            {unreadCount}
+                          </span>
+                        )}
                       </div>
                       <div className="space-y-2 mt-2">
-                        {notifications.length === 0 ? (
-                          <div className="bg-background rounded-md p-2 text-xs text-center text-muted-foreground">
-                            No recent activity
-                          </div>
-                        ) : (
-                          notifications.slice(0, 3).map((tx) => (
-                            <div key={tx.id} className="bg-background rounded-md p-2 text-xs">
-                              <p className="font-medium">
-                                {tx.type === 'drop' ? 'Player dropped' : tx.type === 'claim' ? 'Player added' : 'Transaction'}
-                                {tx.playerName && `: ${tx.playerName}`}
+                        {activeLeagueId ? (() => {
+                          const notificationStore = useNotificationStore.getState();
+                          const leagueNotifications = notificationStore.notifications.get(activeLeagueId) || [];
+                          const recentNotifications = leagueNotifications.slice(0, 3);
+                          
+                          if (recentNotifications.length === 0) {
+                            return (
+                              <div className="bg-background rounded-md p-2 text-xs text-center text-muted-foreground">
+                                No recent activity
+                              </div>
+                            );
+                          }
+                          
+                          return recentNotifications.map((notification) => (
+                            <div 
+                              key={notification.id} 
+                              className="bg-background rounded-md p-2 text-xs cursor-pointer hover:bg-accent/5"
+                              onClick={() => {
+                                if (activeLeagueId) {
+                                  navigate(`/matchup/${activeLeagueId}`);
+                                  closeMobileMenu();
+                                }
+                              }}
+                            >
+                              <p className={`font-medium ${notification.read_status ? 'text-muted-foreground' : 'text-foreground'}`}>
+                                {notification.title}
                               </p>
-                              <p className="text-muted-foreground text-[10px] mt-0.5">{tx.date}</p>
+                              <p className="text-muted-foreground text-[10px] mt-0.5 line-clamp-1">
+                                {notification.message}
+                              </p>
                             </div>
-                          ))
+                          ));
+                        })() : (
+                          <div className="bg-background rounded-md p-2 text-xs text-center text-muted-foreground">
+                            Join a league to see activity
+                          </div>
                         )}
                       </div>
                     </div>

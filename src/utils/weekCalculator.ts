@@ -108,29 +108,64 @@ export function getCurrentWeekNumber(firstWeekStart: Date): number {
 }
 
 /**
- * Get available weeks from first week until end of year, excluding last 3 weeks (playoffs)
+ * Get available weeks from first week until end of regular season (when playoffs begin)
+ * 
+ * NHL regular season typically runs from October to mid-April of the following year.
+ * This function calculates all weeks from the first week start date until April 15,
+ * which is when the regular season ends and playoffs typically begin.
+ * 
+ * Examples:
+ * - Season starts Dec 8, 2025 → Regular season ends Apr 15, 2026 (≈18 weeks)
+ * - Season starts Oct 7, 2025 → Regular season ends Apr 15, 2026 (≈27 weeks)
+ * 
+ * @param firstWeekStart - The Monday date of the first week of the season
+ * @param currentYear - The current calendar year (used for context, but calculation is based on firstWeekStart)
+ * @returns Array of week numbers (1-based) from week 1 to the last week of regular season
  */
 export function getAvailableWeeks(firstWeekStart: Date, currentYear: number): number[] {
   const weeks: number[] = [];
   
-  // Get the last day of the year (December 31)
-  const yearEnd = new Date(currentYear, 11, 31); // Month 11 = December
-  yearEnd.setHours(23, 59, 59, 999);
+  // Determine the season year based on when the first week starts
+  // If first week is in Oct-Dec, season ends in April of next year
+  // If first week is in Jan-Apr, season ends in April of same year
+  const firstWeekYear = firstWeekStart.getFullYear();
+  const firstWeekMonth = firstWeekStart.getMonth(); // 0-11 (Jan = 0, Dec = 11)
   
-  // Calculate how many weeks from first week to year end
-  const diffTime = yearEnd.getTime() - firstWeekStart.getTime();
+  // Regular season typically ends around April 15 (when playoffs begin)
+  // If season starts Oct-Dec, regular season ends April of next year
+  // If season starts Jan-Apr, regular season ends April of same year
+  let regularSeasonEndYear = firstWeekYear;
+  if (firstWeekMonth >= 9) { // October (9) through December (11)
+    regularSeasonEndYear = firstWeekYear + 1; // Season ends next year
+  }
+  
+  // Regular season ends around April 15 (when playoffs typically begin)
+  const regularSeasonEnd = new Date(regularSeasonEndYear, 3, 15); // Month 3 = April
+  regularSeasonEnd.setHours(23, 59, 59, 999);
+  
+  // Calculate how many weeks from first week to regular season end
+  const diffTime = regularSeasonEnd.getTime() - firstWeekStart.getTime();
   const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
   const totalWeeks = Math.floor(diffDays / 7) + 1;
   
-  // Exclude last 3 weeks for playoffs
-  const regularSeasonWeeks = Math.max(1, totalWeeks - 3);
+  // Ensure we have at least 1 week
+  const finalWeekCount = Math.max(1, totalWeeks);
   
-  // Generate week numbers from 1 to regularSeasonWeeks
-  for (let i = 1; i <= regularSeasonWeeks; i++) {
+  // Include all weeks up to regular season end (playoffs begin after this)
+  for (let i = 1; i <= finalWeekCount; i++) {
     weeks.push(i);
   }
   
   return weeks;
+}
+
+/**
+ * Get the total number of regular season weeks (schedule length)
+ * This is the length of the array returned by getAvailableWeeks
+ */
+export function getScheduleLength(firstWeekStart: Date, currentYear: number): number {
+  const weeks = getAvailableWeeks(firstWeekStart, currentYear);
+  return weeks.length;
 }
 
 /**
@@ -151,5 +186,26 @@ export function getWeekLabel(weekNumber: number, firstWeekStart: Date): string {
     return `Week ${weekNumber} • ${startMonth} ${startDay}-${endDay}`;
   } else {
     return `Week ${weekNumber} • ${startMonth} ${startDay} - ${endMonth} ${endDay}`;
+  }
+}
+
+/**
+ * Get just the date portion from week label (e.g., "Jan 6-12" or "Jan 31 - Feb 6")
+ */
+export function getWeekDateLabel(weekNumber: number, firstWeekStart: Date): string {
+  const startDate = getWeekStartDate(weekNumber, firstWeekStart);
+  const endDate = getWeekEndDate(weekNumber, firstWeekStart);
+  
+  const startMonth = startDate.toLocaleDateString('en-US', { month: 'short' });
+  const startDay = startDate.getDate();
+  
+  const endMonth = endDate.toLocaleDateString('en-US', { month: 'short' });
+  const endDay = endDate.getDate();
+  
+  // If same month, show "Jan 6-12", otherwise "Jan 31 - Feb 6"
+  if (startMonth === endMonth) {
+    return `${startMonth} ${startDay}-${endDay}`;
+  } else {
+    return `${startMonth} ${startDay} - ${endMonth} ${endDay}`;
   }
 }

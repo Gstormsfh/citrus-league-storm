@@ -7,6 +7,7 @@ export type MatchupPlayer = {
   position: string;
   team: string;
   points: number;
+  projectedPoints?: number;
   gamesRemaining: number;
   status: MatchupPlayerStatus;
   isStarter: boolean;
@@ -16,6 +17,7 @@ export type MatchupPlayer = {
     sog: number;
     blk: number;
     gamesPlayed?: number;
+    xGoals?: number;
   };
   isToday?: boolean;
   gameInfo?: {

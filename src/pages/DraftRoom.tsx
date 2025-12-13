@@ -1030,7 +1030,7 @@ const DraftRoom = () => {
 
       // Check if draft is complete
       if (isComplete || activePicks.length >= teams.length * draftSettings.rounds) {
-        // Update league status
+        // Update league status (this will trigger matchup generation in DraftService.makePick)
         await supabase
           .from('leagues')
           .update({ draft_status: 'completed' })
@@ -1038,6 +1038,33 @@ const DraftRoom = () => {
         
         // Update local state
         setLeague(prev => prev ? { ...prev, draft_status: 'completed' } : null);
+        
+        // Generate matchups immediately after draft completion
+        try {
+          logger.log('DraftRoom: Generating matchups for entire season...');
+          const { MatchupService } = await import('@/services/MatchupService');
+          const { getFirstWeekStartDate, getDraftCompletionDate } = await import('@/utils/weekCalculator');
+          
+          const draftCompletionDate = getDraftCompletionDate(league!);
+          if (draftCompletionDate) {
+            const firstWeekStart = getFirstWeekStartDate(draftCompletionDate);
+            const { error: matchupError } = await MatchupService.generateMatchupsForLeague(
+              leagueId!,
+              teams,
+              firstWeekStart,
+              false
+            );
+            
+            if (matchupError) {
+              logger.error('DraftRoom: Error generating matchups:', matchupError);
+            } else {
+              logger.log('DraftRoom: Matchups generated successfully');
+            }
+          }
+        } catch (matchupGenError) {
+          logger.error('DraftRoom: Error generating matchups:', matchupGenError);
+          // Don't block draft completion if matchup generation fails
+        }
         
         // Show congratulations screen
         setDraftPhase(DraftPhase.COMPLETED);
@@ -1838,20 +1865,10 @@ const DraftRoom = () => {
       <main className="pt-20 min-h-[80vh]">
         {/* Loading State - Show if loading or auth is loading, but NOT for demo state */}
         {(loading || authLoading || (!user && userLeagueState !== 'guest' && userLeagueState !== 'logged-in-no-league')) && (
-          <div className="container mx-auto px-4 py-20 flex flex-col items-center justify-center min-h-[60vh]">
-            <Loader2 className="h-8 w-8 animate-spin mb-4 text-primary" />
-            <p className="text-muted-foreground">
-              {authLoading ? 'Checking authentication...' : !user && userLeagueState !== 'guest' && userLeagueState !== 'logged-in-no-league' ? 'Redirecting to login...' : 'Loading draft room...'}
-            </p>
-            <p className="text-xs text-muted-foreground mt-2">
-              {userLeagueState === 'guest' || userLeagueState === 'logged-in-no-league' 
-                ? 'Loading demo draft room...' 
-                : `League ID: ${leagueId || 'Finding your league...'}`}
-            </p>
-            {!leagueId && !authLoading && userLeagueState !== 'guest' && userLeagueState !== 'logged-in-no-league' && (
-              <p className="text-xs text-muted-foreground mt-1">Please wait while we locate your league...</p>
-            )}
-          </div>
+          <LoadingScreen
+            character="narwhal"
+            message={authLoading ? 'Checking Authentication...' : !user && userLeagueState !== 'guest' && userLeagueState !== 'logged-in-no-league' ? 'Redirecting to Login...' : 'Loading Draft Room...'}
+          />
         )}
 
         {/* Error State */}

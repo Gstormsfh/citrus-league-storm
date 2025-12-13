@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { Calendar, TrendingUp, Filter, List, Grid, Star, Info, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import LoadingScreen from '@/components/LoadingScreen';
 import { PlayerService, Player } from '@/services/PlayerService';
 import { LeagueService, League } from '@/services/LeagueService';
 import { ScheduleService, NHLGame } from '@/services/ScheduleService';
@@ -721,10 +722,10 @@ const FreeAgents = () => {
             </div>
 
             {loading ? (
-              <div className="text-center py-12">
-                <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                <p className="text-muted-foreground">Loading players...</p>
-              </div>
+              <LoadingScreen
+                character="citrus"
+                message="Loading Free Agents..."
+              />
             ) : (
               <>
                 {viewMode === 'summary' && !searchQuery ? (
