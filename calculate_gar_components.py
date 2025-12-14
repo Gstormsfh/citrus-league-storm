@@ -71,9 +71,9 @@ def load_shots_data():
         
         while True:
             response = supabase.table('raw_shots').select(
-                'player_id, game_id, period, shooting_talent_adjusted_xg, '
+                'id, player_id, game_id, period, time_remaining_seconds, shooting_talent_adjusted_xg, '
                 'flurry_adjusted_xg, xg_value, is_goal, is_empty_net, '
-                'home_skaters_on_ice, away_skaters_on_ice, team_code, is_home_team'
+                'home_skaters_on_ice, away_skaters_on_ice, team_code, is_home_team, goalie_id'
             ).range(offset, offset + batch_size - 1).execute()
             
             if not response.data or len(response.data) == 0:
