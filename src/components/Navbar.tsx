@@ -104,13 +104,13 @@ const Navbar = () => {
   return (
     <header 
       className={cn(
-        "fixed w-full z-50 transition-all duration-500", 
+        "fixed top-0 left-0 right-0 w-full z-50 transition-all duration-500", 
         isScrolled ? 
           "py-3 bg-background/80 backdrop-blur-lg shadow-sm border-b border-border/20" : 
           "py-5 bg-transparent"
       )}
     >
-      <div className="container mx-auto px-4">
+      <div className="container mx-auto px-4 max-w-full">
         {/* Main Navigation Row */}
         <div className="flex items-center justify-between">
           {/* Logo */}

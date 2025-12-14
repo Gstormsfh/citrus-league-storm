@@ -1591,11 +1591,11 @@ const Roster = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
       <Navbar />
       
       <main className="pt-24 pb-16">
-        <div className="container max-w-7xl mx-auto px-4">
+        <div className="container max-w-7xl mx-auto px-4 w-full">
           <div className="flex flex-col lg:flex-row gap-6">
             {/* Left Sidebar - Roster Depth Widget */}
             <aside className="lg:w-64 lg:flex-shrink-0 order-2 lg:order-1">
