@@ -10,6 +10,7 @@ import { LeagueProvider } from "@/contexts/LeagueContext";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { StormyChatBubble } from "./components/StormyChatBubble";
+import LoadingScreen from "./components/LoadingScreen";
 import "./App.css";
 
 // Helper to add error handling to lazy imports
@@ -68,15 +69,9 @@ const AuthCallback = lazyWithErrorHandling(() => import("./pages/AuthCallback"))
 const ProfileSetup = lazyWithErrorHandling(() => import("./pages/ProfileSetup"));
 const LeagueDashboard = lazyWithErrorHandling(() => import("./pages/LeagueDashboard"));
 
-// Loading fallback component
-const PageLoader = () => (
-  <div className="flex items-center justify-center min-h-screen">
-    <div className="text-center">
-      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-      <p className="text-muted-foreground">Loading...</p>
-    </div>
-  </div>
-);
+// Loading fallback component for route navigation (tab changes)
+// Uses LoadingScreen for nice visual feedback when switching between tabs
+const PageLoader = () => <LoadingScreen character="citrus" />;
 
 // Configure with a higher stale time to prevent unnecessary refetches
 const queryClient = new QueryClient({

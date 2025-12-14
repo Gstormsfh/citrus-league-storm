@@ -14,6 +14,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { TrendingUp, TrendingDown, Wand2, Trophy, Activity, ArrowUpRight, Users, Loader2, Calendar, Target, Shield, Skull, Zap, BarChart3, PieChart } from 'lucide-react';
 import LoadingScreen from '@/components/LoadingScreen';
+import { RosterDepthWidget } from '@/components/gm-office/RosterDepthWidget';
 import { 
   Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer,
   BarChart, Bar, XAxis, YAxis, Tooltip, Legend, Cell
@@ -136,10 +137,6 @@ const getTeamAbbreviation = (team: string): string => {
 
     return stats;
   };
-
-import { ErrorBoundary } from "@/components/ErrorBoundary";
-
-// ... existing imports ...
 
 // Helper to safely calculate chart value
 const safeValue = (val: number) => {
@@ -1594,15 +1591,24 @@ const Roster = () => {
   };
 
   return (
-    <ErrorBoundary>
     <div className="min-h-screen bg-background text-foreground">
       <Navbar />
       
       <main className="pt-24 pb-16">
         <div className="container max-w-7xl mx-auto px-4">
-          {/* Fantasy Team Header */}
-          <div className="bg-card rounded-lg shadow-md border p-4 mb-6">
-            <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+          <div className="flex flex-col lg:flex-row gap-6">
+            {/* Left Sidebar - Roster Depth Widget */}
+            <aside className="lg:w-64 lg:flex-shrink-0 order-2 lg:order-1">
+              <div className="lg:sticky lg:top-24">
+                <RosterDepthWidget />
+              </div>
+            </aside>
+
+            {/* Main Content */}
+            <div className="flex-1 min-w-0 order-1 lg:order-2">
+              {/* Fantasy Team Header */}
+              <div className="bg-card rounded-lg shadow-md border p-4 mb-6">
+                <div className="flex flex-col md:flex-row justify-between items-center gap-4">
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-2xl font-bold">
                   {userLeagueState === 'guest' ? 'CC' : (userTeam?.team_name?.substring(0, 2).toUpperCase() || profile?.username?.substring(0, 2).toUpperCase() || 'TM')}
@@ -1639,14 +1645,14 @@ const Roster = () => {
                     Auto Lineup
                   </Button>
                 )}
+                </div>
               </div>
             </div>
-          </div>
 
-          {/* Main Tabs */}
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-            <div className="bg-card rounded-lg shadow-md border">
-              <TabsList className="w-full p-0 bg-transparent border-b rounded-none gap-0">
+            {/* Main Tabs */}
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+              <div className="bg-card rounded-lg shadow-md border">
+                <TabsList className="w-full p-0 bg-transparent border-b rounded-none gap-0">
                 <TabsTrigger 
                   value="roster" 
                   className="flex-1 py-4 rounded-none data-[state=active]:bg-card data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:text-primary"
@@ -1671,9 +1677,9 @@ const Roster = () => {
                 >
                   Transactions
                 </TabsTrigger>
-              </TabsList>
+                </TabsList>
 
-              <TabsContent value="roster" className="m-0 p-6">
+                <TabsContent value="roster" className="m-0 p-6">
                 {/* Read-only banner for demo league */}
                 {userTeam && isDemoLeague(userTeam.league_id) && (
                   <div className="mb-4 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
@@ -1782,9 +1788,9 @@ const Roster = () => {
                   </DndContext>
                   )
                 )}
-              </TabsContent>
+                </TabsContent>
 
-              <TabsContent value="stats" className="m-0 p-6">
+                <TabsContent value="stats" className="m-0 p-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
                   <Card>
                     <CardContent className="p-6">
@@ -1827,9 +1833,9 @@ const Roster = () => {
                     </CardContent>
                   </Card>
                 </div>
-              </TabsContent>
+                </TabsContent>
 
-              <TabsContent value="trends" className="m-0 p-6">
+                <TabsContent value="trends" className="m-0 p-6">
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                   {/* Radar Charts - Category Balance */}
                   <div className="lg:col-span-2">
@@ -1938,9 +1944,9 @@ const Roster = () => {
                       </div>
                    </CardContent>
                 </Card>
-              </TabsContent>
+                </TabsContent>
 
-              <TabsContent value="transactions" className="m-0 p-6">
+                <TabsContent value="transactions" className="m-0 p-6">
                 <div className="space-y-4">
                   <h3 className="text-lg font-bold mb-4">Transaction History</h3>
                   {transactions.length === 0 ? (
@@ -2004,12 +2010,12 @@ const Roster = () => {
                     </div>
                   )}
                 </div>
-              </TabsContent>
+                </TabsContent>
+              </div>
+            </Tabs>
             </div>
-          </Tabs>
-        </div>
-        
-        {/* Enhanced Player Stats Modal */}
+            
+            {/* Enhanced Player Stats Modal */}
         <PlayerStatsModal
           player={selectedPlayer}
           isOpen={isPlayerDialogOpen}
@@ -2195,11 +2201,12 @@ const Roster = () => {
             </div>
           </DialogContent>
         </Dialog>
+            </div>
+          </div>
       </main>
       
       <Footer />
     </div>
-    </ErrorBoundary>
   );
 };
 

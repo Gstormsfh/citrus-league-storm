@@ -6,6 +6,7 @@ interface MatchupComparisonRowProps {
   userPlayer: MatchupPlayer | null;
   opponentPlayer: MatchupPlayer | null;
   position: string;
+  isBench?: boolean;
   onPlayerClick?: (player: MatchupPlayer) => void;
 }
 
@@ -13,6 +14,7 @@ export const MatchupComparisonRow = ({
   userPlayer,
   opponentPlayer,
   position,
+  isBench = false,
   onPlayerClick
 }: MatchupComparisonRowProps) => {
   // Calculate projected points for tonight (points / 20 is the standard projection calculation)
@@ -29,20 +31,29 @@ export const MatchupComparisonRow = ({
       <PlayerCard 
         player={userPlayerWithProjection} 
         isUserTeam={true}
+        isBench={isBench}
         onPlayerClick={onPlayerClick}
       />
       
       {/* Center Column - hidden on mobile, visible on desktop */}
-      <CenterColumn 
-        position={position}
-        userPlayer={userPlayer ? { projectedPoints: userProjectedPoints } : null}
-        opponentPlayer={opponentPlayer ? { projectedPoints: opponentProjectedPoints } : null}
-      />
+      {!isBench && (
+        <CenterColumn 
+          position={position}
+          userPlayer={userPlayer ? { projectedPoints: userProjectedPoints, position: userPlayer.position } : null}
+          opponentPlayer={opponentPlayer ? { projectedPoints: opponentProjectedPoints, position: opponentPlayer.position } : null}
+        />
+      )}
+      {isBench && (
+        <div className="matchup-center-column opacity-40 bg-muted/50 border-muted">
+          <span className="position-label text-muted-foreground/60">{position}</span>
+        </div>
+      )}
       
       {/* Opponent Team Player Card */}
       <PlayerCard 
         player={opponentPlayerWithProjection} 
         isUserTeam={false}
+        isBench={isBench}
         onPlayerClick={onPlayerClick}
       />
     </div>

@@ -1,5 +1,3 @@
-import { Progress } from "@/components/ui/progress";
-
 interface ScoreCardProps {
   myTeamName: string;
   myTeamRecord: { wins: number; losses: number };
@@ -22,52 +20,73 @@ export const ScoreCard = ({
   const oppPointsNum = parseFloat(opponentTeamPoints) || 0;
   const totalPoints = myPointsNum + oppPointsNum;
   const winProbability = totalPoints > 0 ? Math.round((myPointsNum / totalPoints) * 100) : 50;
+  const isWinning = myPointsNum > oppPointsNum;
   
   return (
-    <div className="mb-6 bg-card border-2 border-primary/20 rounded-lg shadow-md overflow-hidden bg-gradient-to-br from-card to-primary/5">
-      <div className="p-6">
-        <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-          {/* My Team - Citrus Green */}
-          <div className="flex flex-col items-center md:items-start text-center md:text-left flex-1">
-            <div className="text-2xl font-bold text-fantasy-secondary mb-1">{myTeamName}</div>
-            <div className="text-xs text-muted-foreground font-medium bg-fantasy-secondary/10 px-2 py-1 rounded-full">
-              {myTeamRecord.wins}-{myTeamRecord.losses} Record
+    <div className="mb-6 bg-card/60 backdrop-blur-sm border border-border/40 rounded-xl shadow-sm overflow-hidden hover:shadow-md transition-shadow duration-200">
+      {/* Main Score Display - Sleeper Style Compact */}
+      <div className="px-4 py-5 md:px-6 md:py-6">
+        <div className="flex flex-col md:flex-row items-center justify-between gap-4 md:gap-6">
+          {/* My Team Section - Left */}
+          <div className="flex-1 min-w-0 w-full md:w-auto order-1 md:order-1">
+            <div className="flex items-center gap-2.5">
+              <div className="flex-shrink-0 w-2.5 h-2.5 rounded-full bg-fantasy-secondary shadow-sm ring-1 ring-fantasy-secondary/20"></div>
+              <div className="min-w-0 flex-1">
+                <div className="text-sm md:text-base font-bold text-foreground truncate leading-tight">{myTeamName}</div>
+                <div className="text-[10px] md:text-xs text-muted-foreground mt-0.5 md:mt-1 font-medium">
+                  {myTeamRecord.wins}-{myTeamRecord.losses} W-L
+                </div>
+              </div>
             </div>
           </div>
           
-          {/* Score Display - Citrus Colors */}
-          <div className="flex items-center gap-6 px-8 py-4 bg-gradient-to-r from-fantasy-secondary/10 via-transparent to-[hsl(var(--vibrant-orange))]/10 rounded-lg">
+          {/* Score Display - Center (Focal Point) */}
+          <div className="flex items-baseline gap-3 md:gap-5 px-4 md:px-8 flex-shrink-0 order-3 md:order-2 w-full md:w-auto justify-center">
             <div className="text-center">
-              <div className="text-4xl md:text-5xl font-bold text-fantasy-secondary mb-1">{myTeamPoints}</div>
-              <div className="text-xs text-muted-foreground font-medium">Points</div>
+              <div className={`text-3xl md:text-4xl lg:text-5xl font-extrabold leading-none tracking-tight ${isWinning ? 'text-fantasy-secondary' : 'text-foreground/80'}`}>
+                {myTeamPoints}
+              </div>
+              <div className="text-[9px] md:text-[10px] text-muted-foreground/60 mt-0.5 md:mt-1 font-medium uppercase tracking-wider">Pts</div>
             </div>
-            <div className="text-lg font-semibold text-muted-foreground/40">—</div>
+            <div className="text-muted-foreground/25 text-lg md:text-xl font-light pb-1">—</div>
             <div className="text-center">
-              <div className="text-4xl md:text-5xl font-bold text-[hsl(var(--vibrant-orange))] mb-1">{opponentTeamPoints}</div>
-              <div className="text-xs text-muted-foreground font-medium">Points</div>
+              <div className={`text-3xl md:text-4xl lg:text-5xl font-extrabold leading-none tracking-tight ${!isWinning && oppPointsNum > myPointsNum ? 'text-[hsl(var(--vibrant-orange))]' : 'text-foreground/80'}`}>
+                {opponentTeamPoints}
+              </div>
+              <div className="text-[9px] md:text-[10px] text-muted-foreground/60 mt-0.5 md:mt-1 font-medium uppercase tracking-wider">Pts</div>
             </div>
           </div>
           
-          {/* Opponent - Citrus Orange */}
-          <div className="flex flex-col items-center md:items-end text-center md:text-right flex-1">
-            <div className="text-2xl font-bold text-[hsl(var(--vibrant-orange))] mb-1">{opponentTeamName}</div>
-            <div className="text-xs text-muted-foreground font-medium bg-[hsl(var(--vibrant-orange))]/10 px-2 py-1 rounded-full">
-              {opponentTeamRecord.wins}-{opponentTeamRecord.losses} Record
+          {/* Opponent Team Section - Right */}
+          <div className="flex-1 min-w-0 flex justify-end w-full md:w-auto order-2 md:order-3">
+            <div className="flex items-center gap-2.5 max-w-full w-full md:w-auto justify-end">
+              <div className="min-w-0 flex-1 md:flex-none text-right">
+                <div className="text-sm md:text-base font-bold text-foreground truncate leading-tight">{opponentTeamName}</div>
+                <div className="text-[10px] md:text-xs text-muted-foreground mt-0.5 md:mt-1 font-medium">
+                  {opponentTeamRecord.wins}-{opponentTeamRecord.losses} W-L
+                </div>
+              </div>
+              <div className="flex-shrink-0 w-2.5 h-2.5 rounded-full bg-[hsl(var(--vibrant-orange))] shadow-sm ring-1 ring-[hsl(var(--vibrant-orange))]/20"></div>
             </div>
           </div>
         </div>
-        
-        {/* Win Probability Bar - Citrus Gradient */}
-        <div className="mt-6 pt-6 border-t border-primary/20">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-medium text-muted-foreground">Win Probability</span>
-            <span className="text-sm font-bold text-fantasy-secondary">{winProbability}%</span>
+      </div>
+      
+      {/* Subtle Win Probability Indicator - Centered at bottom */}
+      <div className="px-4 md:px-6 py-2.5 md:py-3 bg-muted/10 border-t border-border/20">
+        <div className="flex flex-col items-center gap-2">
+          <span className="text-[10px] md:text-xs text-muted-foreground font-semibold uppercase tracking-wider">Win Probability</span>
+          <div className="flex items-center gap-2.5 w-full max-w-[280px]">
+            <div className="flex-1 h-1.5 bg-muted/30 rounded-full overflow-hidden shadow-inner">
+              <div 
+                className="h-full bg-gradient-to-r from-fantasy-secondary via-fantasy-primary to-fantasy-tertiary rounded-full transition-all duration-500 ease-out shadow-sm"
+                style={{ width: `${winProbability}%` }}
+              />
+            </div>
+            <span className="text-[10px] md:text-xs font-bold text-foreground min-w-[38px] text-right">
+              {winProbability}%
+            </span>
           </div>
-          <Progress 
-            value={winProbability} 
-            className="h-2 bg-muted/30" 
-            indicatorClassName="bg-gradient-to-r from-fantasy-secondary to-fantasy-primary" 
-          />
         </div>
       </div>
     </div>

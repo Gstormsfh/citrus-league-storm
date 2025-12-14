@@ -564,37 +564,37 @@
   
   /* Center column styles already defined in mobile-first section - no override needed */
   
-  /* Position-specific center column colors - Soft Colorful Colors */
+  /* Position-specific center column colors - High-Contrast Citrus Palette */
   .matchup-center-column-fantasy-primary {
-    background: rgba(255, 163, 102, 0.2);
-    border-left-color: rgba(255, 163, 102, 0.6);
-    border-right-color: rgba(255, 163, 102, 0.6);
+    background: rgba(249, 224, 118, 0.2);
+    border-left-color: rgba(249, 224, 118, 0.6);
+    border-right-color: rgba(249, 224, 118, 0.6);
   }
   
   .matchup-center-column-fantasy-secondary {
-    background: rgba(155, 207, 74, 0.2);
-    border-left-color: rgba(155, 207, 74, 0.6);
-    border-right-color: rgba(155, 207, 74, 0.6);
+    background: rgba(69, 147, 69, 0.2);
+    border-left-color: rgba(69, 147, 69, 0.6);
+    border-right-color: rgba(69, 147, 69, 0.6);
   }
   
   .matchup-center-column-fantasy-tertiary {
-    background: rgba(255, 204, 51, 0.2);
-    border-left-color: rgba(255, 204, 51, 0.6);
-    border-right-color: rgba(255, 204, 51, 0.6);
+    background: rgba(249, 164, 54, 0.2);
+    border-left-color: rgba(249, 164, 54, 0.6);
+    border-right-color: rgba(249, 164, 54, 0.6);
   }
   
-  /* Defense - Deep Blueberry Blue (#4A5D8C) - distinct from citrus colors */
+  /* Defense - Yellow-Green (#A8D85C) */
   .matchup-center-column-defense {
-    background: rgba(74, 93, 140, 0.2);
-    border-left-color: rgba(74, 93, 140, 0.6);
-    border-right-color: rgba(74, 93, 140, 0.6);
+    background: rgba(168, 216, 92, 0.2);
+    border-left-color: rgba(168, 216, 92, 0.6);
+    border-right-color: rgba(168, 216, 92, 0.6);
   }
   
-  /* Goalie - Deep Blackberry (#5D3A6B) - distinct purple-berry color */
+  /* Goalie - Contrast Grapefruit Pink (#FF6F80) */
   .matchup-center-column-goalie {
-    background: rgba(93, 58, 107, 0.2);
-    border-left-color: rgba(93, 58, 107, 0.6);
-    border-right-color: rgba(93, 58, 107, 0.6);
+    background: rgba(255, 111, 128, 0.2);
+    border-left-color: rgba(255, 111, 128, 0.6);
+    border-right-color: rgba(255, 111, 128, 0.6);
   }
   
   /* Utility - Citrus Apricot (#FFB84D) - distinct orange-yellow blend */
@@ -615,25 +615,25 @@
     margin-bottom: 1px;
   }
   
-  /* Position-specific label colors - Soft Colorful Colors */
+  /* Position-specific label colors - High-Contrast Citrus Palette */
   .position-label-fantasy-primary {
-    color: #FF8C42; /* Center - Soft Orange */
+    color: #F9E076; /* Center - Bright Lemon Peel */
   }
   
   .position-label-fantasy-secondary {
-    color: #A8D85C; /* Left Wing - Soft Lime Green */
+    color: #459345; /* Left Wing - Deep Lime Green */
   }
   
   .position-label-fantasy-tertiary {
-    color: #FFD966; /* Right Wing - Soft Golden Yellow */
+    color: #F9A436; /* Right Wing - Zesty Tangerine */
   }
   
   .position-label-defense {
-    color: #5BC5F0; /* Defense - Soft Sky Blue */
+    color: #A8D85C; /* Defense - Yellow-Green */
   }
   
   .position-label-goalie {
-    color: #B085F5; /* Goalie - Soft Purple */
+    color: #FF6F80; /* Goalie - Contrast Grapefruit Pink */
   }
   
   .position-label-utility {

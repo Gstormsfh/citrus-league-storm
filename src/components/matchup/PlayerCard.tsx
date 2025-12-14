@@ -5,6 +5,7 @@ import { getTeamColor } from "@/utils/teamColors";
 interface PlayerCardProps {
   player: MatchupPlayer | null;
   isUserTeam: boolean;
+  isBench?: boolean;
   onPlayerClick?: (player: MatchupPlayer) => void;
 }
 
@@ -12,24 +13,24 @@ interface PlayerCardProps {
 const getPositionColorClasses = (position: string): string => {
   const pos = position?.toUpperCase() || '';
   if (pos.includes('C') && !pos.includes('LW') && !pos.includes('RW')) {
-    // Center - Citrus Orange (#FFA366)
+    // Center - Bright Lemon Peel (#F9E076)
     return 'md:border-l-[3px] border-l-4 md:border-fantasy-primary border-fantasy-primary md:bg-fantasy-primary/15 bg-fantasy-primary/20';
   }
   if (pos.includes('LW') || pos === 'L' || pos === 'LEFT' || pos === 'LEFTWING') {
-    // Left Wing - Citrus Lime Green (#9BCF4A)
+    // Left Wing - Deep Lime Green (#459345)
     return 'md:border-l-[3px] border-l-4 md:border-fantasy-secondary border-fantasy-secondary md:bg-fantasy-secondary/15 bg-fantasy-secondary/20';
   }
   if (pos.includes('RW') || pos === 'R' || pos === 'RIGHT' || pos === 'RIGHTWING') {
-    // Right Wing - Citrus Golden Yellow (#FFCC33)
+    // Right Wing - Zesty Tangerine (#F9A436)
     return 'md:border-l-[3px] border-l-4 md:border-fantasy-tertiary border-fantasy-tertiary md:bg-fantasy-tertiary/15 bg-fantasy-tertiary/20';
   }
   if (pos.includes('D')) {
-    // Defense - Deep Blueberry Blue (#4A5D8C) - distinct from citrus colors
-    return 'md:border-l-[3px] border-l-4 md:border-[#4A5D8C] border-[#4A5D8C] md:bg-[#4A5D8C]/15 bg-[#4A5D8C]/20';
+    // Defense - Yellow-Green (#A8D85C)
+    return 'md:border-l-[3px] border-l-4 md:border-[#A8D85C] border-[#A8D85C] md:bg-[#A8D85C]/15 bg-[#A8D85C]/20';
   }
   if (pos.includes('G')) {
-    // Goalie - Deep Blackberry (#5D3A6B) - distinct purple-berry color
-    return 'md:border-l-[3px] border-l-4 md:border-[#5D3A6B] border-[#5D3A6B] md:bg-[#5D3A6B]/15 bg-[#5D3A6B]/20';
+    // Goalie - Contrast Grapefruit Pink (#FF6F80)
+    return 'md:border-l-[3px] border-l-4 md:border-[#FF6F80] border-[#FF6F80] md:bg-[#FF6F80]/15 bg-[#FF6F80]/20';
   }
   if (pos === 'UTIL' || pos === 'UTILITY') {
     // Utility - Citrus Apricot (#FFB84D) - distinct orange-yellow blend
@@ -59,7 +60,7 @@ const calculatePercentages = (player: MatchupPlayer) => {
   return { shotPct, pointRate };
 };
 
-export const PlayerCard = ({ player, isUserTeam, onPlayerClick }: PlayerCardProps) => {
+export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick }: PlayerCardProps) => {
   if (!player) {
     return (
       <div className={cn(`player-card player-card-empty ${isUserTeam ? 'user-team' : 'opponent-team'} opacity-50`)}>
@@ -129,8 +130,9 @@ export const PlayerCard = ({ player, isUserTeam, onPlayerClick }: PlayerCardProp
     <div 
       className={cn(
         `player-card ${isUserTeam ? 'user-team' : 'opponent-team'} cursor-pointer`,
-        positionColors,
-        player.isToday && 'ring-2 ring-primary/30'
+        !isBench && positionColors,
+        player.isToday && !isBench && 'ring-2 ring-primary/30',
+        isBench && 'opacity-40 grayscale bg-muted/50 border-muted'
       )}
       onClick={() => onPlayerClick?.(player)}
     >

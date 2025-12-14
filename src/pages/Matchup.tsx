@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from '@/contexts/AuthContext';
 import { useLeague } from '@/contexts/LeagueContext';
@@ -23,7 +23,8 @@ import PlayerStatsModal from '@/components/PlayerStatsModal';
 import { LeagueService, League, Team } from '@/services/LeagueService';
 import { MatchupService, Matchup } from '@/services/MatchupService';
 import { PlayerService } from '@/services/PlayerService';
-import { getDraftCompletionDate, getFirstWeekStartDate, getCurrentWeekNumber, getAvailableWeeks, getWeekLabel, getWeekDateLabel } from '@/utils/weekCalculator';
+import { supabase } from '@/integrations/supabase/client';
+import { getDraftCompletionDate, getFirstWeekStartDate, getCurrentWeekNumber, getAvailableWeeks, getWeekLabel, getWeekDateLabel, getWeekStartDate, getWeekEndDate } from '@/utils/weekCalculator';
 import { Loader2 } from 'lucide-react';
 import LoadingScreen from '@/components/LoadingScreen';
 
@@ -37,7 +38,9 @@ const Matchup = () => {
   console.log('[Matchup] URL parameters:', { urlLeagueId, urlWeekId });
   const [activeTab, setActiveTab] = useState("lineup");
   const [loading, setLoading] = useState(true);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const loadingRef = useRef(false); // Prevent concurrent loads
 
   const [selectedPlayer, setSelectedPlayer] = useState<HockeyPlayer | null>(null);
   const [isPlayerDialogOpen, setIsPlayerDialogOpen] = useState(false);
@@ -250,7 +253,14 @@ const Matchup = () => {
     }
 
     const loadMatchupData = async () => {
+      // Prevent concurrent loads
+      if (loadingRef.current) {
+        console.log('[Matchup] Load already in progress, skipping duplicate call...');
+        return;
+      }
+      
       try {
+        loadingRef.current = true;
         setLoading(true);
         setError(null);
 
@@ -342,39 +352,242 @@ const Matchup = () => {
         }
 
         setSelectedWeek(weekToShow);
+        
+        // Debug: Log week calculation details
+        console.log('[Matchup] Week calculation details:', {
+          urlWeekId,
+          weekToShow,
+          weekToShowType: typeof weekToShow,
+          firstWeekStart: firstWeek.toISOString(),
+          week2StartDate: getWeekStartDate(2, firstWeek).toISOString(),
+          week2EndDate: getWeekEndDate(2, firstWeek).toISOString(),
+          week2DateLabel: getWeekDateLabel(2, firstWeek),
+          availableWeeks: weeks,
+          weeksIncludeWeek2: weeks.includes(2)
+        });
 
         // Quick check: Does a matchup exist for this week? If yes, skip generation entirely
+        console.log('[Matchup] Checking for existing matchup:', {
+          leagueId: currentLeague.id,
+          userId: user.id,
+          weekNumber: weekToShow,
+          weekNumberType: typeof weekToShow
+        });
+        
         const { matchup: existingMatchup } = await MatchupService.getUserMatchup(
           currentLeague.id,
           user.id,
           weekToShow
         );
         
+        console.log('[Matchup] Existing matchup check result:', {
+          found: !!existingMatchup,
+          matchup: existingMatchup ? {
+            id: existingMatchup.id,
+            week_number: existingMatchup.week_number,
+            week_number_type: typeof existingMatchup.week_number,
+            team1_id: existingMatchup.team1_id,
+            team2_id: existingMatchup.team2_id
+          } : null
+        });
+        
         if (!existingMatchup) {
-          // Only generate matchups if they don't exist for this week
-          console.log('[Matchup] No matchup found for week', weekToShow, '- generating matchups for entire season...');
+          // No matchup found for this week - generate all missing weeks
+          console.log('[Matchup] No matchup found for week', weekToShow, '- generating matchups...');
           const { teams: leagueTeams } = await LeagueService.getLeagueTeams(currentLeague.id);
           
-          // For existing leagues that were drafted before this update, generate ALL weeks
-          // Check if this is an existing league with no matchups (drafted before auto-generation)
-          const { matchup: week1Matchup } = await MatchupService.getMatchup(currentLeague.id, 1);
+          // Check if ANY matchups exist for this league
+          const { data: anyMatchups } = await supabase
+            .from('matchups')
+            .select('week_number')
+            .eq('league_id', currentLeague.id)
+            .limit(1);
           
-          const hasAnyMatchups = week1Matchup !== null;
+          const hasAnyMatchups = anyMatchups && anyMatchups.length > 0;
           
-          // If no matchups exist at all, generate for all available weeks (complete season)
-          // Otherwise, just generate missing weeks
+          // If no matchups exist at all, force regenerate ALL weeks
+          // Otherwise, generate only missing weeks (which will include this one)
+          const forceRegenerate = !hasAnyMatchups;
+          
+          console.log('[Matchup] Generating matchups with forceRegenerate:', forceRegenerate, 'for week:', weekToShow);
+          console.log('[Matchup] Generation parameters:', {
+            leagueId: currentLeague.id,
+            teamCount: leagueTeams.length,
+            teams: leagueTeams.map(t => ({ id: t.id, name: t.team_name || t.id })),
+            firstWeekStart: firstWeek.toISOString(),
+            forceRegenerate,
+            requestedWeek: weekToShow,
+            requestedWeekType: typeof weekToShow
+          });
+          
           const { error: genError } = await MatchupService.generateMatchupsForLeague(
             currentLeague.id, 
             leagueTeams, 
             firstWeek,
-            !hasAnyMatchups // Force regenerate if no matchups exist (existing league fix)
+            forceRegenerate
           );
+          
           if (genError) {
             console.error('[Matchup] Error generating matchups:', genError);
-            // Don't throw - continue to try loading the matchup anyway
-          } else {
-            console.log('[Matchup] Matchup generation completed successfully');
+            setError(`Failed to generate matchups: ${genError.message || 'Unknown error'}`);
+            setLoading(false);
+            setIsInitialLoad(false);
+            return;
           }
+          
+          console.log('[Matchup] Matchup generation completed successfully');
+          
+          // Wait longer to ensure database commits complete
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          
+          // Debug: Check what matchups actually exist in the database BEFORE verification
+          const { data: allMatchups, error: checkError } = await supabase
+            .from('matchups')
+            .select('week_number, team1_id, team2_id, league_id')
+            .eq('league_id', currentLeague.id)
+            .eq('week_number', weekToShow);
+          
+          console.log('[Matchup] Debug - All matchups for week', weekToShow, ':', allMatchups);
+          
+          // Also check ALL weeks in database to see what's actually stored
+          const { data: allWeeksMatchups } = await supabase
+            .from('matchups')
+            .select('week_number')
+            .eq('league_id', currentLeague.id);
+          
+          const uniqueWeeks = new Set(allWeeksMatchups?.map(m => m.week_number) || []);
+          console.log('[Matchup] Debug - All week numbers in database:', Array.from(uniqueWeeks).sort((a, b) => a - b));
+          console.log('[Matchup] Debug - Requested week', weekToShow, 'exists in database?', uniqueWeeks.has(weekToShow));
+          
+          // Also check user's team
+          const { data: userTeamData } = await supabase
+            .from('teams')
+            .select('id, team_name, owner_id')
+            .eq('league_id', currentLeague.id)
+            .eq('owner_id', user.id)
+            .maybeSingle();
+          
+          console.log('[Matchup] Debug - User team:', userTeamData);
+          
+          if (allMatchups && allMatchups.length > 0) {
+            console.log('[Matchup] Debug - Matchups exist but user team not found. User team ID:', userTeamData?.id);
+            console.log('[Matchup] Debug - Matchups in week:', allMatchups.map(m => ({
+              team1: m.team1_id,
+              team2: m.team2_id
+            })));
+            
+            // Check if user's team is in any of these matchups
+            const userTeamInMatchups = allMatchups.some(m => 
+              m.team1_id === userTeamData?.id || m.team2_id === userTeamData?.id
+            );
+            console.log('[Matchup] Debug - User team in matchups?', userTeamInMatchups);
+          }
+          
+          // Verify the matchup was created
+          const { matchup: verifyMatchup } = await MatchupService.getUserMatchup(
+            currentLeague.id,
+            user.id,
+            weekToShow
+          );
+          
+          if (!verifyMatchup) {
+            console.error('[Matchup] Matchup still not found after generation for week', weekToShow);
+            
+            // If matchups exist but user's team isn't in them, this is a serious issue - FORCE REGENERATE
+            if (allMatchups && allMatchups.length > 0 && userTeamData) {
+              const userTeamInMatchups = allMatchups.some(m => 
+                m.team1_id === userTeamData.id || m.team2_id === userTeamData.id
+              );
+              
+              if (!userTeamInMatchups) {
+                console.error('[Matchup] CRITICAL: Week', weekToShow, 'has matchups but user team', userTeamData.id, 'is not in any of them!');
+                console.error('[Matchup] FORCING FULL REGENERATION of all matchups...');
+                
+                // Force delete ALL matchups and regenerate
+                await MatchupService.deleteAllMatchupsForLeague(currentLeague.id);
+                
+                // Get all teams again to ensure we have the complete list
+                const { teams: allLeagueTeams } = await LeagueService.getLeagueTeams(currentLeague.id);
+                
+                // Verify user's team is in the list
+                const userTeamInList = allLeagueTeams.some(t => t.id === userTeamData.id);
+                if (!userTeamInList) {
+                  console.error('[Matchup] CRITICAL: User team is not in the league teams list!');
+                  setError(`Your team (${userTeamData.id}) is not found in the league teams. This is a data integrity issue.`);
+                  setLoading(false);
+                  setIsInitialLoad(false);
+                  return;
+                }
+                
+                console.log('[Matchup] Regenerating ALL matchups with complete team list...');
+                const { error: regenError } = await MatchupService.generateMatchupsForLeague(
+                  currentLeague.id,
+                  allLeagueTeams,
+                  firstWeek,
+                  true // Force regenerate
+                );
+                
+                if (regenError) {
+                  console.error('[Matchup] Error during forced regeneration:', regenError);
+                  setError(`Failed to regenerate matchups: ${regenError.message || 'Unknown error'}`);
+                  setLoading(false);
+                  setIsInitialLoad(false);
+                  return;
+                }
+                
+                // Wait for database commits
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                
+                // Verify again
+                const { matchup: finalMatchup } = await MatchupService.getUserMatchup(
+                  currentLeague.id,
+                  user.id,
+                  weekToShow
+                );
+                
+                if (!finalMatchup) {
+                  console.error('[Matchup] Still no matchup after forced regeneration!');
+                  setError(`Failed to generate matchup for week ${weekToShow} after forced regeneration. Please refresh and try again.`);
+                  setLoading(false);
+                  setIsInitialLoad(false);
+                  return;
+                }
+                
+                console.log('[Matchup] Successfully regenerated and verified matchup exists');
+                // Matchup now exists, continue with normal flow below
+              } else {
+                setError(`No matchup found for week ${weekToShow}. The matchup generation may have failed. Please try refreshing the page.`);
+                setLoading(false);
+                setIsInitialLoad(false);
+                return;
+              }
+            } else {
+              setError(`No matchup found for week ${weekToShow}. The matchup generation may have failed. Please try refreshing the page.`);
+              setLoading(false);
+              setIsInitialLoad(false);
+              return;
+            }
+            
+            // If we got here after forced regeneration, the matchup should exist now
+            // Re-fetch it to continue with normal flow
+            const { matchup: regeneratedMatchup } = await MatchupService.getUserMatchup(
+              currentLeague.id,
+              user.id,
+              weekToShow
+            );
+            
+            if (!regeneratedMatchup) {
+              console.error('[Matchup] Matchup still not found after forced regeneration!');
+              setError(`Failed to generate matchup for week ${weekToShow} after forced regeneration. Please refresh and try again.`);
+              setLoading(false);
+              setIsInitialLoad(false);
+              return;
+            }
+            
+            console.log('[Matchup] Verified matchup exists after forced regeneration');
+          }
+          
+          console.log('[Matchup] Verified matchup exists for week', weekToShow);
         } else {
           console.log('[Matchup] Matchup already exists for week', weekToShow, '- skipping generation');
         }
@@ -438,10 +651,28 @@ const Matchup = () => {
         }
 
       } catch (err: any) {
-        console.error('Error loading matchup data:', err);
-        setError(err.message || 'Failed to load matchup data');
+        console.error('[Matchup] Error loading matchup data:', err);
+        console.error('[Matchup] Error details:', {
+          message: err.message,
+          stack: err.stack,
+          name: err.name
+        });
+        
+        // Only set error if it's not a transient/network error that might resolve on retry
+        const errorMessage = err.message || 'Failed to load matchup data';
+        const isTransientError = errorMessage.includes('network') || 
+                                 errorMessage.includes('timeout') ||
+                                 errorMessage.includes('fetch');
+        
+        if (!isTransientError) {
+          setError(errorMessage);
+        } else {
+          console.log('[Matchup] Transient error detected, will retry on next load');
+        }
       } finally {
         setLoading(false);
+        setIsInitialLoad(false); // Mark that initial load is complete
+        loadingRef.current = false; // Release lock
       }
     };
 
@@ -523,11 +754,19 @@ const Matchup = () => {
                 </div>
               </div>
           
-          {loading && (
+          {/* Show LoadingScreen on initial load (route navigation) - Suspense handles the transition */}
+          {loading && isInitialLoad && (
             <LoadingScreen
               character="citrus"
               message="Loading NHL Matchups..."
             />
+          )}
+          
+          {loading && !isInitialLoad && (
+            <div className="flex items-center justify-center py-20">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <p className="ml-3 text-muted-foreground">Loading matchup...</p>
+            </div>
           )}
           
           {!loading && error && userLeagueState === 'active-user' && (
@@ -601,6 +840,8 @@ const Matchup = () => {
                 <MatchupComparison
                   userStarters={myStarters}
                   opponentStarters={opponentStarters}
+                  userBench={myBench}
+                  opponentBench={opponentBench}
                   userSlotAssignments={displayMyTeamSlotAssignments}
                   opponentSlotAssignments={displayOpponentTeamSlotAssignments}
                   onPlayerClick={handlePlayerClick}

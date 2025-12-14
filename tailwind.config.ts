@@ -63,11 +63,13 @@ export default {
 					border: 'hsl(var(--sidebar-border))',
 					ring: 'hsl(var(--sidebar-ring))'
 				},
-				// Citrus fantasy sports theme colors - Soft colorful versions
+				// Citrus fantasy sports theme colors - High-Contrast Citrus Palette
 				fantasy: {
-					primary: '#FFA366',     // Soft orange (more colorful than pastel)
-					secondary: '#9BCF4A',   // Soft lime green (more colorful)
-					tertiary: '#FFCC33',    // Soft golden yellow (more colorful)
+					primary: '#F9E076',     // Bright Lemon Peel (Center)
+					secondary: '#459345',   // Deep Lime Green (Left Wing)
+					tertiary: '#F9A436',     // Zesty Tangerine (Right Wing)
+					'dark-orange': '#B75302', // Dark Orange Rind
+					'grapefruit-red': '#FF6F80', // Grapefruit Ruby Red
 					light: '#FFF1DB',      // Light cream
 					dark: '#1E293B',       // Slate dark
 					muted: '#94A3B8',      // Slate gray

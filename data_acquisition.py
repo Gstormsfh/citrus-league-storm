@@ -1551,7 +1551,42 @@ def scrape_pbp_and_process(date_str='2025-12-07'):
                 
                 # GOALIE INFORMATION
                 goalie_id = details.get('goalieInNetId')
-                goalie_name = None  # Would need roster lookup for name
+                goalie_name = None
+                
+                # Fetch goalie name from player_names table (fast lookup)
+                if goalie_id:
+                    try:
+                        name_response = supabase.table('player_names').select('full_name').eq('player_id', goalie_id).limit(1).execute()
+                        if name_response.data:
+                            goalie_name = name_response.data[0]['full_name']
+                    except:
+                        # If table lookup fails, try API fetch (slower)
+                        try:
+                            goalie_api_url = f"https://api-web.nhle.com/v1/player/{goalie_id}/landing"
+                            goalie_api_response = requests.get(goalie_api_url, timeout=2)
+                            if goalie_api_response.status_code == 200:
+                                goalie_data = goalie_api_response.json()
+                                first_name = goalie_data.get('firstName', {}).get('default', '')
+                                last_name = goalie_data.get('lastName', {}).get('default', '')
+                                if first_name and last_name:
+                                    goalie_name = f"{first_name} {last_name}"
+                                    # Store in player_names for future lookups
+                                    try:
+                                        supabase.table('player_names').upsert({
+                                            'player_id': goalie_id,
+                                            'full_name': goalie_name,
+                                            'first_name': first_name,
+                                            'last_name': last_name,
+                                            'position': goalie_data.get('position', 'G'),
+                                            'team': goalie_data.get('currentTeamAbbrev', ''),
+                                            'jersey_number': goalie_data.get('sweaterNumber'),
+                                            'is_active': goalie_data.get('isActive', True),
+                                            'headshot_url': goalie_data.get('headshot', '')
+                                        }, on_conflict='player_id').execute()
+                                    except:
+                                        pass  # Don't fail if upsert fails
+                        except:
+                            pass  # Don't fail if API fetch fails
                 
                 # PERIOD/TIME CONTEXT
                 period_descriptor = play.get('periodDescriptor', {})

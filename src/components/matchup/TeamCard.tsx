@@ -86,14 +86,14 @@ export const TeamCard = ({ title, starters, bench, gradientClass, slotAssignment
         text: 'text-fantasy-tertiary'
       },
       'D': {
-        bg: 'md:bg-[#4A5D8C]/15 bg-[#4A5D8C]/20',
-        border: 'md:border-l-[1px] border-l-4 md:border-[#4A5D8C]/40 border-[#4A5D8C]',
-        text: 'text-[#4A5D8C]'
+        bg: 'md:bg-[#A8D85C]/15 bg-[#A8D85C]/20',
+        border: 'md:border-l-[1px] border-l-4 md:border-[#A8D85C]/40 border-[#A8D85C]',
+        text: 'text-[#A8D85C]'
       },
       'G': {
-        bg: 'md:bg-[#5D3A6B]/15 bg-[#5D3A6B]/20',
-        border: 'md:border-l-[1px] border-l-4 md:border-[#5D3A6B]/40 border-[#5D3A6B]',
-        text: 'text-[#5D3A6B]'
+        bg: 'md:bg-[#FF6F80]/15 bg-[#FF6F80]/20',
+        border: 'md:border-l-[1px] border-l-4 md:border-[#FF6F80]/40 border-[#FF6F80]',
+        text: 'text-[#FF6F80]'
       },
       'UTIL': {
         bg: 'md:bg-[#FFB84D]/15 bg-[#FFB84D]/20',
@@ -239,16 +239,18 @@ export const TeamCard = ({ title, starters, bench, gradientClass, slotAssignment
         {/* Mobile View */}
         <div className="md:hidden">
            {organizedStarters.map(({ player, position, slot }, index) => {
-             // For UTIL slot, always display "Util" regardless of player's actual position
-             const displayPosition = slot === 'slot-UTIL' ? 'Util' : (player ? formatPositionForDisplay(player.position) : formatPositionForDisplay(position));
+             // For UTIL slot, use player's actual position for color, but display "Util"
+             const isUtilSlot = slot === 'slot-UTIL';
+             const colorPosition = isUtilSlot && player ? player.position : position;
+             const displayPosition = isUtilSlot ? 'Util' : (player ? formatPositionForDisplay(player.position) : formatPositionForDisplay(position));
              
              if (player) {
                // For UTIL slot, pass the slot position instead of player position to renderMobilePlayerRow
                // We'll handle the display in the render function
-               return <div key={player.id}>{renderMobilePlayerRow(player, false, slot === 'slot-UTIL' ? 'Util' : undefined)}</div>;
+               return <div key={player.id}>{renderMobilePlayerRow(player, false, isUtilSlot ? 'Util' : undefined)}</div>;
              } else {
                // Empty slot
-               const posStyles = getPositionStyles(position, false, true);
+               const posStyles = getPositionStyles(colorPosition, false, true);
                return (
                  <div 
                    key={`empty-${index}`}
@@ -303,9 +305,11 @@ export const TeamCard = ({ title, starters, bench, gradientClass, slotAssignment
             </TableHeader>
             <TableBody>
               {organizedStarters.map(({ player, position, slot, isGroupStart }, index) => {
-                const posStyles = getPositionStyles(position, false, false);
-                // For UTIL slot, always display "Util" regardless of player's actual position
-                const displayPosition = slot === 'slot-UTIL' ? 'Util' : (player ? formatPositionForDisplay(player.position) : formatPositionForDisplay(position));
+                // For UTIL slot, use player's actual position for color, but display "Util"
+                const isUtilSlot = slot === 'slot-UTIL';
+                const colorPosition = isUtilSlot && player ? player.position : position;
+                const posStyles = getPositionStyles(colorPosition, false, false);
+                const displayPosition = isUtilSlot ? 'Util' : (player ? formatPositionForDisplay(player.position) : formatPositionForDisplay(position));
                 
                 // Add spacer row before new position groups (except the first one) - minimal on desktop
                 const spacerRow = isGroupStart && index > 0 ? (

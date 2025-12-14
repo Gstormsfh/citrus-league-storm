@@ -89,6 +89,97 @@ export const MatchupService = {
   /**
    * Generate round-robin matchups for all available weeks in a league
    */
+  /**
+   * Get round-robin pairings for a specific week using the Circle Method
+   * For weeks beyond numRounds, repeats the cycle
+   */
+  getRoundRobinPairings(
+    weekNumber: number,
+    teams: Team[],
+    numRounds: number
+  ): Array<{ team1: Team; team2: Team | null }> {
+    const numTeams = teams.length;
+    
+    // Determine base week for cycle repetition (weeks beyond numRounds repeat the cycle)
+    const baseWeek = ((weekNumber - 1) % numRounds) + 1;
+    const roundIndex = baseWeek - 1;
+    
+    const pairs: Array<{ team1: Team; team2: Team | null }> = [];
+    
+    if (numTeams % 2 === 0) {
+      // Even number of teams: Use circle method
+      const fixedTeam = teams[0];
+      const rotatingTeams = teams.slice(1);
+      
+      // Rotate teams
+      const rotationOffset = roundIndex;
+      const rotated = [
+        ...rotatingTeams.slice(rotationOffset),
+        ...rotatingTeams.slice(0, rotationOffset)
+      ];
+      
+      // Pair fixed team with last team in rotated array
+      pairs.push({
+        team1: fixedTeam,
+        team2: rotated[rotated.length - 1]
+      });
+      
+      // Pair remaining teams (excluding the last one which is already paired with fixedTeam)
+      // first with last, second with second-to-last, etc.
+      const remainingTeams = rotated.slice(0, rotated.length - 1);
+      const pairsToMake = Math.floor(remainingTeams.length / 2);
+      for (let i = 0; i < pairsToMake; i++) {
+        pairs.push({
+          team1: remainingTeams[i],
+          team2: remainingTeams[remainingTeams.length - 1 - i]
+        });
+      }
+    } else {
+      // Odd number of teams: Fixed team gets bye when rotationOffset is 0
+      const fixedTeam = teams[0];
+      const rotatingTeams = teams.slice(1);
+      
+      const rotationOffset = roundIndex % numTeams;
+      const rotated = [
+        ...rotatingTeams.slice(rotationOffset),
+        ...rotatingTeams.slice(0, rotationOffset)
+      ];
+      
+      if (rotationOffset === 0) {
+        // Fixed team gets bye
+        pairs.push({ team1: fixedTeam, team2: null });
+        // Pair all rotating teams
+        const pairsToMake = Math.floor(rotated.length / 2);
+        for (let i = 0; i < pairsToMake; i++) {
+          pairs.push({
+            team1: rotated[i],
+            team2: rotated[rotated.length - 1 - i]
+          });
+        }
+      } else {
+        // When rotationOffset !== 0, the team at position (rotationOffset - 1) in rotatingTeams gets the bye
+        // This team is at index (rotationOffset - 1) in the original rotatingTeams array
+        const byeTeamIndexInRotating = (rotationOffset - 1 + rotatingTeams.length) % rotatingTeams.length;
+        const byeTeam = rotatingTeams[byeTeamIndexInRotating];
+        
+        // Give the bye team a solo pair
+        pairs.push({ team1: byeTeam, team2: null });
+        
+        // Pair the remaining teams (fixedTeam + all rotatingTeams except the bye team)
+        const teamsToPair = [fixedTeam, ...rotatingTeams.filter((_, idx) => idx !== byeTeamIndexInRotating)];
+        const pairsToMake = Math.floor(teamsToPair.length / 2);
+        for (let i = 0; i < pairsToMake; i++) {
+          pairs.push({
+            team1: teamsToPair[i],
+            team2: teamsToPair[teamsToPair.length - 1 - i]
+          });
+        }
+      }
+    }
+    
+    return pairs;
+  },
+
   async generateMatchupsForLeague(
     leagueId: string,
     teams: Team[],
@@ -96,7 +187,7 @@ export const MatchupService = {
     forceRegenerate: boolean = false
   ): Promise<{ error: any }> {
     try {
-      // Get available weeks (includes all weeks through end of year, including playoffs)
+      // Get available weeks
       const currentYear = new Date().getFullYear();
       const availableWeeks = getAvailableWeeks(firstWeekStart, currentYear);
       console.log(`[MatchupService] Generating matchups for ${availableWeeks.length} weeks (weeks ${availableWeeks[0]} to ${availableWeeks[availableWeeks.length - 1]})`);
@@ -105,445 +196,134 @@ export const MatchupService = {
         return { error: new Error('Need at least 2 teams to generate matchups') };
       }
 
-      let matchupsCreated = 0;
-      
-      // Use proper round-robin tournament algorithm (circle method)
-      // This ensures every team plays every other team exactly once
       const numTeams = teams.length;
-      const numRounds = numTeams % 2 === 0 ? numTeams - 1 : numTeams; // For even teams, need n-1 rounds to play everyone
+      const numRounds = numTeams % 2 === 0 ? numTeams - 1 : numTeams;
       
-      // Shuffle teams to randomize schedule while maintaining fairness
-      // This makes matchups less predictable while still ensuring every team plays every other team once
+      // Verify we have at least 2 teams
+      if (numTeams < 2) {
+        console.error(`[MatchupService] Cannot generate matchups: Need at least 2 teams, got ${numTeams}`);
+        return { error: new Error(`Need at least 2 teams to generate matchups, got ${numTeams}`) };
+      }
+      
+      // CRITICAL: Verify all teams have valid IDs
+      const teamsWithInvalidIds = teams.filter(t => !t.id || t.id === null || t.id === undefined);
+      if (teamsWithInvalidIds.length > 0) {
+        console.error(`[MatchupService] CRITICAL: Found ${teamsWithInvalidIds.length} teams with invalid IDs:`, teamsWithInvalidIds);
+        return { error: new Error(`Cannot generate matchups: ${teamsWithInvalidIds.length} teams have invalid IDs`) };
+      }
+      
+      // Log all teams to verify completeness
+      console.log(`[MatchupService] Teams passed to generation (${numTeams} teams):`, teams.map(t => ({
+        id: t.id,
+        name: t.team_name || t.id,
+        owner_id: t.owner_id
+      })));
+      
+      // Get all unique team IDs to verify no duplicates
+      const teamIds = teams.map(t => t.id);
+      const uniqueTeamIds = new Set(teamIds);
+      if (teamIds.length !== uniqueTeamIds.size) {
+        console.error(`[MatchupService] CRITICAL: Duplicate team IDs found! Total: ${teamIds.length}, Unique: ${uniqueTeamIds.size}`);
+        const duplicates = teamIds.filter((id, index) => teamIds.indexOf(id) !== index);
+        console.error(`[MatchupService] Duplicate IDs:`, duplicates);
+        return { error: new Error(`Cannot generate matchups: Duplicate team IDs found`) };
+      }
+      
+      // Shuffle teams once for randomness (deterministic after that)
       const shuffledTeams = [...teams].sort(() => Math.random() - 0.5);
       
-      console.log(`[MatchupService] Generating world-class schedule for ${numTeams} teams over ${totalWeeks} weeks`);
-      console.log(`[MatchupService] Base round-robin: ${numRounds} rounds (weeks 1-${numRounds})`);
-      if (totalWeeks > numRounds) {
-        const extraWeeks = totalWeeks - numRounds;
-        console.log(`[MatchupService] Extended season: ${extraWeeks} additional weeks (weeks ${numRounds + 1}-${totalWeeks})`);
-        console.log(`[MatchupService] Will enforce ±1 rule: each team plays some opponents once, others twice`);
-      }
-      console.log(`[MatchupService] Team mapping (shuffled for randomness):`, shuffledTeams.map((t, i) => ({ index: i, id: t.id, name: t.team_name || t.id })));
+      console.log(`[MatchupService] Generating schedule for ${numTeams} teams (${numRounds} rounds per cycle)`);
+      console.log(`[MatchupService] Shuffled team order:`, shuffledTeams.map((t, i) => ({
+        index: i,
+        id: t.id,
+        name: t.team_name || t.id
+      })));
       
-      // Track schedule state for constraint checking
-      // schedule[weekNumber] = Map<teamId, opponentId>
-      const schedule = new Map<number, Map<string, string>>();
-      
-      // Track opponent counts per team: opponentCounts[teamId][opponentId] = count
-      const opponentCounts = new Map<string, Map<string, number>>();
-      teams.forEach(team => {
-        opponentCounts.set(team.id, new Map<string, number>());
-      });
-      
-      // Track last matchup week for spacing optimization: lastMatchupWeek[teamId][opponentId] = weekNumber
-      const lastMatchupWeek = new Map<string, Map<string, number>>();
-      teams.forEach(team => {
-        lastMatchupWeek.set(team.id, new Map<string, number>());
-      });
-      
-      // If forceRegenerate is true, delete all existing matchups first
-      if (forceRegenerate) {
-        console.log('[MatchupService] Force regenerate requested, deleting all existing matchups...');
-        await this.deleteAllMatchupsForLeague(leagueId);
-      }
-      
-      // Check which weeks already have matchups to avoid regenerating
-      // Only check a sample of weeks to speed up the query (check first, middle, and last weeks)
-      const sampleWeeks = [
-        availableWeeks[0],
-        availableWeeks[Math.floor(availableWeeks.length / 2)],
-        availableWeeks[availableWeeks.length - 1]
-      ].filter(Boolean);
-      
+      // Check existing matchups - simple check: does each week have matchups?
       const { data: existingMatchups } = await supabase
         .from('matchups')
         .select('week_number')
-        .eq('league_id', leagueId)
-        .in('week_number', sampleWeeks);
+        .eq('league_id', leagueId);
       
       const weeksWithMatchups = new Set(existingMatchups?.map(m => m.week_number) || []);
       
-      // If sample weeks have matchups, assume most weeks do - only generate first numRounds weeks
-      // If sample weeks don't have matchups, generate all weeks
-      const shouldGenerateAll = weeksWithMatchups.size === 0;
-      const weeksNeedingMatchups = shouldGenerateAll 
-        ? availableWeeks.slice(0, numRounds) // Generate first cycle
-        : availableWeeks.filter(w => !weeksWithMatchups.has(w)).slice(0, numRounds); // Only missing weeks in first cycle
+      // Determine which weeks need matchups
+      let weeksNeedingMatchups: number[] = [];
       
-      console.log(`[MatchupService] Sample check: ${weeksWithMatchups.size}/${sampleWeeks.length} sample weeks have matchups. Will generate ${weeksNeedingMatchups.length} weeks.`);
-      
-      // Verify that existing matchups cover all teams correctly
-      // If the first numRounds weeks don't have matchups for all teams, we should regenerate
-      let shouldRegenerate = false;
-      if (weeksWithMatchups.size > 0 && !forceRegenerate) {
-        const { data: firstRoundsMatchups } = await supabase
-          .from('matchups')
-          .select('week_number, team1_id, team2_id')
-          .eq('league_id', leagueId)
-          .in('week_number', availableWeeks.slice(0, Math.min(numRounds, availableWeeks.length)))
-          .order('week_number', { ascending: true });
+      if (forceRegenerate || weeksWithMatchups.size === 0) {
+        // Full regeneration: delete all, generate all weeks
+        console.log('[MatchupService] Full regeneration requested - deleting all existing matchups...');
+        await this.deleteAllMatchupsForLeague(leagueId);
+        weeksNeedingMatchups = availableWeeks;
+      } else {
+        // Generate only missing weeks
+        weeksNeedingMatchups = availableWeeks.filter(w => !weeksWithMatchups.has(w));
         
-        if (firstRoundsMatchups && firstRoundsMatchups.length > 0) {
-          // Check if all teams appear in matchups
-          const teamsInMatchups = new Set<string>();
-          firstRoundsMatchups.forEach(m => {
-            if (m.team1_id) teamsInMatchups.add(m.team1_id);
-            if (m.team2_id) teamsInMatchups.add(m.team2_id);
-          });
-          
-          const allTeamIds = new Set(shuffledTeams.map(t => t.id));
-          const missingTeams = Array.from(allTeamIds).filter(id => !teamsInMatchups.has(id));
-          
-          if (missingTeams.length > 0) {
-            console.warn(`[MatchupService] Found ${missingTeams.length} teams missing from matchups:`, missingTeams);
-            console.warn('[MatchupService] Regenerating matchups to fix schedule...');
-            shouldRegenerate = true;
-          } else {
-            // Check if any team only faces the same opponent
-            const teamOpponents = new Map<string, Set<string>>();
-            shuffledTeams.forEach(t => teamOpponents.set(t.id, new Set()));
-            
-            firstRoundsMatchups.forEach(m => {
-              if (m.team1_id && m.team2_id) {
-                teamOpponents.get(m.team1_id)?.add(m.team2_id);
-                teamOpponents.get(m.team2_id)?.add(m.team1_id);
-              }
-            });
-            
-            // Check if any team has fewer than numRounds-1 unique opponents (should be n-1 for n teams)
-            let hasInsufficientOpponents = false;
-            teamOpponents.forEach((opponents, teamId) => {
-              if (opponents.size < numRounds - 1) {
-                console.warn(`[MatchupService] Team ${teamId} only faces ${opponents.size} opponents (should be ${numRounds - 1})`);
-                hasInsufficientOpponents = true;
-              }
-            });
-            
-            if (hasInsufficientOpponents) {
-              console.warn('[MatchupService] Schedule appears incorrect, regenerating...');
-              shouldRegenerate = true;
-            }
-          }
+        // CRITICAL: If a week has matchups but is incomplete (not all teams have matchups),
+        // we need to regenerate it. For now, if ANY week is missing, regenerate ALL weeks
+        // to ensure consistency. This is safer than trying to patch individual weeks.
+        if (weeksNeedingMatchups.length > 0) {
+          console.log('[MatchupService] Some weeks are missing matchups. Regenerating ALL weeks to ensure consistency...');
+          await this.deleteAllMatchupsForLeague(leagueId);
+          weeksNeedingMatchups = availableWeeks;
         }
       }
       
-      if (shouldRegenerate) {
-        console.log('[MatchupService] Deleting existing matchups to regenerate correct schedule...');
-        await this.deleteAllMatchupsForLeague(leagueId);
-        weeksWithMatchups.clear();
-      }
-      
-      // Generate matchups only for weeks that need them
-      // If forceRegenerate is true (e.g., existing league with no matchups), generate ALL available weeks
-      // If regenerating due to incorrect schedule, generate first numRounds weeks (complete cycle)
-      // Otherwise, only generate missing weeks (up to numRounds to complete cycle)
-      const weeksToProcess = forceRegenerate
-        ? availableWeeks // Generate ALL weeks for existing leagues that need it
-        : shouldRegenerate
-          ? availableWeeks.slice(0, numRounds) // Regenerate first cycle
-          : weeksNeedingMatchups.length > 0
-            ? weeksNeedingMatchups.slice(0, numRounds) // Only missing weeks, limit to first cycle
-            : []; // Nothing to generate
-      
-      if (weeksToProcess.length === 0) {
+      if (weeksNeedingMatchups.length === 0) {
         console.log('[MatchupService] No weeks need matchup generation - all matchups already exist');
         return { error: null };
       }
       
-      const totalWeeks = weeksToProcess.length;
-      console.log(`[MatchupService] Processing ${totalWeeks} weeks for matchup generation (weeks ${weeksToProcess[0]} to ${weeksToProcess[weeksToProcess.length - 1]})`);
+      console.log(`[MatchupService] Generating matchups for ${weeksNeedingMatchups.length} weeks:`, weeksNeedingMatchups);
+      console.log(`[MatchupService] Teams in league:`, teams.map(t => ({ id: t.id, name: t.team_name || t.id })));
       
-      // Helper function to get valid opponents for a team in a given week
-      const getValidOpponents = (
-        teamId: string,
-        weekNumber: number,
-        allTeams: Team[]
-      ): Team[] => {
-        const valid: Team[] = [];
-        const teamOpponentCounts = opponentCounts.get(teamId) || new Map();
-        
-        // Get last week's opponent (to avoid back-to-back)
-        const lastWeekOpponent = weekNumber > 1 
-          ? schedule.get(weekNumber - 1)?.get(teamId)
-          : null;
-        
-        // Calculate target count for ±1 rule
-        const gamesPerOpponent = Math.floor(totalWeeks / numRounds);
-        const currentCounts = Array.from(teamOpponentCounts.values());
-        const minCount = currentCounts.length > 0 
-          ? Math.min(...currentCounts, gamesPerOpponent)
-          : gamesPerOpponent;
-        
-        for (const opponent of allTeams) {
-          if (opponent.id === teamId) continue; // Can't play yourself
-          if (opponent.id === lastWeekOpponent) continue; // No back-to-back!
-          
-          const currentCount = teamOpponentCounts.get(opponent.id) || 0;
-          // Prefer opponents with count <= minCount (maintain ±1 rule)
-          if (currentCount <= minCount + 1) {
-            valid.push(opponent);
-          }
-        }
-        
-        // If no valid opponents found (shouldn't happen), return all except self and last week
-        if (valid.length === 0) {
-          return allTeams.filter(t => t.id !== teamId && t.id !== lastWeekOpponent);
-        }
-        
-        return valid;
-      };
+      let matchupsCreated = 0;
+      let matchupsSkipped = 0;
+      let matchupsErrors = 0;
       
-      // Helper function to find optimal opponent (maximizes spacing)
-      const findOptimalOpponent = (
-        teamId: string,
-        validOpponents: Team[],
-        weekNumber: number
-      ): Team | null => {
-        if (validOpponents.length === 0) return null;
-        if (validOpponents.length === 1) return validOpponents[0];
-        
-        const teamLastMatchup = lastMatchupWeek.get(teamId) || new Map();
-        const teamOpponentCounts = opponentCounts.get(teamId) || new Map();
-        
-        // Sort by: 1) spacing (maximize), 2) count (minimize for ±1 rule)
-        const scored = validOpponents.map(opp => {
-          const lastWeek = teamLastMatchup.get(opp.id) || 0;
-          const spacing = lastWeek > 0 ? weekNumber - lastWeek : Infinity;
-          const count = teamOpponentCounts.get(opp.id) || 0;
-          return { opponent: opp, spacing, count };
-        });
-        
-        // Sort: maximize spacing, then minimize count
-        scored.sort((a, b) => {
-          if (b.spacing !== a.spacing) return b.spacing - a.spacing;
-          return a.count - b.count;
-        });
-        
-        return scored[0].opponent;
-      };
-      
-      // Generate matchups for each week using constraint-based algorithm
-      for (const weekNumber of weeksToProcess) {
+      // Generate matchups for each week using simple round-robin
+      for (const weekNumber of weeksNeedingMatchups) {
         const weekStart = getWeekStartDate(weekNumber, firstWeekStart);
         const weekEnd = getWeekEndDate(weekNumber, firstWeekStart);
-
-        const teamPairs: Array<{ team1: Team; team2: Team | null }> = [];
-        const weekSchedule = new Map<string, string>(); // Track this week's matchups
         
-        // Weeks 1 to numRounds: Use base round-robin (circle method)
-        if (weekNumber <= numRounds) {
-          // Round-robin algorithm using circle method
-          // Fix first team in place, rotate others around it
-          const roundIndex = weekNumber - 1;
-          console.log(`[MatchupService] Week ${weekNumber}: Base round-robin, roundIndex=${roundIndex}`);
-          
-          if (numTeams % 2 === 0) {
-          // Even number of teams: Use circle method
-          // Fix team 0, rotate teams 1..n-1 around it
-          const fixedTeam = shuffledTeams[0];
-          const rotatingTeams = shuffledTeams.slice(1); // Teams 1 through n-1
-          
-          // For the circle method, we rotate teams 1-9 clockwise
-          // Round 0: no rotation
-          // Round 1: rotate by 1
-          // Round 2: rotate by 2
-          // etc.
-          const rotationOffset = roundIndex;
-          const rotated = [
-            ...rotatingTeams.slice(rotationOffset),
-            ...rotatingTeams.slice(0, rotationOffset)
-          ];
-          
-          console.log(`[MatchupService] Week ${weekNumber} rotation:`, {
-            roundIndex,
-            rotationOffset,
-            fixedTeam: fixedTeam.team_name || fixedTeam.id,
-            rotatingTeams: rotatingTeams.map(t => t.team_name || t.id),
-            rotated: rotated.map(t => t.team_name || t.id)
-          });
-          
-          // Pair fixed team with the last team in rotated array (opposite position)
-          teamPairs.push({
-            team1: fixedTeam,
-            team2: rotated[rotated.length - 1]
-          });
-          
-          // Pair remaining teams: first with last, second with second-to-last, etc.
-          // For 9 rotating teams, we make 4 pairs (indices 0-3 paired with 7-4)
-          const pairsToMake = Math.floor(rotated.length / 2);
-          for (let i = 0; i < pairsToMake; i++) {
-            const team1Index = i;
-            const team2Index = rotated.length - 1 - i;
-            teamPairs.push({
-              team1: rotated[team1Index],
-              team2: rotated[team2Index]
-            });
-          }
-          
-          console.log(`[MatchupService] Week ${weekNumber} generated pairs:`, teamPairs.map(p => ({
-            team1: p.team1.team_name || p.team1.id,
-            team2: p.team2?.team_name || p.team2?.id || 'BYE'
-          })));
-          
-          // Store in schedule and update tracking
-          teamPairs.forEach(pair => {
-            if (pair.team2) {
-              weekSchedule.set(pair.team1.id, pair.team2.id);
-              weekSchedule.set(pair.team2.id, pair.team1.id);
-              
-              // Update opponent counts
-              const team1Counts = opponentCounts.get(pair.team1.id)!;
-              const team2Counts = opponentCounts.get(pair.team2.id)!;
-              team1Counts.set(pair.team2.id, (team1Counts.get(pair.team2.id) || 0) + 1);
-              team2Counts.set(pair.team1.id, (team2Counts.get(pair.team1.id) || 0) + 1);
-              
-              // Update last matchup week
-              const team1Last = lastMatchupWeek.get(pair.team1.id)!;
-              const team2Last = lastMatchupWeek.get(pair.team2.id)!;
-              team1Last.set(pair.team2.id, weekNumber);
-              team2Last.set(pair.team1.id, weekNumber);
-            }
-          });
-          } else {
-            // Odd number of teams: Add a "bye" (null team) - only for odd number of teams
-            // Fix team 0, rotate teams 1..n-1, and include bye in rotation
-            const fixedTeam = shuffledTeams[0];
-            const rotatingTeams = shuffledTeams.slice(1); // Teams 1 through n-1
-            
-            // Rotate the rotating teams array
-            const rotationOffset = roundIndex % numTeams;
-            const rotated = [
-              ...rotatingTeams.slice(rotationOffset),
-              ...rotatingTeams.slice(0, rotationOffset)
-            ];
-            
-            // Pair fixed team with last team (or bye)
-            // When rotationOffset is 0, fixed team gets bye
-            if (rotationOffset === 0) {
-              // Fixed team gets bye this round
-              teamPairs.push({
-                team1: fixedTeam,
-                team2: null
-              });
-            } else {
-              teamPairs.push({
-                team1: fixedTeam,
-                team2: rotated[rotated.length - 1]
-              });
-            }
-            
-            // Pair remaining teams
-            const pairsToMake = Math.floor(rotated.length / 2);
-            for (let i = 0; i < pairsToMake; i++) {
-              teamPairs.push({
-                team1: rotated[i],
-                team2: rotated[rotated.length - 1 - i]
-              });
-            }
-            
-            // Store in schedule and update tracking (skip bye weeks)
-            teamPairs.forEach(pair => {
-              if (pair.team2) {
-                weekSchedule.set(pair.team1.id, pair.team2.id);
-                weekSchedule.set(pair.team2.id, pair.team1.id);
-                
-                // Update opponent counts
-                const team1Counts = opponentCounts.get(pair.team1.id)!;
-                const team2Counts = opponentCounts.get(pair.team2.id)!;
-                team1Counts.set(pair.team2.id, (team1Counts.get(pair.team2.id) || 0) + 1);
-                team2Counts.set(pair.team1.id, (team2Counts.get(pair.team1.id) || 0) + 1);
-                
-                // Update last matchup week
-                const team1Last = lastMatchupWeek.get(pair.team1.id)!;
-                const team2Last = lastMatchupWeek.get(pair.team2.id)!;
-                team1Last.set(pair.team2.id, weekNumber);
-                team2Last.set(pair.team1.id, weekNumber);
-              }
-            });
-          }
+        // Use the helper function to get round-robin pairings
+        // For weeks beyond numRounds, it automatically repeats the cycle
+        const teamPairs = this.getRoundRobinPairings(weekNumber, shuffledTeams, numRounds);
         
-        // Store week schedule
-        schedule.set(weekNumber, weekSchedule);
+        // Verify all teams are included in pairs
+        const teamsInPairs = new Set<string>();
+        teamPairs.forEach(p => {
+          if (p.team1) teamsInPairs.add(p.team1.id);
+          if (p.team2) teamsInPairs.add(p.team2.id);
+        });
         
-        // Weeks beyond numRounds: Use constraint-based scheduling
-        } else {
-          console.log(`[MatchupService] Week ${weekNumber}: Extended season - using constraint-based scheduling`);
-          
-          // Track which teams have been matched this week
-          const matchedTeams = new Set<string>();
-          
-          // Process teams in random order to avoid bias
-          const teamsToProcess = [...shuffledTeams].sort(() => Math.random() - 0.5);
-          
-          for (const team of teamsToProcess) {
-            if (matchedTeams.has(team.id)) continue; // Already matched this week
-            
-            // Get valid opponents (no back-to-back, maintain ±1 rule)
-            const validOpponents = getValidOpponents(team.id, weekNumber, shuffledTeams)
-              .filter(opp => !matchedTeams.has(opp.id)); // Not already matched
-            
-            if (validOpponents.length === 0) {
-              console.warn(`[MatchupService] Week ${weekNumber}: No valid opponents for ${team.team_name || team.id}`);
-              continue;
-            }
-            
-            // Find optimal opponent (maximizes spacing)
-            const opponent = findOptimalOpponent(team.id, validOpponents, weekNumber);
-            
-            if (opponent) {
-              teamPairs.push({
-                team1: team,
-                team2: opponent
-              });
-              
-              matchedTeams.add(team.id);
-              matchedTeams.add(opponent.id);
-              
-              // Update tracking
-              weekSchedule.set(team.id, opponent.id);
-              weekSchedule.set(opponent.id, team.id);
-              
-              // Update opponent counts
-              const teamCounts = opponentCounts.get(team.id)!;
-              const oppCounts = opponentCounts.get(opponent.id)!;
-              teamCounts.set(opponent.id, (teamCounts.get(opponent.id) || 0) + 1);
-              oppCounts.set(team.id, (oppCounts.get(team.id) || 0) + 1);
-              
-              // Update last matchup week
-              const teamLast = lastMatchupWeek.get(team.id)!;
-              const oppLast = lastMatchupWeek.get(opponent.id)!;
-              teamLast.set(opponent.id, weekNumber);
-              oppLast.set(team.id, weekNumber);
-            }
-          }
-          
-          // Store week schedule
-          schedule.set(weekNumber, weekSchedule);
-          
-          console.log(`[MatchupService] Week ${weekNumber} extended pairs:`, teamPairs.map(p => ({
-            team1: p.team1.team_name || p.team1.id,
-            team2: p.team2?.team_name || p.team2?.id || 'BYE'
-          })));
+        const allTeamIds = new Set(shuffledTeams.map(t => t.id));
+        const missingFromPairs = Array.from(allTeamIds).filter(id => !teamsInPairs.has(id));
+        
+        if (missingFromPairs.length > 0) {
+          console.error(`[MatchupService] Week ${weekNumber} - CRITICAL: Teams missing from pairs:`, missingFromPairs);
+          console.error(`[MatchupService] Week ${weekNumber} - Teams in pairs:`, Array.from(teamsInPairs));
+          console.error(`[MatchupService] Week ${weekNumber} - All team IDs:`, Array.from(allTeamIds));
+          console.error(`[MatchupService] Week ${weekNumber} - This indicates a bug in the round-robin algorithm!`);
+          console.error(`[MatchupService] ABORTING matchup generation to prevent incomplete data`);
+          return { error: new Error(`Round-robin algorithm failed: ${missingFromPairs.length} teams missing from week ${weekNumber} pairs. Teams: ${missingFromPairs.join(', ')}`) };
         }
         
-        console.log(`[MatchupService] Week ${weekNumber} matchups:`, teamPairs.map(p => `${p.team1.team_name || p.team1.id} (${p.team1.id}) vs ${p.team2?.team_name || p.team2?.id || 'BYE'} (${p.team2?.id || 'null'})`).join(', '));
-        console.log(`[MatchupService] Week ${weekNumber} matchup details:`, teamPairs.map(p => ({
-          team1_id: p.team1.id,
-          team1_name: p.team1.team_name || p.team1.id,
-          team2_id: p.team2?.id || null,
-          team2_name: p.team2?.team_name || p.team2?.id || 'BYE'
-        })));
-
+        console.log(`[MatchupService] Week ${weekNumber} - Verification passed: All ${numTeams} teams included in pairs ✓`);
+        
+        console.log(`[MatchupService] Week ${weekNumber} - Generated ${teamPairs.length} pairs:`, teamPairs.map(p => 
+          `${p.team1.team_name || p.team1.id} (${p.team1.id}) vs ${p.team2?.team_name || p.team2?.id || 'BYE'} (${p.team2?.id || 'null'})`
+        ).join(', '));
+        
         // Insert matchups for this week
         for (const pair of teamPairs) {
           // Skip bye weeks (team2 is null) for even number of teams
           if (!pair.team2 && numTeams % 2 === 0) {
-            console.warn(`[MatchupService] Skipping bye week for even number of teams in week ${weekNumber}`);
+            console.log(`[MatchupService] Week ${weekNumber} - Skipping bye week for even teams`);
             continue;
           }
           
-          // Check if matchup already exists (check both team1 and team2 to avoid duplicates)
-          // Check if team1-team2 or team2-team1 matchup exists
+          // Check if matchup already exists (check both directions to avoid duplicates)
           const { data: existing1 } = await supabase
             .from('matchups')
             .select('id')
@@ -564,109 +344,110 @@ export const MatchupService = {
           
           const existing = existing1 || existing2;
 
-          if (!existing) {
-            const { error } = await supabase
-              .from('matchups')
-              .insert({
-                league_id: leagueId,
-                week_number: weekNumber,
-                team1_id: pair.team1.id,
-                team2_id: pair.team2?.id || null,
-                week_start_date: weekStart.toISOString().split('T')[0],
-                week_end_date: weekEnd.toISOString().split('T')[0],
-                status: 'scheduled'
-              });
+          if (existing) {
+            console.log(`[MatchupService] Week ${weekNumber} - Matchup already exists: ${pair.team1.team_name || pair.team1.id} vs ${pair.team2?.team_name || pair.team2?.id || 'BYE'}`);
+            matchupsSkipped++;
+            continue;
+          }
 
-            if (error) {
-              console.error(`Error creating matchup for week ${weekNumber} (${pair.team1.team_name || pair.team1.id} vs ${pair.team2?.team_name || pair.team2?.id || 'BYE'}):`, error);
-            } else {
-              matchupsCreated++;
+          const insertData = {
+            league_id: leagueId,
+            week_number: weekNumber,
+            team1_id: pair.team1.id,
+            team2_id: pair.team2?.id || null,
+            week_start_date: weekStart.toISOString().split('T')[0],
+            week_end_date: weekEnd.toISOString().split('T')[0],
+            status: 'scheduled'
+          };
+          
+          console.log(`[MatchupService] Week ${weekNumber} - Inserting matchup:`, insertData);
+          
+          const { data: inserted, error } = await supabase
+            .from('matchups')
+            .insert(insertData)
+            .select()
+            .single();
+
+          if (error) {
+            console.error(`[MatchupService] Week ${weekNumber} - Error creating matchup:`, error);
+            console.error(`[MatchupService] Failed matchup data:`, insertData);
+            matchupsErrors++;
+          } else {
+            console.log(`[MatchupService] Week ${weekNumber} - Successfully created matchup:`, inserted);
+            matchupsCreated++;
+          }
+        }
+      }
+
+      console.log(`[MatchupService] Generation complete: ${matchupsCreated} created, ${matchupsSkipped} skipped, ${matchupsErrors} errors across ${weeksNeedingMatchups.length} weeks`);
+      
+      // Small delay to ensure all database commits are complete
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Verify matchups were created by checking the database
+      if (weeksNeedingMatchups.length > 0) {
+        const { data: verifyMatchups, error: verifyError } = await supabase
+          .from('matchups')
+          .select('week_number, team1_id, team2_id')
+          .eq('league_id', leagueId)
+          .in('week_number', weeksNeedingMatchups);
+        
+        if (verifyError) {
+          console.error(`[MatchupService] Verification query error:`, verifyError);
+        } else {
+          console.log(`[MatchupService] Verification: Found ${verifyMatchups?.length || 0} matchups in database for generated weeks`);
+          if (verifyMatchups && verifyMatchups.length > 0) {
+            const weeksWithMatchups = new Set(verifyMatchups.map(m => m.week_number));
+            console.log(`[MatchupService] Verification: Weeks with matchups:`, Array.from(weeksWithMatchups).sort((a, b) => a - b));
+            
+            // Check if all teams are represented in each week
+            const allTeamIds = new Set(teams.map(t => t.id));
+            let hasIncompleteWeeks = false;
+            
+            for (const weekNum of weeksNeedingMatchups) {
+              const weekMatchups = verifyMatchups.filter(m => m.week_number === weekNum);
+              const teamsInWeek = new Set<string>();
+              weekMatchups.forEach(m => {
+                if (m.team1_id) teamsInWeek.add(m.team1_id);
+                if (m.team2_id) teamsInWeek.add(m.team2_id);
+              });
+              
+              const missingTeams = Array.from(allTeamIds).filter(id => !teamsInWeek.has(id));
+              if (missingTeams.length > 0) {
+                console.error(`[MatchupService] Week ${weekNum} - CRITICAL: Missing teams:`, missingTeams);
+                console.error(`[MatchupService] Week ${weekNum} - Teams in matchups:`, Array.from(teamsInWeek));
+                console.error(`[MatchupService] Week ${weekNum} - All team IDs:`, Array.from(allTeamIds));
+                hasIncompleteWeeks = true;
+              } else {
+                console.log(`[MatchupService] Week ${weekNum} - All teams have matchups ✓`);
+              }
+            }
+            
+            // If any week is incomplete, delete and regenerate ALL weeks
+            if (hasIncompleteWeeks) {
+              console.error(`[MatchupService] CRITICAL: Some weeks have incomplete matchups. Deleting all and regenerating...`);
+              await this.deleteAllMatchupsForLeague(leagueId);
+              
+              // Regenerate all weeks
+              await new Promise(resolve => setTimeout(resolve, 500));
+              
+              // Recursively call this function to regenerate
+              return this.generateMatchupsForLeague(leagueId, teams, firstWeekStart, true);
             }
           } else {
-            console.log(`[MatchupService] Matchup already exists for week ${weekNumber}: ${pair.team1.team_name || pair.team1.id} vs ${pair.team2?.team_name || pair.team2?.id || 'BYE'}`);
-          }
-        }
-      }
-
-      console.log(`[MatchupService] Generated ${matchupsCreated} new matchups across ${weeksToProcess.length} weeks`);
-      
-      // Verify world-class schedule constraints
-      console.log('[MatchupService] Verifying world-class schedule constraints...');
-      
-      // Check for back-to-back matchups
-      let backToBackViolations = 0;
-      for (let i = 1; i < weeksToProcess.length; i++) {
-        const prevWeek = weeksToProcess[i - 1];
-        const currWeek = weeksToProcess[i];
-        const prevSchedule = schedule.get(prevWeek);
-        const currSchedule = schedule.get(currWeek);
-        if (prevSchedule && currSchedule) {
-          for (const [teamId, opponentId] of currSchedule.entries()) {
-            const prevOpponent = prevSchedule.get(teamId);
-            if (prevOpponent === opponentId) {
-              backToBackViolations++;
-              const team = teams.find(t => t.id === teamId);
-              const opponent = teams.find(t => t.id === opponentId);
-              console.warn(`[MatchupService] BACK-TO-BACK VIOLATION: ${team?.team_name || teamId} plays ${opponent?.team_name || opponentId} in weeks ${prevWeek} and ${currWeek}`);
-            }
+            console.error(`[MatchupService] Verification FAILED: No matchups found in database after generation!`);
+            return { error: new Error('Matchup generation completed but no matchups found in database') };
           }
         }
       }
       
-      if (backToBackViolations > 0) {
-        console.error(`[MatchupService] ❌ Found ${backToBackViolations} back-to-back matchup violations!`);
-      } else {
-        console.log('[MatchupService] ✓ No back-to-back matchups found - constraint satisfied');
-      }
-      
-      // Verify ±1 rule
-      let balanceViolations = 0;
-      const balanceStats: Array<{ teamId: string; teamName: string; min: number; max: number; diff: number }> = [];
-      
-      for (const team of teams) {
-        const counts = opponentCounts.get(team.id);
-        if (counts) {
-          const countValues = Array.from(counts.values());
-          if (countValues.length > 0) {
-            const min = Math.min(...countValues);
-            const max = Math.max(...countValues);
-            const diff = max - min;
-            
-            balanceStats.push({
-              teamId: team.id,
-              teamName: team.team_name || team.id,
-              min,
-              max,
-              diff
-            });
-            
-            if (diff > 1) {
-              balanceViolations++;
-              console.warn(`[MatchupService] ±1 RULE VIOLATION: ${team.team_name || team.id} has opponent counts ranging from ${min} to ${max} (diff: ${diff})`);
-            }
-          }
-        }
-      }
-      
-      if (balanceViolations > 0) {
-        console.error(`[MatchupService] ❌ Found ${balanceViolations} teams violating ±1 rule!`);
-      } else {
-        console.log('[MatchupService] ✓ ±1 rule verified: All teams have balanced opponent counts (max difference: 1)');
-      }
-      
-      // Log balance statistics
-      console.log('[MatchupService] Balance Statistics:');
-      balanceStats.forEach(stat => {
-        console.log(`  ${stat.teamName}: min=${stat.min}, max=${stat.max}, diff=${stat.diff} ${stat.diff > 1 ? '❌' : '✓'}`);
-      });
-      
-      if (backToBackViolations === 0 && balanceViolations === 0) {
-        console.log('[MatchupService] ✅ World-class schedule constraints verified successfully!');
+      if (matchupsErrors > 0) {
+        return { error: new Error(`Failed to create ${matchupsErrors} matchups. Check logs for details.`) };
       }
       
       return { error: null };
     } catch (error) {
-      console.error('Error generating matchups:', error);
+      console.error('[MatchupService] Error generating matchups:', error);
       return { error };
     }
   },
