@@ -76,6 +76,115 @@ def load_gar_components(player_ids: Optional[List[int]] = None, season: int = 20
         return pd.DataFrame()
 
 
+def get_team_id_from_players(player_ids: List[int]) -> Optional[int]:
+    """
+    Get team ID for a list of players by querying player_shifts table.
+    
+    Args:
+        player_ids: List of player IDs
+    
+    Returns:
+        Most common team_id for these players, or None if not found
+    """
+    if not player_ids:
+        return None
+    
+    try:
+        # Get team IDs for these players from recent shifts
+        response = supabase.table('player_shifts').select(
+            'player_id, team_id'
+        ).in_('player_id', player_ids[:100]).limit(1000).execute()  # Limit to avoid huge queries
+        
+        if not response.data:
+            return None
+        
+        # Count team_id occurrences
+        team_counts = {}
+        for row in response.data:
+            team_id = row.get('team_id')
+            if team_id:
+                team_counts[team_id] = team_counts.get(team_id, 0) + 1
+        
+        if not team_counts:
+            return None
+        
+        # Return most common team_id
+        most_common_team = max(team_counts.items(), key=lambda x: x[1])[0]
+        return int(most_common_team)
+        
+    except Exception as e:
+        print(f"  WARNING: Could not get team ID from players: {e}")
+        return None
+
+
+def get_players_by_team(team_id: int) -> List[int]:
+    """
+    Get list of player IDs for a given team by querying player_shifts table.
+    
+    Args:
+        team_id: NHL team ID
+    
+    Returns:
+        List of unique player IDs on that team
+    """
+    try:
+        # Get unique players from player_shifts for this team
+        # Limit to recent games to get current roster
+        response = supabase.table('player_shifts').select(
+            'player_id'
+        ).eq('team_id', team_id).limit(10000).execute()
+        
+        if not response.data:
+            return []
+        
+        # Get unique player IDs
+        player_ids = list(set([row['player_id'] for row in response.data]))
+        return player_ids
+        
+    except Exception as e:
+        print(f"  WARNING: Could not get players for team {team_id}: {e}")
+        return []
+
+
+def get_player_positions(player_ids: List[int]) -> Dict[int, str]:
+    """
+    Get player positions from staging_2025_skaters table.
+    
+    Args:
+        player_ids: List of player IDs
+    
+    Returns:
+        Dictionary mapping player_id -> position
+    """
+    if not player_ids:
+        return {}
+    
+    try:
+        # Query staging table for positions
+        # Note: playerId in staging is string, need to convert
+        player_id_strs = [str(pid) for pid in player_ids]
+        
+        response = supabase.table('staging_2025_skaters').select(
+            'playerId, position'
+        ).in_('playerId', player_id_strs).eq('situation', 'all').execute()
+        
+        if not response.data:
+            return {}
+        
+        # Create mapping
+        position_map = {}
+        for row in response.data:
+            player_id = int(row['playerId'])
+            position = row.get('position', '')
+            position_map[player_id] = position
+        
+        return position_map
+        
+    except Exception as e:
+        print(f"  WARNING: Could not get player positions: {e}")
+        return {}
+
+
 def get_opponent_team_gar(opponent_team_id: int, component: str, season: int = 2025):
     """
     Get average GAR component rate for an opponent team.
@@ -91,19 +200,54 @@ def get_opponent_team_gar(opponent_team_id: int, component: str, season: int = 2
     Returns:
         Average component rate for the team
     """
-    # TODO: This requires team_id mapping from player_id
-    # For now, return a placeholder
-    # In full implementation, we'd:
-    # 1. Get all players on opponent_team_id
-    # 2. Filter by position if needed (forwards for EVO/PPO, all for EVD/PPD)
-    # 3. Average their regressed component rates
+    # Get all players on the team
+    team_player_ids = get_players_by_team(opponent_team_id)
     
-    # Placeholder: return 0.0 (no adjustment) if team data not available
-    return 0.0
+    if not team_player_ids:
+        # Fallback: return league average (0.0 means no adjustment)
+        return 0.0
+    
+    # Load GAR components for team players
+    df_team_gar = load_gar_components(team_player_ids, season)
+    
+    if len(df_team_gar) == 0:
+        return 0.0
+    
+    # Filter by position if needed
+    if component in ['evo', 'ppo']:
+        # For offensive components, use forwards only
+        positions = get_player_positions(team_player_ids)
+        forward_ids = [pid for pid, pos in positions.items() 
+                      if pos and pos.upper() in ['C', 'LW', 'RW', 'F', 'W']]
+        
+        if forward_ids:
+            df_team_gar = df_team_gar[df_team_gar['player_id'].isin(forward_ids)]
+    
+    # For EVD/PPD, use all skaters (already have all players)
+    
+    if len(df_team_gar) == 0:
+        return 0.0
+    
+    # Get the appropriate component column
+    component_map = {
+        'evo': 'evo_rate_regressed',
+        'evd': 'evd_rate_regressed',
+        'ppo': 'ppo_rate_regressed',
+        'ppd': 'ppd_rate_regressed'
+    }
+    
+    component_col = component_map.get(component.lower())
+    if not component_col or component_col not in df_team_gar.columns:
+        return 0.0
+    
+    # Calculate average (simple mean, could be weighted by TOI in future)
+    avg_rate = df_team_gar[component_col].mean()
+    
+    return float(avg_rate) if pd.notna(avg_rate) else 0.0
 
 
 def calculate_qoc_adjustment(player_id: int, opponent_team_id: int, 
-                             situation: str, df_gar: pd.DataFrame) -> float:
+                             situation: str, df_gar: pd.DataFrame, season: int = 2025) -> float:
     """
     Calculate QoC adjustment factor for a player-opponent matchup.
     
@@ -120,34 +264,43 @@ def calculate_qoc_adjustment(player_id: int, opponent_team_id: int,
     player_data = df_gar[df_gar['player_id'] == player_id]
     
     if len(player_data) == 0:
-        return 0.0  # No adjustment if player data not available
+        return 1.0  # No adjustment if player data not available (1.0 = no change)
     
     player_row = player_data.iloc[0]
     
     # Determine which components to use based on situation
     if situation == '5v5':
         # Even strength: Player EVO vs Opponent EVD
+        # Higher player EVO and lower opponent EVD = better matchup (positive adjustment)
         player_component = player_row.get('evo_rate_regressed', 0.0)
-        opponent_component = get_opponent_team_gar(opponent_team_id, 'evd')
+        opponent_component = get_opponent_team_gar(opponent_team_id, 'evd', season)
+        # QoC = (Player_EVO - Opponent_EVD) × Strength
+        # Positive when player is better offensively than opponent is defensively
+        qoc_factor = (player_component - opponent_component) * QOC_ADJUSTMENT_STRENGTH
         
     elif situation == 'PP':
         # Power play: Player PPO vs Opponent PPD
+        # Higher player PPO and lower opponent PPD = better matchup (positive adjustment)
         player_component = player_row.get('ppo_rate_regressed', 0.0)
-        opponent_component = get_opponent_team_gar(opponent_team_id, 'ppd')
+        opponent_component = get_opponent_team_gar(opponent_team_id, 'ppd', season)
+        # QoC = (Player_PPO - Opponent_PPD) × Strength
+        qoc_factor = (player_component - opponent_component) * QOC_ADJUSTMENT_STRENGTH
         
     elif situation == 'PK':
-        # Penalty kill: Player PPD vs Opponent PPO (inverted)
+        # Penalty kill: Player PPD vs Opponent PPO
+        # Lower player PPD (better defense) and lower opponent PPO = better matchup
+        # For PK, lower PPD is better, so we invert: (Opponent_PPO - Player_PPD)
         player_component = player_row.get('ppd_rate_regressed', 0.0)
-        opponent_component = get_opponent_team_gar(opponent_team_id, 'ppo')
-        # For PK, we invert the adjustment (better opponent PPO = harder for player)
-        opponent_component = -opponent_component
+        opponent_component = get_opponent_team_gar(opponent_team_id, 'ppo', season)
+        # QoC = (Opponent_PPO - Player_PPD) × Strength
+        # Positive when opponent has lower PPO (easier to defend) and player has lower PPD (better defense)
+        qoc_factor = (opponent_component - player_component) * QOC_ADJUSTMENT_STRENGTH
         
     else:
-        return 0.0  # Unknown situation
+        return 1.0  # Unknown situation - no adjustment
     
-    # Calculate adjustment factor
-    # QoC_Factor = (Player_Component - Opponent_Component) × Adjustment_Strength
-    qoc_factor = (player_component - opponent_component) * QOC_ADJUSTMENT_STRENGTH
+    # Cap the adjustment to prevent extreme values (e.g., ±20%)
+    qoc_factor = max(-0.2, min(0.2, qoc_factor))
     
     # Convert to multiplier (1 + factor)
     # Positive factor = increase xG, negative factor = decrease xG

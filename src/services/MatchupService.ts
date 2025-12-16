@@ -6,6 +6,11 @@ import { MatchupPlayer } from '@/components/matchup/types';
 import { getFirstWeekStartDate, getWeekStartDate, getWeekEndDate, getAvailableWeeks, getScheduleLength } from '@/utils/weekCalculator';
 import { HockeyPlayer } from '@/components/roster/HockeyPlayerCard';
 import { ScheduleService, NHLGame, GameInfo } from './ScheduleService';
+import {
+  getProjectionsForMatchup,
+  calculateMatchupProjectionTotal,
+  getRoSProjectionPoints,
+} from './ProjectionService';
 
 // Roster cache for performance optimization
 interface RosterCacheEntry {
@@ -725,10 +730,57 @@ export const MatchupService = {
       };
 
       // Assign rosters based on which team user is
-      const userRoster = isTeam1 ? team1Roster : (team2Roster || []);
-      const opponentRoster = isTeam1 ? (team2Roster || []) : team1Roster;
+      let userRoster = isTeam1 ? team1Roster : (team2Roster || []);
+      let opponentRoster = isTeam1 ? (team2Roster || []) : team1Roster;
       const userSlotAssignments = normalizeSlotAssignments(isTeam1 ? team1SlotAssignments : team2SlotAssignments);
       const opponentSlotAssignments = normalizeSlotAssignments(isTeam1 ? team2SlotAssignments : team1SlotAssignments);
+
+      // Fetch projections for all players in the matchup
+      const weekStart = new Date(matchup.week_start_date);
+      const weekEnd = new Date(matchup.week_end_date);
+      const team1PlayerIds = team1Roster.map(p => p.id);
+      const team2PlayerIds = (team2Roster || []).map(p => p.id);
+      
+      const projectionsMap = await getProjectionsForMatchup(
+        team1PlayerIds,
+        team2PlayerIds,
+        weekStart,
+        weekEnd,
+        2025 // Season
+      );
+
+      // Attach projections to players
+      const attachProjections = (roster: MatchupPlayer[]): MatchupPlayer[] => {
+        return roster.map(player => {
+          const projectionData = projectionsMap.get(player.id);
+          if (!projectionData) {
+            return player;
+          }
+
+          const matchupTotal = calculateMatchupProjectionTotal(projectionData.matchup);
+          const rosPoints = getRoSProjectionPoints(projectionData.ros);
+
+          return {
+            ...player,
+            projection: {
+              matchup_projected_xg: matchupTotal.matchup_projected_xg,
+              matchup_projected_points: matchupTotal.matchup_projected_points,
+              gsax_factor_pct: matchupTotal.gsax_factor_pct,
+              qoc_factor_pct: matchupTotal.qoc_factor_pct,
+              explainability_message: matchupTotal.explainability_message,
+              ros_projected_xg: projectionData.ros?.ros_projection_xg || 0,
+              ros_projected_points: rosPoints,
+            },
+            // Update projectedPoints to use matchup projection if available
+            projectedPoints: matchupTotal.matchup_projected_points > 0
+              ? matchupTotal.matchup_projected_points
+              : player.projectedPoints,
+          };
+        });
+      };
+
+      userRoster = attachProjections(userRoster);
+      opponentRoster = attachProjections(opponentRoster);
 
       // Get team records
       const userRecord = await this.getTeamRecord(userTeam.id, leagueId);

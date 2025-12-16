@@ -232,9 +232,21 @@ def calculate_raw_gsax(df_shots):
     
     print(f"   Processing {len(df_filtered):,} shots")
     
-    # Aggregate by goalie (include goalie_name if available)
+    # Check if season column exists, if not derive it
+    if 'season' not in df_filtered.columns and 'game_id' in df_filtered.columns:
+        from season_utils import derive_season_from_game_id
+        df_filtered['season'] = df_filtered['game_id'].apply(derive_season_from_game_id)
+        # Fill missing seasons with most common season or current year
+        if df_filtered['season'].isna().any():
+            most_common_season = df_filtered['season'].mode()[0] if len(df_filtered['season'].mode()) > 0 else 2025
+            df_filtered['season'] = df_filtered['season'].fillna(most_common_season)
+            print(f"   Derived season for {df_filtered['season'].notna().sum():,} shots")
+    
+    # Aggregate by goalie and season (include goalie_name if available)
+    groupby_cols = ['goalie_id', 'season'] if 'season' in df_filtered.columns else ['goalie_id']
+    
     if 'goalie_name' in df_filtered.columns:
-        goalie_stats = df_filtered.groupby('goalie_id').agg(
+        goalie_stats = df_filtered.groupby(groupby_cols).agg(
             goalie_name=('goalie_name', 'first'),  # Get first non-null name
             total_shots_faced=('goalie_id', 'count'),
             total_xGA=('xga_value', 'sum'),
@@ -243,12 +255,16 @@ def calculate_raw_gsax(df_shots):
         # Clean up goalie_name (use first non-null value per goalie)
         goalie_stats['goalie_name'] = goalie_stats['goalie_name'].fillna('')
     else:
-        goalie_stats = df_filtered.groupby('goalie_id').agg(
+        goalie_stats = df_filtered.groupby(groupby_cols).agg(
             total_shots_faced=('goalie_id', 'count'),
             total_xGA=('xga_value', 'sum'),
             total_GA=('is_goal', 'sum')
         ).reset_index()
         goalie_stats['goalie_name'] = None
+    
+    # Ensure season column exists (default to 2025 if not present)
+    if 'season' not in goalie_stats.columns:
+        goalie_stats['season'] = 2025
     
     # Calculate raw GSAx
     goalie_stats['raw_gsax'] = goalie_stats['total_xGA'] - goalie_stats['total_GA']
@@ -434,12 +450,13 @@ def export_to_csv(goalie_stats, filename='goalie_gsax.csv'):
         traceback.print_exc()
 
 
-def upsert_to_database(goalie_stats):
+def upsert_to_database(goalie_stats, season: Optional[int] = None):
     """
     Upsert GSAx results to goalie_gsax table in Supabase.
     
     Args:
-        goalie_stats: DataFrame with GSAx results
+        goalie_stats: DataFrame with GSAx results (should include season column)
+        season: Optional season override (if season not in DataFrame)
     """
     print("\n" + "=" * 80)
     print("UPSERTING TO DATABASE")
@@ -449,8 +466,12 @@ def upsert_to_database(goalie_stats):
         # Prepare data for database
         records = []
         for _, row in goalie_stats.iterrows():
+            # Get season from row or use default
+            season_val = int(row.get('season', season if season else 2025))
+            
             record = {
                 'goalie_id': int(row['goalie_id']),
+                'season': season_val,
                 'total_shots_faced': int(row['total_shots_faced']),
                 'total_xGA': float(row['total_xGA']),
                 'total_GA': int(row['total_GA']),
@@ -461,7 +482,7 @@ def upsert_to_database(goalie_stats):
             }
             records.append(record)
         
-        # Batch upsert (Supabase handles upsert on primary key)
+        # Batch upsert (Supabase handles upsert on composite primary key: goalie_id, season)
         batch_size = 100
         total_batches = (len(records) + batch_size - 1) // batch_size
         
@@ -470,10 +491,10 @@ def upsert_to_database(goalie_stats):
             batch_num = (i // batch_size) + 1
             
             try:
-                # Use upsert (insert with conflict resolution on goalie_id)
+                # Use upsert (insert with conflict resolution on composite primary key)
                 response = supabase.table('goalie_gsax').upsert(
                     batch,
-                    on_conflict='goalie_id'
+                    on_conflict='goalie_id,season'
                 ).execute()
                 
                 print(f"   Upserted batch {batch_num}/{total_batches} ({len(batch)} goalies)")
@@ -485,7 +506,7 @@ def upsert_to_database(goalie_stats):
                     try:
                         supabase.table('goalie_gsax').upsert(
                             record,
-                            on_conflict='goalie_id'
+                            on_conflict='goalie_id,season'
                         ).execute()
                     except Exception as e2:
                         print(f"      WARNING: Failed to upsert goalie_id {record['goalie_id']}: {e2}")

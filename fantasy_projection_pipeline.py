@@ -35,7 +35,7 @@ if not supabase_url or not supabase_key:
 supabase: Client = create_client(supabase_url, supabase_key)
 
 
-def load_goalie_gsax_data() -> Optional[pd.DataFrame]:
+def load_goalie_gsax_data(season: int = 2025) -> Optional[pd.DataFrame]:
     """
     Load GSAx data from goalie_gsax table.
     
@@ -47,7 +47,14 @@ def load_goalie_gsax_data() -> Optional[pd.DataFrame]:
     print("=" * 80)
     
     try:
-        response = supabase.table('goalie_gsax').select('*').execute()
+        # IMPORTANT: For production we only care about the current season (2025)
+        response = (
+            supabase
+            .table('goalie_gsax')
+            .select('*')
+            .eq('season', season)
+            .execute()
+        )
         
         if not response.data or len(response.data) == 0:
             print("⚠️  No GSAx data found. Please run calculate_goalie_gsax.py first.")
@@ -109,7 +116,7 @@ def calculate_goalie_factors(goalie_gsax: pd.DataFrame, goalie_games: Dict[int, 
     return goalie_gsax[['goalie_id', 'regressed_gsax', 'games_played', 'goalie_factor']].copy()
 
 
-def get_goalie_games_played() -> Dict[int, int]:
+def get_goalie_games_played(season: int = 2025) -> Dict[int, int]:
     """
     Get games played for each goalie from raw_shots table.
     
@@ -121,15 +128,20 @@ def get_goalie_games_played() -> Dict[int, int]:
     print("=" * 80)
     
     try:
-        # Get unique (goalie_id, game_id) pairs
+        # Get unique (goalie_id, game_id) pairs for the specified season
         all_shots = []
         offset = 0
         batch_size = 1000
         
         while True:
-            response = supabase.table('raw_shots').select(
-                'goalie_id, game_id'
-            ).range(offset, offset + batch_size - 1).execute()
+            response = (
+                supabase
+                .table('raw_shots')
+                .select('goalie_id, game_id, season')
+                .eq('season', season)
+                .range(offset, offset + batch_size - 1)
+                .execute()
+            )
             
             if not response.data or len(response.data) == 0:
                 break
@@ -204,7 +216,7 @@ def apply_gsax_adjustment(team_xgf: float, opponent_goalie_factor: float) -> flo
     return adjusted_goals
 
 
-def get_player_talent_adjusted_xg() -> Dict[int, float]:
+def get_player_talent_adjusted_xg(season: int = 2025) -> Dict[int, float]:
     """
     Get per-game talent-adjusted xG for each player from raw_shots table.
     
@@ -221,9 +233,18 @@ def get_player_talent_adjusted_xg() -> Dict[int, float]:
         batch_size = 1000
         
         while True:
-            response = supabase.table('raw_shots').select(
-                'player_id, shooting_talent_adjusted_xg, flurry_adjusted_xg, xg_value, game_id'
-            ).range(offset, offset + batch_size - 1).execute()
+            # IMPORTANT: Only use current-season shots for production projections
+            response = (
+                supabase
+                .table('raw_shots')
+                .select(
+                    'player_id, shooting_talent_adjusted_xg, '
+                    'flurry_adjusted_xg, xg_value, game_id, season'
+                )
+                .eq('season', season)
+                .range(offset, offset + batch_size - 1)
+                .execute()
+            )
             
             if not response.data or len(response.data) == 0:
                 break
@@ -285,7 +306,7 @@ def get_player_talent_adjusted_xg() -> Dict[int, float]:
         return {}
 
 
-def main():
+def main(season: int = 2025):
     """Main execution function."""
     print("\n" + "=" * 80)
     print("FANTASY PROJECTION PIPELINE WITH GSAX INTEGRATION")
@@ -293,19 +314,19 @@ def main():
     print(f"Started at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     
     # Load GSAx data
-    goalie_gsax = load_goalie_gsax_data()
+    goalie_gsax = load_goalie_gsax_data(season=season)
     if goalie_gsax is None:
         print("❌ Failed to load GSAx data. Please run calculate_goalie_gsax.py first.")
         return
     
     # Get goalie games played
-    goalie_games = get_goalie_games_played()
+    goalie_games = get_goalie_games_played(season=season)
     
     # Calculate goalie factors
     goalie_factors = calculate_goalie_factors(goalie_gsax, goalie_games)
     
     # Get player talent-adjusted xG
-    player_xg = get_player_talent_adjusted_xg()
+    player_xg = get_player_talent_adjusted_xg(season=season)
     
     print("\n" + "=" * 80)
     print("PIPELINE READY")
@@ -349,7 +370,7 @@ def update_projections_with_gsax(
     2. Gets Team B's goalie factor
     3. Applies GSAx adjustment: Team_A_Projected_Goals = Team_A_xGF - Goalie_B_Factor
     4. Optionally applies QoC adjustments using GAR components
-    5. Returns adjusted projected goals
+    5. Returns adjusted projected goals (for backwards compatibility)
     
     Args:
         game_id: NHL game ID
@@ -364,34 +385,103 @@ def update_projections_with_gsax(
     Returns:
         Adjusted projected goals for Team A, or None if calculation fails
     """
-    # Calculate Team A's xGF (sum of talent-adjusted xG for all players)
-    team_a_xgf = calculate_team_xgf(team_a_players, player_xg)
+    result = get_final_fantasy_projection(
+        game_id=game_id,
+        team_a_players=team_a_players,
+        team_b_players=team_b_players,
+        team_b_goalie_id=team_b_goalie_id,
+        goalie_factors=goalie_factors,
+        player_xg=player_xg,
+        apply_qoc=apply_qoc,
+        season=season,
+    )
     
-    # Get Team B's goalie factor (default to 0 if goalie not found)
+    if result is None:
+        return None
+    
+    # For legacy callers, return only the final projected goals
+    return result.get('final_projected_goals')
+
+
+def get_final_fantasy_projection(
+    game_id: int,
+    team_a_players: list,
+    team_b_players: list,
+    team_b_goalie_id: Optional[int],
+    goalie_factors: Dict[int, float],
+    player_xg: Dict[int, float],
+    apply_qoc: bool = True,
+    season: int = 2025,
+) -> Optional[Dict[str, float]]:
+    """
+    Final projection entrypoint that enforces the full pipeline:
+    Base Talent-Adjusted xG → GSAx → GAR/QoC.
+
+    Returns a dictionary with both the final projection AND
+    explainability hooks (intermediate values and factors).
+    """
+    # 1) Base team xGF from talent-adjusted xG
+    base_team_xgf = calculate_team_xgf(team_a_players, player_xg)
+    
+    # Guard against completely empty teams
+    if base_team_xgf < 0:
+        base_team_xgf = 0.0
+    
+    # 2) GSAx adjustment
     goalie_factor = goalie_factors.get(team_b_goalie_id, 0.0) if team_b_goalie_id else 0.0
+    gsax_adjusted_goals = apply_gsax_adjustment(base_team_xgf, goalie_factor)
     
-    # Apply GSAx adjustment
-    adjusted_goals = apply_gsax_adjustment(team_a_xgf, goalie_factor)
+    if base_team_xgf > 0:
+        gsax_factor_pct = (gsax_adjusted_goals / base_team_xgf) - 1.0
+    else:
+        gsax_factor_pct = 0.0
     
-    # Apply QoC adjustments if requested
-    if apply_qoc:
-        # Create DataFrame for QoC adjustment
-        # For team-level projection, we'll apply average QoC adjustment
-        # Individual player projections would use player-specific QoC
-        df_projections = pd.DataFrame({
-            'player_id': team_a_players,
-            'opponent_team_id': [team_b_players[0] if team_b_players else 0] * len(team_a_players),  # Simplified
-            'situation': ['5v5'] * len(team_a_players),  # Default to 5v5
-            'base_xg': [player_xg.get(pid, 0.0) for pid in team_a_players]
-        })
+    final_goals = gsax_adjusted_goals
+    qoc_factor_pct = 0.0
+    
+    # 3) QoC adjustment (GAR-based) – operates at player level, then aggregates
+    qoc_adjusted_goals = gsax_adjusted_goals
+    
+    if apply_qoc and team_a_players:
+        from apply_qoc_adjustments import get_team_id_from_players
         
-        # Apply QoC adjustments
-        df_projections = apply_qoc_to_projections(df_projections, season)
+        opponent_team_id = get_team_id_from_players(team_b_players) if team_b_players else None
         
-        # Sum adjusted xG for team projection
-        adjusted_goals = df_projections['adjusted_xg'].sum()
+        if opponent_team_id:
+            df_projections = pd.DataFrame({
+                'player_id': team_a_players,
+                'opponent_team_id': [opponent_team_id] * len(team_a_players),
+                'situation': ['5v5'] * len(team_a_players),
+                # Use per-player base xG so QoC acts at player level
+                'base_xg': [player_xg.get(pid, 0.0) for pid in team_a_players],
+            })
+            
+            df_projections = apply_qoc_to_projections(df_projections, season)
+            qoc_adjusted_goals = float(df_projections['adjusted_xg'].sum())
+            
+            if gsax_adjusted_goals > 0:
+                qoc_factor_pct = (qoc_adjusted_goals / gsax_adjusted_goals) - 1.0
+            else:
+                qoc_factor_pct = 0.0
+            
+            final_goals = qoc_adjusted_goals
+        else:
+            print("  WARNING: Could not determine opponent team ID. Skipping QoC adjustment.")
     
-    return adjusted_goals
+    # Ensure final projection is non-negative
+    final_goals = max(0.0, final_goals)
+    
+    return {
+        'game_id': game_id,
+        'season': season,
+        'base_team_xgf': float(base_team_xgf),
+        'gsax_adjusted_goals': float(gsax_adjusted_goals),
+        'qoc_adjusted_goals': float(qoc_adjusted_goals),
+        'final_projected_goals': float(final_goals),
+        'gsax_factor_pct': float(gsax_factor_pct),
+        'qoc_factor_pct': float(qoc_factor_pct),
+        'goalie_factor': float(goalie_factor),
+    }
 
 
 def update_all_projections(

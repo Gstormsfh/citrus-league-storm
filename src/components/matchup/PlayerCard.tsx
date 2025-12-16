@@ -1,6 +1,7 @@
 import { MatchupPlayer } from "./types";
 import { cn } from "@/lib/utils";
 import { getTeamColor } from "@/utils/teamColors";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 
 interface PlayerCardProps {
   player: MatchupPlayer | null;
@@ -80,11 +81,39 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick 
   const positionColors = getPositionColorClasses(player.position);
   const { shotPct, pointRate } = calculatePercentages(player);
   
+  // Get projections (matchup and RoS)
+  const matchupProjectedPoints = player.projection?.matchup_projected_points || 0;
+  const rosProjectedPoints = player.projection?.ros_projected_points || 0;
+  const explainabilityMessage = player.projection?.explainability_message;
+  
+  // Use matchup projection if available, otherwise fallback to calculated or default
+  const projectedPoints = matchupProjectedPoints > 0 
+    ? matchupProjectedPoints 
+    : (player.projectedPoints || (player.points / 20));
+  
   // Calculate projection percentage (normalize to 0-100 for bar display)
   // Assuming max projection of ~25 points for a single game
   const maxProjection = 25;
-  const projectedPoints = player.projectedPoints || (player.points / 20);
   const projectionPercentage = Math.min((projectedPoints / maxProjection) * 100, 100);
+  
+  // Determine explainability badge
+  const getExplainabilityBadge = () => {
+    if (!explainabilityMessage) return null;
+    
+    // Extract emoji and color from message
+    if (explainabilityMessage.includes('⬆️')) {
+      return { emoji: '⬆️', color: 'text-green-600 bg-green-50 border-green-200', message: explainabilityMessage };
+    } else if (explainabilityMessage.includes('⬇️')) {
+      return { emoji: '⬇️', color: 'text-red-600 bg-red-50 border-red-200', message: explainabilityMessage };
+    } else if (explainabilityMessage.includes('📉')) {
+      return { emoji: '📉', color: 'text-orange-600 bg-orange-50 border-orange-200', message: explainabilityMessage };
+    } else if (explainabilityMessage.includes('📈')) {
+      return { emoji: '📈', color: 'text-green-600 bg-green-50 border-green-200', message: explainabilityMessage };
+    }
+    return null;
+  };
+  
+  const explainabilityBadge = getExplainabilityBadge();
   
   // Get unique stats for top right corner: F Pts, PPP, xG
   const getUniqueStats = () => {
@@ -144,8 +173,26 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick 
         {/* Header Section with Unique Stats in Top Right */}
         <div className="player-card-header">
           <div className="player-header-left">
-            <div className="player-name" title={player.name}>
-              {displayName}
+            <div className="flex items-center gap-1.5">
+              <div className="player-name" title={player.name}>
+                {displayName}
+              </div>
+              {/* Explainability Badge */}
+              {explainabilityBadge && !isBench && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className={cn(
+                      "flex items-center justify-center w-5 h-5 rounded-full text-xs border cursor-help",
+                      explainabilityBadge.color
+                    )}>
+                      {explainabilityBadge.emoji}
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-xs">
+                    <p className="text-sm">{explainabilityBadge.message}</p>
+                  </TooltipContent>
+                </Tooltip>
+              )}
             </div>
             {/* Key Stats Below Name */}
             <div className="player-key-stats">
@@ -174,7 +221,16 @@ export const PlayerCard = ({ player, isUserTeam, isBench = false, onPlayerClick 
             />
           </div>
           <div className="player-projection-text">
-            {projectedPoints.toFixed(1)} pts projected
+            <div className="flex items-center gap-2">
+              <span className="font-semibold">
+                {projectedPoints.toFixed(1)} pts {matchupProjectedPoints > 0 ? '(Matchup)' : 'projected'}
+              </span>
+              {rosProjectedPoints > 0 && (
+                <span className="text-xs text-muted-foreground">
+                  | RoS: {rosProjectedPoints.toFixed(1)} pts
+                </span>
+              )}
+            </div>
           </div>
         </div>
       </div>

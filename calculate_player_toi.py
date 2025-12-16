@@ -38,8 +38,9 @@ if not supabase_url or not supabase_key:
 
 supabase: Client = create_client(supabase_url, supabase_key)
 
-# NHL API base URL
-NHL_BASE_URL = "https://api-web.nhle.com/v1"
+# NHL API base URLs
+NHL_BASE_URL = "https://api-web.nhle.com/v1"  # Modern API for PBP
+NHL_LEGACY_BASE_URL = "https://api.nhle.com/stats/rest/en"  # Legacy API for shifts
 
 # Situation identification constants
 SITUATION_5V5 = "5v5"
@@ -69,6 +70,140 @@ def parse_time_to_seconds(time_str: str) -> float:
         return 0.0
     except (ValueError, IndexError):
         return 0.0
+
+
+def parse_shift_time(time_str: str) -> Optional[float]:
+    """
+    Parse MM:SS format to seconds (for shift data).
+    Handles period-end shifts (20:00).
+    
+    Args:
+        time_str: Time string in "MM:SS" format (e.g., "01:36" or "20:00")
+    
+    Returns:
+        Seconds as float, or None if invalid
+    """
+    if not time_str or not isinstance(time_str, str):
+        return None
+    
+    try:
+        parts = time_str.split(':')
+        if len(parts) != 2:
+            return None
+        minutes = int(parts[0])
+        seconds = int(parts[1])
+        
+        # Special case: "20:00" is valid (period end)
+        if minutes == 20 and seconds == 0:
+            return 20 * 60.0  # 1200 seconds = 20 minutes
+        
+        # Validate range (0-19 minutes, 0-59 seconds)
+        if minutes < 0 or minutes > 19 or seconds < 0 or seconds > 59:
+            return None
+        
+        return minutes * 60.0 + seconds
+    except (ValueError, IndexError, AttributeError):
+        return None
+
+
+def calculate_running_game_clock(period: int, time_in_period_seconds: float) -> Optional[float]:
+    """
+    Convert period + time to running game clock.
+    
+    Args:
+        period: Period number (1, 2, 3, 4+)
+        time_in_period_seconds: Time in period in seconds
+    
+    Returns:
+        Running game clock in seconds, or None if invalid
+    """
+    if period < 1 or period > 10:  # Reasonable max (overtime periods)
+        return None
+    
+    if time_in_period_seconds is None or time_in_period_seconds < 0:
+        return None
+    
+    # Period 1: 0-1200 seconds (0-20 minutes)
+    # Period 2: 1200-2400 seconds (20-40 minutes)
+    # Period 3: 2400-3600 seconds (40-60 minutes)
+    # Overtime: 3600+ seconds (60+ minutes, increments of 300s per OT period)
+    base_seconds = (period - 1) * 1200.0
+    
+    # For overtime periods (4+), add 5 minutes per OT period
+    if period > 3:
+        ot_periods = period - 3
+        base_seconds = 3600.0 + (ot_periods - 1) * 300.0
+    
+    return base_seconds + time_in_period_seconds
+
+
+def fetch_official_shifts(game_id: int) -> Tuple[bool, List[Dict], List[str]]:
+    """
+    Fetch official shift data from NHL Legacy API with validation.
+    
+    Args:
+        game_id: NHL game ID
+    
+    Returns:
+        Tuple of (success, shifts_list, error_messages)
+    """
+    url = f"{NHL_LEGACY_BASE_URL}/shiftcharts?cayenneExp=gameId={game_id}"
+    
+    errors = []
+    
+    try:
+        response = requests.get(url, timeout=15)
+        
+        if response.status_code != 200:
+            errors.append(f"API returned status code {response.status_code}")
+            return False, [], errors
+        
+        try:
+            data = response.json()
+        except json.JSONDecodeError as e:
+            errors.append(f"Invalid JSON response: {e}")
+            return False, [], errors
+        
+        # Check response structure
+        if not isinstance(data, dict):
+            errors.append(f"Expected dict response, got {type(data)}")
+            return False, [], errors
+        
+        if 'data' not in data:
+            errors.append("Response missing 'data' key")
+            return False, [], errors
+        
+        shifts = data.get('data', [])
+        
+        if not isinstance(shifts, list):
+            errors.append(f"Expected list in 'data', got {type(shifts)}")
+            return False, [], errors
+        
+        # Validate shifts (basic validation - full validation happens later)
+        valid_shifts = []
+        for shift in shifts:
+            # Basic field check
+            if all(key in shift for key in ['playerId', 'gameId', 'period', 'startTime', 'endTime']):
+                # Parse times to validate
+                start_seconds = parse_shift_time(shift.get('startTime'))
+                end_seconds = parse_shift_time(shift.get('endTime'))
+                if start_seconds is not None and end_seconds is not None:
+                    if end_seconds > start_seconds or end_seconds == 1200.0:  # Allow period-end
+                        valid_shifts.append(shift)
+        
+        return True, valid_shifts, errors
+        
+    except requests.exceptions.Timeout:
+        errors.append("Request timeout (15s)")
+        return False, [], errors
+    
+    except requests.exceptions.RequestException as e:
+        errors.append(f"Request error: {e}")
+        return False, [], errors
+    
+    except Exception as e:
+        errors.append(f"Unexpected error: {e}")
+        return False, [], errors
 
 
 def parse_situation_code(situation_code: str, event_owner_team_id: int, 
@@ -383,8 +518,8 @@ def extract_players_from_event(play: Dict, home_team_id: int, away_team_id: int)
 
 def process_game_shifts(game_id: int) -> Tuple[List[Dict], List[Dict]]:
     """
-    Process play-by-play data for a game to extract shifts and calculate TOI.
-    Infers shifts from player participation in events.
+    Process official shift data for a game and calculate TOI by situation.
+    Uses official NHL shift data instead of heuristic inference.
     
     Args:
         game_id: NHL game ID
@@ -394,56 +529,135 @@ def process_game_shifts(game_id: int) -> Tuple[List[Dict], List[Dict]]:
     """
     print(f"Processing shifts for game {game_id}...")
     
-    # Fetch play-by-play data
+    # Step 1: Fetch official shift data
+    print(f"  Fetching official shift data...")
+    success, raw_shifts, errors = fetch_official_shifts(game_id)
+    
+    if not success or not raw_shifts:
+        print(f"  ERROR: Could not fetch shift data: {errors}")
+        return [], []
+    
+    print(f"  ✅ Fetched {len(raw_shifts)} official shifts")
+    
+    # Step 2: Fetch play-by-play data for situation information
+    print(f"  Fetching play-by-play data for situation tracking...")
     pbp_url = f"{NHL_BASE_URL}/gamecenter/{game_id}/play-by-play"
     
     try:
         response = requests.get(pbp_url, timeout=30)
         response.raise_for_status()
-        raw_data = response.json()
+        pbp_data = response.json()
     except Exception as e:
         print(f"  ERROR: Error fetching PBP for game {game_id}: {e}")
         return [], []
     
     # Extract game info
-    home_team_id = raw_data.get('homeTeam', {}).get('id')
-    away_team_id = raw_data.get('awayTeam', {}).get('id')
+    home_team_id = pbp_data.get('homeTeam', {}).get('id')
+    away_team_id = pbp_data.get('awayTeam', {}).get('id')
     
     if not home_team_id or not away_team_id:
         print(f"  ERROR: Could not extract team IDs for game {game_id}")
         return [], []
     
-    # Initialize shift tracker
-    tracker = ShiftTracker(game_id, home_team_id, away_team_id)
+    # Step 3: Build situation timeline from PBP
+    print(f"  Building situation timeline from PBP...")
+    situation_timeline = build_situation_timeline(pbp_data, home_team_id, away_team_id)
     
-    # Track last appearance time for each player (to detect shift ends)
-    last_appearance: Dict[Tuple[int, int], float] = {}  # {(player_id, period): time}
+    # Step 4: Process shifts with running game clock and situation splitting
+    print(f"  Processing shifts with situation splitting...")
+    processed_shifts = []
+    shifts_split = 0
+    total_segments = 0
     
-    # Process plays
-    plays = raw_data.get('plays', [])
-    print(f"  Processing {len(plays)} plays...")
+    for raw_shift in raw_shifts:
+        player_id = raw_shift.get('playerId')
+        period = raw_shift.get('period')
+        start_time_str = raw_shift.get('startTime')
+        end_time_str = raw_shift.get('endTime')
+        team_id = raw_shift.get('teamId')
+        
+        # Parse times
+        start_seconds = parse_shift_time(start_time_str)
+        end_seconds = parse_shift_time(end_time_str)
+        
+        if start_seconds is None or end_seconds is None:
+            continue  # Skip invalid shifts
+        
+        # Calculate running game clock
+        start_game_clock = calculate_running_game_clock(period, start_seconds)
+        end_game_clock = calculate_running_game_clock(period, end_seconds)
+        
+        if start_game_clock is None or end_game_clock is None:
+            continue  # Skip invalid shifts
+        
+        # Create initial shift record
+        shift_record = {
+            'player_id': player_id,
+            'game_id': game_id,
+            'team_id': team_id,
+            'period': period,
+            'shift_start_time_seconds': start_seconds,
+            'shift_end_time_seconds': end_seconds,
+            'shift_start_game_clock': start_game_clock,
+            'shift_end_game_clock': end_game_clock,
+            'situation': '5v5',  # Will be set correctly by splitting
+            'duration_seconds': end_game_clock - start_game_clock
+        }
+        
+        # Split shift at situation boundaries
+        shift_segments = split_shift_by_situation(shift_record, situation_timeline)
+        
+        if len(shift_segments) > 1:
+            shifts_split += 1
+        
+        total_segments += len(shift_segments)
+        processed_shifts.extend(shift_segments)
     
-    # Track previous period and time for period transitions
-    prev_period = 0
-    prev_time = 0.0
+    print(f"  ✅ Processed {len(raw_shifts)} shifts into {total_segments} segments")
+    if shifts_split > 0:
+        print(f"  📊 Split {shifts_split} shifts at situation boundaries")
+    
+    # Step 5: Aggregate TOI by situation
+    toi_by_situation = aggregate_toi_by_situation(processed_shifts)
+    
+    print(f"  ✅ Generated {len(toi_by_situation)} TOI records")
+    
+    return processed_shifts, toi_by_situation
+
+
+def build_situation_timeline(pbp_data: Dict, home_team_id: int, away_team_id: int) -> List[Dict]:
+    """
+    Build a timeline of situation changes from play-by-play data.
+    Only includes events where the situation actually changes.
+    
+    Args:
+        pbp_data: Play-by-play data from NHL API
+        home_team_id: Home team ID
+        away_team_id: Away team ID
+    
+    Returns:
+        List of situation change events with game clock times (sorted chronologically)
+    """
+    timeline = []
+    plays = pbp_data.get('plays', [])
+    previous_situation = None
     
     for play in plays:
-        type_code = play.get('typeCode')
-        details = play.get('details', {})
         period_desc = play.get('periodDescriptor', {})
         period = period_desc.get('number', 1)
         time_str = play.get('timeInPeriod', '')
         time_seconds = parse_time_to_seconds(time_str)
         
-        # Detect period start - start all shifts
-        if period != prev_period and prev_period > 0:
-            # End all shifts from previous period
-            tracker.end_all_shifts_period(prev_period, 1200.0)  # 20 minutes
-            last_appearance.clear()  # Reset for new period
+        # Calculate running game clock
+        game_clock = calculate_running_game_clock(period, time_seconds)
+        if game_clock is None:
+            continue
         
         # Parse situation
         situation_code = str(play.get('situationCode', ''))
+        details = play.get('details', {})
         event_owner_team_id = details.get('eventOwnerTeamId')
+        
         home_skaters, away_skaters, is_empty_net = parse_situation_code(
             situation_code, event_owner_team_id, home_team_id
         )
@@ -453,68 +667,147 @@ def process_game_shifts(game_id: int) -> Tuple[List[Dict], List[Dict]]:
             event_owner_team_id, home_team_id
         )
         
-        # Update situation if changed
-        if period in tracker.current_situation:
-            if tracker.current_situation[period] != situation:
-                tracker.update_situation(period, situation, time_seconds)
-        else:
-            tracker.current_situation[period] = situation
+        # Only add to timeline if situation changed
+        if situation != previous_situation:
+            timeline.append({
+                'game_clock': game_clock,
+                'period': period,
+                'situation': situation,
+                'time_seconds': time_seconds
+            })
+            previous_situation = situation
+    
+    # Sort by game clock to ensure chronological order
+    timeline.sort(key=lambda x: x['game_clock'])
+    
+    return timeline
+
+
+def get_situation_at_time(timeline: List[Dict], game_clock: float, period: int) -> str:
+    """
+    Get the situation at a specific game clock time.
+    
+    Args:
+        timeline: Situation timeline from PBP
+        game_clock: Running game clock time in seconds
+        period: Period number
+    
+    Returns:
+        Situation string ("5v5", "PP", or "PK")
+    """
+    # Find the most recent situation change before or at this time
+    current_situation = "5v5"  # Default
+    
+    for event in timeline:
+        if event['game_clock'] <= game_clock and event['period'] == period:
+            current_situation = event['situation']
+        elif event['game_clock'] > game_clock:
+            break
+    
+    return current_situation
+
+
+def split_shift_by_situation(shift: Dict, situation_timeline: List[Dict]) -> List[Dict]:
+    """
+    Split a shift into multiple segments based on situation changes.
+    
+    For any shift that overlaps a situation change event, split the single shift
+    record into two or more adjacent shift segments, each attributed to the correct,
+    non-overlapping situation.
+    
+    Args:
+        shift: Shift record with shift_start_game_clock, shift_end_game_clock, period
+        situation_timeline: Chronological list of situation change events
+    
+    Returns:
+        List of shift segments, each with correct situation attribution
+    """
+    start_clock = shift['shift_start_game_clock']
+    end_clock = shift['shift_end_game_clock']
+    period = shift['period']
+    
+    # Find all situation changes that occur within this shift's duration
+    # Condition: Shift_S < C_T < Shift_E
+    situation_changes = []
+    for event in situation_timeline:
+        event_clock = event['game_clock']
+        event_period = event['period']
         
-        # Extract players from this event
-        event_players = extract_players_from_event(play, home_team_id, away_team_id)
+        # Only consider events in the same period and within shift bounds
+        if (event_period == period and 
+            start_clock < event_clock < end_clock):
+            situation_changes.append(event)
+    
+    # If no situation changes, return original shift
+    if not situation_changes:
+        return [shift]
+    
+    # Sort situation changes by game clock (should already be sorted, but ensure)
+    situation_changes.sort(key=lambda x: x['game_clock'])
+    
+    # Determine initial situation (situation before shift started)
+    initial_situation = get_situation_at_time(situation_timeline, start_clock, period)
+    
+    # Split the shift at each situation change
+    segments = []
+    segment_start = start_clock
+    current_situation = initial_situation
+    
+    for change_event in situation_changes:
+        change_clock = change_event['game_clock']
+        new_situation = change_event['situation']
         
-        # For each player in the event, start/continue their shift
-        for player_id, team_id in event_players.items():
-            key = (player_id, period)
+        # Create segment from segment_start to change_clock
+        if segment_start < change_clock:
+            segment = shift.copy()
+            segment['shift_start_game_clock'] = segment_start
+            segment['shift_end_game_clock'] = change_clock
+            segment['situation'] = current_situation
+            segment['duration_seconds'] = change_clock - segment_start
             
-            # Check if player has been inactive (gap > 60 seconds suggests shift end)
-            if key in last_appearance:
-                time_gap = time_seconds - last_appearance[key]
-                if time_gap > 60.0:  # More than 60 seconds gap = likely shift change
-                    # End previous shift
-                    tracker.end_shift(player_id, team_id, period, last_appearance[key] + 30.0)  # End 30s after last appearance
-                    # Start new shift
-                    tracker.start_shift(player_id, team_id, period, time_seconds, situation)
-                else:
-                    # Continue existing shift (update situation if needed)
-                    if player_id in tracker.active_shifts and period in tracker.active_shifts[player_id]:
-                        # Shift is active, just update last appearance
-                        pass
-                    else:
-                        # Start new shift
-                        tracker.start_shift(player_id, team_id, period, time_seconds, situation)
-            else:
-                # First appearance in this period - start shift
-                tracker.start_shift(player_id, team_id, period, time_seconds, situation)
+            # Recalculate period time for segment start/end
+            # Find period and time for segment start
+            segment_start_period = period
+            segment_start_period_time = segment_start - ((period - 1) * 1200.0)
+            if period > 3:
+                segment_start_period_time = segment_start - 3600.0 - ((period - 4) * 300.0)
             
-            # Update last appearance time
-            last_appearance[key] = time_seconds
+            segment_end_period_time = change_clock - ((period - 1) * 1200.0)
+            if period > 3:
+                segment_end_period_time = change_clock - 3600.0 - ((period - 4) * 300.0)
+            
+            segment['shift_start_time_seconds'] = segment_start_period_time
+            segment['shift_end_time_seconds'] = segment_end_period_time
+            
+            segments.append(segment)
         
-        # Handle goals - end all shifts (line reset)
-        if type_code == 505:  # Goal
-            tracker.end_all_shifts_period(period, time_seconds)
-            # Reset last appearance for this period (forces new shifts after goal)
-            keys_to_remove = [k for k in last_appearance.keys() if k[1] == period]
-            for k in keys_to_remove:
-                del last_appearance[k]
+        # Update for next segment
+        segment_start = change_clock
+        current_situation = new_situation
+    
+    # Create final segment from last change to shift end
+    if segment_start < end_clock:
+        segment = shift.copy()
+        segment['shift_start_game_clock'] = segment_start
+        segment['shift_end_game_clock'] = end_clock
+        segment['situation'] = current_situation
+        segment['duration_seconds'] = end_clock - segment_start
         
-        # Update previous period/time
-        prev_period = period
-        prev_time = time_seconds
+        # Recalculate period time for segment start/end
+        segment_start_period_time = segment_start - ((period - 1) * 1200.0)
+        if period > 3:
+            segment_start_period_time = segment_start - 3600.0 - ((period - 4) * 300.0)
+        
+        segment_end_period_time = end_clock - ((period - 1) * 1200.0)
+        if period > 3:
+            segment_end_period_time = end_clock - 3600.0 - ((period - 4) * 300.0)
+        
+        segment['shift_start_time_seconds'] = segment_start_period_time
+        segment['shift_end_time_seconds'] = segment_end_period_time
+        
+        segments.append(segment)
     
-    # End all remaining shifts at end of game
-    for period in tracker.current_situation.keys():
-        tracker.end_all_shifts_period(period, 1200.0)  # End of period
-    
-    # Get completed shifts
-    shifts = tracker.get_completed_shifts()
-    
-    # Aggregate TOI by situation
-    toi_by_situation = aggregate_toi_by_situation(shifts)
-    
-    print(f"  Extracted {len(shifts)} shifts, {len(toi_by_situation)} TOI records")
-    
-    return shifts, toi_by_situation
+    return segments
 
 
 def aggregate_toi_by_situation(shifts: List[Dict]) -> List[Dict]:
@@ -522,7 +815,7 @@ def aggregate_toi_by_situation(shifts: List[Dict]) -> List[Dict]:
     Aggregate shifts into TOI by player, game, and situation.
     
     Args:
-        shifts: List of shift dictionaries
+        shifts: List of shift dictionaries with game_clock times
     
     Returns:
         List of TOI records
@@ -535,7 +828,9 @@ def aggregate_toi_by_situation(shifts: List[Dict]) -> List[Dict]:
     
     for shift in shifts:
         key = (shift['player_id'], shift['game_id'], shift['situation'])
-        duration = shift['shift_end_time_seconds'] - shift['shift_start_time_seconds']
+        # Use game clock duration for accuracy
+        duration = shift.get('duration_seconds', 
+                           shift['shift_end_game_clock'] - shift['shift_start_game_clock'])
         
         if key not in toi_dict:
             toi_dict[key] = 0.0
@@ -548,7 +843,8 @@ def aggregate_toi_by_situation(shifts: List[Dict]) -> List[Dict]:
             'player_id': player_id,
             'game_id': game_id,
             'situation': situation,
-            'toi_seconds': toi_seconds
+            'toi_seconds': toi_seconds,
+            'toi_minutes': toi_seconds / 60.0
         })
     
     return toi_records

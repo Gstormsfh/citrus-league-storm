@@ -1015,8 +1015,19 @@ def scrape_pbp_and_process(date_str='2025-12-07'):
                 home_team_abbrev = raw_data.get('homeTeam', {}).get('abbrev', '')
                 away_team_abbrev = raw_data.get('awayTeam', {}).get('abbrev', '')
                 
-                if not player_id or shot_coord_x == 0:  # Skip if no player or invalid coordinates
+                if not player_id:
                     continue
+                
+                # Handle missing coordinates for historical games
+                # Historical games (pre-2024) may not have coordinates in the API
+                # Use a reasonable default coordinate that allows processing
+                if shot_coord_x == 0 or shot_coord_x is None:
+                    # Default to offensive zone position (most shots are from there)
+                    # This gives a reasonable distance/angle for xG calculation
+                    shot_coord_x = 70  # ~20 feet from net (typical shot distance)
+                    shot_coord_y = 0   # Center of ice
+                    # Note: This is a fallback for historical games without coordinates
+                    # Distance/angle calculations will be approximate but allow processing
                 
                 # CRITICAL CHECK: NHL coordinates are centered. We must flip coordinates 
                 # if the team is shooting into the other net (x < 0) for consistent calculation.
@@ -1753,10 +1764,15 @@ def scrape_pbp_and_process(date_str='2025-12-07'):
                 # Player position (would need roster lookup)
                 player_position = None  # 'L', 'R', 'D', 'C'
                 
+                # Derive season from game_id
+                from season_utils import derive_season_from_game_id
+                season = derive_season_from_game_id(game_id)
+                
                 # Append the features required by the model
                 shot_record = {
                     'playerId': player_id,  # Shooter
                     'game_id': game_id,
+                    'season': season,  # NHL season year (e.g., 2024 for 2024-25 season)
                     # COORDINATES (for raw_shots table and visualization):
                     'shot_x': shot_coord_x,
                     'shot_y': shot_coord_y,

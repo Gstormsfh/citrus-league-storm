@@ -101,66 +101,56 @@ def calculate_replacement_level_rates(df_rates):
     # Filter players with sufficient TOI for each component
     # Use total TOI as weight for percentile calculation
     
-    # EVO replacement level (75th percentile of EVO rate, weighted by 5v5 TOI)
-    evo_players = df_rates[df_rates['toi_5v5_minutes'] > 0].copy()
-    if len(evo_players) > 0:
-        # Weight by TOI for percentile calculation
-        rp_rates['evo'] = np.percentile(
-            evo_players['evo_rate_raw'],
-            REPLACEMENT_LEVEL_PERCENTILE
-        )
-        print(f"   EVO Replacement Level: {rp_rates['evo']:.4f} xGF/60")
+    # Calculate 75th percentile of TOI to identify replacement-level players
+    toi_75th_percentile = np.percentile(df_rates['toi_total_minutes'], REPLACEMENT_LEVEL_PERCENTILE)
+    replacement_players = df_rates[df_rates['toi_total_minutes'] <= toi_75th_percentile].copy()
+    
+    print(f"   Identified {len(replacement_players):,} replacement-level players (TOI <= {toi_75th_percentile:.1f} minutes)")
+    
+    # EVO replacement level (mean rate among replacement-level players with 5v5 TOI)
+    evo_rp = replacement_players[replacement_players['toi_5v5_minutes'] > 0]
+    if len(evo_rp) > 0:
+        rp_rates['evo'] = evo_rp['evo_rate_raw'].mean()
+        print(f"   EVO Replacement Level: {rp_rates['evo']:.4f} xGF/60 (from {len(evo_rp):,} players)")
     else:
         rp_rates['evo'] = 0.0
-        print("   WARNING: No players with 5v5 TOI for EVO replacement level")
+        print("   WARNING: No replacement-level players with 5v5 TOI for EVO")
     
-    # EVD replacement level (75th percentile of EVD rate, weighted by 5v5 TOI)
-    evd_players = df_rates[df_rates['toi_5v5_minutes'] > 0].copy()
-    if len(evd_players) > 0:
-        rp_rates['evd'] = np.percentile(
-            evd_players['evd_rate_raw'],
-            REPLACEMENT_LEVEL_PERCENTILE
-        )
-        print(f"   EVD Replacement Level: {rp_rates['evd']:.4f} xGA/60")
+    # EVD replacement level (mean rate among replacement-level players with 5v5 TOI)
+    evd_rp = replacement_players[replacement_players['toi_5v5_minutes'] > 0]
+    if len(evd_rp) > 0:
+        rp_rates['evd'] = evd_rp['evd_rate_raw'].mean()
+        print(f"   EVD Replacement Level: {rp_rates['evd']:.4f} xGA/60 (from {len(evd_rp):,} players)")
     else:
         rp_rates['evd'] = 0.0
-        print("   WARNING: No players with 5v5 TOI for EVD replacement level")
+        print("   WARNING: No replacement-level players with 5v5 TOI for EVD")
     
-    # PPO replacement level (75th percentile of PPO rate, weighted by PP TOI)
-    ppo_players = df_rates[df_rates['toi_pp_minutes'] > 0].copy()
-    if len(ppo_players) > 0:
-        rp_rates['ppo'] = np.percentile(
-            ppo_players['ppo_rate_raw'],
-            REPLACEMENT_LEVEL_PERCENTILE
-        )
-        print(f"   PPO Replacement Level: {rp_rates['ppo']:.4f} xGF/60")
+    # PPO replacement level (mean rate among replacement-level players with PP TOI)
+    ppo_rp = replacement_players[replacement_players['toi_pp_minutes'] > 0]
+    if len(ppo_rp) > 0:
+        rp_rates['ppo'] = ppo_rp['ppo_rate_raw'].mean()
+        print(f"   PPO Replacement Level: {rp_rates['ppo']:.4f} xGF/60 (from {len(ppo_rp):,} players)")
     else:
         rp_rates['ppo'] = 0.0
-        print("   WARNING: No players with PP TOI for PPO replacement level")
+        print("   WARNING: No replacement-level players with PP TOI for PPO")
     
-    # PPD replacement level (75th percentile of PPD rate, weighted by PK TOI)
-    ppd_players = df_rates[df_rates['toi_pk_minutes'] > 0].copy()
-    if len(ppd_players) > 0:
-        rp_rates['ppd'] = np.percentile(
-            ppd_players['ppd_rate_raw'],
-            REPLACEMENT_LEVEL_PERCENTILE
-        )
-        print(f"   PPD Replacement Level: {rp_rates['ppd']:.4f} xGA/60")
+    # PPD replacement level (mean rate among replacement-level players with PK TOI)
+    ppd_rp = replacement_players[replacement_players['toi_pk_minutes'] > 0]
+    if len(ppd_rp) > 0:
+        rp_rates['ppd'] = ppd_rp['ppd_rate_raw'].mean()
+        print(f"   PPD Replacement Level: {rp_rates['ppd']:.4f} xGA/60 (from {len(ppd_rp):,} players)")
     else:
         rp_rates['ppd'] = 0.0
-        print("   WARNING: No players with PK TOI for PPD replacement level")
+        print("   WARNING: No replacement-level players with PK TOI for PPD")
     
-    # Penalty replacement level (75th percentile of Penalty component, weighted by total TOI)
-    penalty_players = df_rates[df_rates['toi_total_minutes'] > 0].copy()
-    if len(penalty_players) > 0:
-        rp_rates['penalty'] = np.percentile(
-            penalty_players['penalty_component_raw'],
-            REPLACEMENT_LEVEL_PERCENTILE
-        )
-        print(f"   Penalty Replacement Level: {rp_rates['penalty']:.4f} (drawn - taken)/60")
+    # Penalty replacement level (mean rate among replacement-level players)
+    penalty_rp = replacement_players[replacement_players['toi_total_minutes'] > 0]
+    if len(penalty_rp) > 0:
+        rp_rates['penalty'] = penalty_rp['penalty_component_raw'].mean()
+        print(f"   Penalty Replacement Level: {rp_rates['penalty']:.4f} (drawn - taken)/60 (from {len(penalty_rp):,} players)")
     else:
         rp_rates['penalty'] = 0.0
-        print("   WARNING: No players with TOI for Penalty replacement level")
+        print("   WARNING: No replacement-level players for Penalty")
     
     return rp_rates
 
