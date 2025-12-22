@@ -96,124 +96,160 @@ def cleanup_raw_shots_table(confirm=True):
         traceback.print_exc()
         return 0
 
-def pull_season_data(start_date='2025-10-07', end_date=None, days_per_batch=7, cleanup_first=False):
+def pull_season_data(start_date='2025-10-07', end_date=None, cleanup_first=False):
     """
-    Pull all season data by processing games in date batches.
+    Pull all season data by processing all finished games efficiently.
     
     Args:
         start_date: Season start date
         end_date: Season end date (default: today)
-        days_per_batch: Number of days to process per batch (to show progress)
+        cleanup_first: Whether to clean raw_shots table first
     """
     if end_date is None:
         end_date = datetime.date.today().strftime('%Y-%m-%d')
     
     print("=" * 80)
-    print("PULLING 2025 SEASON DATA")
+    print("PULLING 2025-26 SEASON DATA")
     print("=" * 80)
     print(f"Date range: {start_date} to {end_date}")
-    print(f"Processing in batches of {days_per_batch} days")
     print()
     
     # Cleanup old data if requested
     if cleanup_first:
-        print("🧹 Cleaning up old data from raw_shots table...")
+        print("Cleaning up old data from raw_shots table...")
         cleanup_raw_shots_table(confirm=True)
         print()
     
-    # Process by date (scrape_pbp_and_process handles individual dates)
-    start = datetime.datetime.strptime(start_date, '%Y-%m-%d').date()
-    end = datetime.datetime.strptime(end_date, '%Y-%m-%d').date()
+    # Get ALL finished games from database at once (much faster than day-by-day)
+    print("Fetching all finished games from database...")
+    all_game_ids = get_all_finished_games_from_db(start_date=start_date, end_date=end_date)
     
-    current_date = start
-    total_dates = (end - start).days + 1
-    dates_processed = 0
+    if not all_game_ids:
+        print("No finished games found in database. Make sure nhl_games table is populated.")
+        return None
     
-    print("Processing games by date...")
-    print("(This will save all shots to raw_shots table)")
+    print(f"Found {len(all_game_ids):,} finished games to process")
+    print("Processing games (this will save all shots to raw_shots table)...")
     print()
     
-    while current_date <= end:
-        date_str = current_date.strftime('%Y-%m-%d')
-        dates_processed += 1
+    # Process games in batches for better progress tracking
+    from data_acquisition import scrape_pbp_and_process, get_finished_game_ids_from_db
+    import time
+    
+    games_processed = 0
+    games_failed = 0
+    total_shots = 0
+    
+    # Process games by grouping them by date for better organization
+    games_by_date = {}
+    for game_id in all_game_ids:
+        # Get date for this game (we'll need to query or derive it)
+        # For now, process all games - we can optimize date grouping later if needed
+        games_by_date.setdefault('all', []).append(game_id)
+    
+    # Process all games
+    for idx, game_id in enumerate(all_game_ids, 1):
+        try:
+            # Get the date for this game by querying nhl_games table
+            game_response = supabase.table('nhl_games').select('game_date').eq('game_id', game_id).single().execute()
+            game_date = game_response.data.get('game_date') if game_response.data else None
+            
+            if game_date:
+                date_str = game_date[:10] if isinstance(game_date, str) else str(game_date)[:10]
+            else:
+                # Fallback: process without date filtering
+                date_str = None
+            
+            if idx % 10 == 0 or idx == len(all_game_ids):
+                print(f"[{idx}/{len(all_game_ids)}] Processing game {game_id}...")
+            
+            # Process this specific game
+            # We need to modify scrape_pbp_and_process to accept game_id directly
+            # For now, we'll process by date but more efficiently
+            if date_str:
+                # Only process if we haven't processed this date yet
+                # Actually, let's just process all games directly
+                pass
         
-        print(f"[{dates_processed}/{total_dates}] Processing {date_str}...")
+        except Exception as e:
+            games_failed += 1
+            if games_failed <= 5:  # Only show first 5 errors
+                print(f"  [WARNING] Error processing game {game_id}: {e}")
+    
+    # OPTIMIZED: Process all dates in the range efficiently
+    # Get unique dates from the game list
+    print("\nFetching game dates...")
+    games_by_date_dict = {}
+    batch_size = 100
+    for i in range(0, len(all_game_ids), batch_size):
+        batch_ids = all_game_ids[i:i + batch_size]
+        try:
+            games_response = supabase.table('nhl_games').select('game_id, game_date').in_('game_id', batch_ids).execute()
+            for game in games_response.data:
+                game_id = game['game_id']
+                game_date = game.get('game_date')
+                if game_date:
+                    date_key = game_date[:10] if isinstance(game_date, str) else str(game_date)[:10]
+                    games_by_date_dict.setdefault(date_key, []).append(game_id)
+        except Exception as e:
+            print(f"  [WARNING] Error fetching dates for batch: {e}")
+    
+    print(f"Found games across {len(games_by_date_dict)} unique dates")
+    print("\nProcessing games by date (optimized batch processing)...")
+    print()
+    
+    # Process each date
+    dates_processed = 0
+    total_dates = len(games_by_date_dict)
+    
+    for date_str in sorted(games_by_date_dict.keys()):
+        dates_processed += 1
+        games_for_date = games_by_date_dict[date_str]
+        
+        print(f"[{dates_processed}/{total_dates}] Processing {date_str} ({len(games_for_date)} games)...")
         
         try:
+            # scrape_pbp_and_process handles all games for a date efficiently
             final_stats_df = scrape_pbp_and_process(date_str=date_str)
             # Note: scrape_pbp_and_process saves to raw_shots table automatically
         except Exception as e:
-            print(f"  ⚠️  Error processing {date_str}: {e}")
+            print(f"  [WARNING] Error processing {date_str}: {e}")
             import traceback
             traceback.print_exc()
-        
-        current_date += datetime.timedelta(days=1)
-        
-        # Small delay to avoid overwhelming API
-        import time
-        time.sleep(0.1)
     
     print("\n" + "=" * 80)
-    print("All dates processed. Fetching from raw_shots table...")
+    print("DATA SCRAPING COMPLETE")
     print("=" * 80)
     
-    # Fetch all shots from raw_shots table with pagination
+    # Quick summary from database
     try:
-        print("\nFetching all shots from raw_shots table...")
-        print("(Using pagination to fetch all records, not just the first 1000)")
+        print("\nFetching summary from raw_shots table...")
+        count_response = supabase.table('raw_shots').select('id', count='exact').eq('season', 2025).execute()
+        total_shots = count_response.count if hasattr(count_response, 'count') else 0
         
-        all_shots = []
-        offset = 0
-        batch_size = 1000
-        
-        while True:
-            response = supabase.table('raw_shots').select('*').gte('created_at', f'{start_date}T00:00:00').range(offset, offset + batch_size - 1).execute()
+        if total_shots > 0:
+            # Get unique games and players
+            games_response = supabase.table('raw_shots').select('game_id').eq('season', 2025).execute()
+            players_response = supabase.table('raw_shots').select('player_id').eq('season', 2025).execute()
             
-            if not response.data or len(response.data) == 0:
-                break
+            unique_games = len(set([g['game_id'] for g in games_response.data])) if games_response.data else 0
+            unique_players = len(set([p['player_id'] for p in players_response.data])) if players_response.data else 0
             
-            all_shots.extend(response.data)
-            
-            if len(response.data) < batch_size:
-                break  # Last batch - we've fetched all records
-            
-            offset += batch_size
-            print(f"  Fetched {len(all_shots):,} records so far...")
-        
-        if all_shots:
-            df_shots = pd.DataFrame(all_shots)
-            print(f"✅ Fetched {len(df_shots):,} shot records (all records)")
-            
-            # Save to CSV
-            output_file = 'data/our_shots_2025.csv'
-            df_shots.to_csv(output_file, index=False)
-            print(f"\n✅ Saved {len(df_shots)} shots to {output_file}")
-            
-            # Print summary
-            print("\n" + "=" * 80)
-            print("SUMMARY")
-            print("=" * 80)
-            print(f"Total shots: {len(df_shots):,}")
-            print(f"Unique games: {df_shots['game_id'].nunique()}")
-            print(f"Unique players: {df_shots['player_id'].nunique()}")
-            print(f"xG statistics:")
-            print(f"  Mean: {df_shots['xg_value'].mean():.4f}")
-            print(f"  Median: {df_shots['xg_value'].median():.4f}")
-            print(f"  Max: {df_shots['xg_value'].max():.4f}")
-            print(f"  Min: {df_shots['xg_value'].min():.4f}")
-            print(f"\nShots with xG > 0.3: {(df_shots['xg_value'] > 0.3).sum():,}")
-            print(f"Shots with xG > 0.2: {(df_shots['xg_value'] > 0.2).sum():,}")
-            
-            return df_shots
+            print(f"\n✅ Summary:")
+            print(f"   Total shots: {total_shots:,}")
+            print(f"   Unique games: {unique_games:,}")
+            print(f"   Unique players: {unique_players:,}")
+            print(f"\n[OK] All data saved to raw_shots table with season=2025")
         else:
             print("⚠️  No shots found in raw_shots table")
-            return None
             
     except Exception as e:
-        print(f"Error fetching shots: {e}")
-        import traceback
-        traceback.print_exc()
-        return None
+        print(f"[WARNING] Could not fetch summary: {e}")
+    
+    print("\nNext steps:")
+    print("  1. Run: python calculate_goalie_gsax.py")
+    print("  2. Run: python calculate_gar_components.py")
+    print("  3. Run: python calculate_and_store_projections.py")
 
 if __name__ == "__main__":
     # 2025-26 season started October 7, 2025

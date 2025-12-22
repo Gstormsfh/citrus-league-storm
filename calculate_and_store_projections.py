@@ -22,6 +22,7 @@ from fantasy_projection_pipeline import (
     calculate_team_xgf
 )
 from apply_qoc_adjustments import get_players_by_team, get_team_id_from_players
+from calculate_stat_conversions import convert_batch_xg_to_stats, convert_xg_to_stats
 
 # Load environment variables
 load_dotenv()
@@ -36,9 +37,6 @@ if not supabase_url or not supabase_key:
     exit(1)
 
 supabase: Client = create_client(supabase_url, supabase_key)
-
-# Conversion factor: xG to fantasy points
-XG_TO_POINTS_FACTOR = 20.0
 
 
 def get_upcoming_games(season: int = 2025, days_ahead: int = 7) -> pd.DataFrame:
@@ -132,11 +130,30 @@ def calculate_ros_projections(
     print("=" * 80)
     
     try:
-        # Load TOI data from player_toi_by_situation
+        # Load TOI data from player_gar_components (has toi_total_minutes)
         print("   Loading TOI data...")
-        response = supabase.table('player_toi_by_situation').select(
+        response = supabase.table('player_gar_components').select(
             'player_id, toi_total_minutes, season'
         ).eq('season', season).execute()
+        
+        # If no data in player_gar_components, aggregate from player_toi_by_situation
+        if not response.data:
+            print("   No TOI in player_gar_components, aggregating from player_toi_by_situation...")
+            toi_response = supabase.table('player_toi_by_situation').select(
+                'player_id, toi_seconds, game_id, season'
+            ).eq('season', season).execute()
+            
+            if toi_response.data:
+                df_toi_raw = pd.DataFrame(toi_response.data)
+                df_toi_raw['toi_seconds'] = pd.to_numeric(df_toi_raw['toi_seconds'], errors='coerce').fillna(0)
+                df_toi_agg = df_toi_raw.groupby('player_id').agg({
+                    'toi_seconds': 'sum',
+                    'game_id': 'nunique'
+                }).reset_index()
+                df_toi_agg['toi_total_minutes'] = df_toi_agg['toi_seconds'] / 60.0
+                df_toi_agg['games_played'] = df_toi_agg['game_id']
+                df_toi_agg['season'] = season
+                response.data = df_toi_agg[['player_id', 'toi_total_minutes', 'season', 'games_played']].to_dict('records')
         
         if not response.data:
             print("   WARNING: No TOI data found. Cannot calculate RoS projections.")
@@ -215,7 +232,7 @@ def calculate_ros_projections(
         print(f"ERROR: Error calculating RoS projections: {e}")
         import traceback
         traceback.print_exc()
-        return pd.DataFrame()
+        return pd.DataFrame()  # pd is imported at module level
 
 
 def store_ros_projections(df_ros: pd.DataFrame):
@@ -370,10 +387,13 @@ def calculate_and_store_matchup_projections(
                         'opponent_team_id': home_team_id
                     })
     
-    # Store projections
+    # Store xG projections
     if all_projections:
         print(f"\n   Storing {len(all_projections):,} matchup projections...")
         store_matchup_projections(all_projections)
+        
+        # Convert and store stat projections
+        convert_and_store_matchup_stats(all_projections, season)
     else:
         print("   No matchup projections to store")
 
@@ -386,23 +406,269 @@ def store_matchup_projections(projections: List[Dict]):
         projections: List of projection dictionaries
     """
     print("\n" + "=" * 80)
-    print("STORING MATCHUP PROJECTIONS")
+    print("STORING MATCHUP PROJECTIONS (xG)")
     print("=" * 80)
     
     try:
+        # Deduplicate by (player_id, game_id, season) - keep last occurrence
+        seen = {}
+        for proj in projections:
+            key = (proj.get('player_id'), proj.get('game_id'), proj.get('season'))
+            if key:
+                seen[key] = proj
+        
+        deduplicated = list(seen.values())
+        if len(deduplicated) < len(projections):
+            print(f"   Deduplicated {len(projections)} projections to {len(deduplicated)} unique records")
+        
         chunk_size = 1000
-        for i in range(0, len(projections), chunk_size):
-            chunk = projections[i:i + chunk_size]
+        for i in range(0, len(deduplicated), chunk_size):
+            chunk = deduplicated[i:i + chunk_size]
             result = supabase.table('player_projections').upsert(
                 chunk,
                 on_conflict='player_id,game_id,season'
             ).execute()
-            print(f"   Upserted matchup projections {i+1}-{min(i+chunk_size, len(projections))}")
+            print(f"   Upserted matchup projections {i+1}-{min(i+chunk_size, len(deduplicated))}")
         
-        print(f"   Successfully stored {len(projections):,} matchup projections")
+        print(f"   Successfully stored {len(deduplicated):,} matchup projections")
         
     except Exception as e:
         print(f"ERROR: Error storing matchup projections: {e}")
+        import traceback
+        traceback.print_exc()
+
+
+def get_player_toi_per_game(player_id: int, season: int = 2025) -> float:
+    """
+    Get estimated per-game TOI for a player.
+    
+    Args:
+        player_id: NHL player ID
+        season: Season year
+    
+    Returns:
+        Estimated TOI per game in minutes (default: 18.0)
+    """
+    try:
+        # Try player_gar_components first
+        response = supabase.table('player_gar_components').select(
+            'player_id, toi_total_minutes, season'
+        ).eq('player_id', player_id).eq('season', season).execute()
+        
+        if response.data:
+            df = pd.DataFrame(response.data)
+            df['toi_total_minutes'] = pd.to_numeric(df['toi_total_minutes'], errors='coerce').fillna(0)
+            total_toi = df['toi_total_minutes'].sum()
+            
+            # Get games played
+            games_response = supabase.table('raw_shots').select(
+                'game_id'
+            ).eq('player_id', player_id).eq('season', season).execute()
+            
+            if games_response.data:
+                games_df = pd.DataFrame(games_response.data)
+                games_played = games_df['game_id'].nunique()
+                if games_played > 0:
+                    return float(total_toi / games_played)
+        else:
+            # Fall back to aggregating from player_toi_by_situation
+            toi_response = supabase.table('player_toi_by_situation').select(
+                'player_id, toi_seconds, game_id, season'
+            ).eq('player_id', player_id).eq('season', season).execute()
+            
+            if toi_response.data:
+                df_toi = pd.DataFrame(toi_response.data)
+                df_toi['toi_seconds'] = pd.to_numeric(df_toi['toi_seconds'], errors='coerce').fillna(0)
+                total_toi_seconds = df_toi['toi_seconds'].sum()
+                total_toi_minutes = total_toi_seconds / 60.0
+                games_played = df_toi['game_id'].nunique()
+                if games_played > 0:
+                    return float(total_toi_minutes / games_played)
+        
+        # Default: 18 minutes per game
+        return 18.0
+        
+    except Exception as e:
+        return 18.0
+
+
+def convert_and_store_matchup_stats(projections: List[Dict], season: int = 2025):
+    """
+    Convert xG projections to stats and store in player_projected_stats table.
+    
+    Args:
+        projections: List of xG projection dictionaries (from store_matchup_projections)
+        season: Season year
+    """
+    if len(projections) == 0:
+        return
+    
+    print("\n" + "=" * 80)
+    print("CONVERTING MATCHUP xG TO STATS")
+    print("=" * 80)
+    
+    try:
+        # Prepare projections for conversion (per-game)
+        conversion_inputs = []
+        for proj in projections:
+            player_id = proj['player_id']
+            projected_xg = proj['final_projected_xg']
+            projected_toi = get_player_toi_per_game(player_id, season)
+            
+            conversion_inputs.append({
+                'player_id': player_id,
+                'game_id': proj['game_id'],
+                'projected_xg': projected_xg,
+                'projected_toi': projected_toi,
+            })
+        
+        # Convert to stats in batch
+        print(f"   Converting {len(conversion_inputs):,} projections...")
+        stat_projections = convert_batch_xg_to_stats(
+            conversion_inputs,
+            season=season,
+            projection_type='matchup'
+        )
+        
+        # Store in player_projected_stats
+        print(f"\n   Storing {len(stat_projections):,} stat projections...")
+        store_projected_stats(stat_projections, season)
+        
+    except Exception as e:
+        print(f"ERROR: Error converting and storing matchup stats: {e}")
+        import traceback
+        traceback.print_exc()
+
+
+def convert_and_store_ros_stats(df_ros: pd.DataFrame, season: int = 2025):
+    """
+    Convert RoS xG projections to stats and store in player_projected_stats table.
+    
+    Args:
+        df_ros: DataFrame with RoS xG projections
+        season: Season year
+    """
+    if len(df_ros) == 0:
+        return
+    
+    print("\n" + "=" * 80)
+    print("CONVERTING RoS xG TO STATS")
+    print("=" * 80)
+    
+    try:
+        # Estimate remaining games (assume 82 game season)
+        # Get current games played from staging
+        staging_response = supabase.table('staging_2025_skaters').select(
+            'playerId, games_played'
+        ).eq('situation', 'all').execute()
+        
+        games_played_dict = {}
+        if staging_response.data:
+            for row in staging_response.data:
+                player_id = int(row['playerId']) if pd.notna(row['playerId']) else None
+                games = pd.to_numeric(row['games_played'], errors='coerce')
+                if player_id and pd.notna(games):
+                    games_played_dict[player_id] = int(games)
+        
+        # Prepare conversions
+        conversion_inputs = []
+        for _, row in df_ros.iterrows():
+            player_id = int(row['player_id'])
+            ros_xg_per_game = float(row['ros_projection_xg'])
+            avg_toi_per_game = float(row.get('avg_toi_per_game', 18.0))
+            
+            # Calculate remaining games
+            games_played = games_played_dict.get(player_id, 0)
+            remaining_games = max(1, 82 - games_played)  # Assume 82 game season
+            
+            # Scale to season totals
+            total_remaining_xg = ros_xg_per_game * remaining_games
+            total_remaining_toi = avg_toi_per_game * remaining_games
+            
+            conversion_inputs.append({
+                'player_id': player_id,
+                'game_id': None,  # NULL for RoS
+                'projected_xg': total_remaining_xg,
+                'projected_toi': total_remaining_toi,
+            })
+        
+        # Convert to stats in batch
+        print(f"   Converting {len(conversion_inputs):,} RoS projections...")
+        stat_projections = convert_batch_xg_to_stats(
+            conversion_inputs,
+            season=season,
+            projection_type='ros'
+        )
+        
+        # Store in player_projected_stats
+        print(f"\n   Storing {len(stat_projections):,} RoS stat projections...")
+        store_projected_stats(stat_projections, season)
+        
+    except Exception as e:
+        print(f"ERROR: Error converting and storing RoS stats: {e}")
+        import traceback
+        traceback.print_exc()
+
+
+def store_projected_stats(stat_projections: List[Dict], season: int = 2025):
+    """
+    Store projected stats in player_projected_stats table.
+    
+    Args:
+        stat_projections: List of stat projection dictionaries
+        season: Season year
+    """
+    print("\n" + "=" * 80)
+    print("STORING PROJECTED STATS")
+    print("=" * 80)
+    
+    try:
+        # Prepare records for database
+        records = []
+        for proj in stat_projections:
+            game_id = proj.get('game_id')
+            # Use -1 for RoS projections (NULL) to match primary key COALESCE(game_id, -1)
+            if game_id is None:
+                game_id = -1
+            
+            record = {
+                'player_id': proj['player_id'],
+                'game_id': game_id,
+                'season': season,
+                'projected_goals': float(proj.get('goals', 0.0)),
+                'projected_assists': float(proj.get('assists', 0.0)),
+                'projected_shots': float(proj.get('shots', 0.0)),
+                'projected_blocks': float(proj.get('blocks', 0.0)),
+                'projected_hits': float(proj.get('hits', 0.0)),
+                'projected_ppp': float(proj.get('ppp', 0.0)),
+            }
+            records.append(record)
+        
+        # Deduplicate by (player_id, game_id, season) - keep last occurrence
+        seen = {}
+        for record in records:
+            key = (record.get('player_id'), record.get('game_id'), record.get('season'))
+            if key:
+                seen[key] = record
+        
+        deduplicated = list(seen.values())
+        if len(deduplicated) < len(records):
+            print(f"   Deduplicated {len(records)} records to {len(deduplicated)} unique records")
+        
+        # Batch upsert
+        chunk_size = 1000
+        for i in range(0, len(deduplicated), chunk_size):
+            chunk = deduplicated[i:i + chunk_size]
+            result = supabase.table('player_projected_stats').upsert(
+                chunk,
+                on_conflict='player_id,game_id,season'
+            ).execute()
+            print(f"   Upserted stat projections {i+1}-{min(i+chunk_size, len(deduplicated))}")
+        
+        print(f"   Successfully stored {len(deduplicated):,} stat projections")
+        
+    except Exception as e:
+        print(f"ERROR: Error storing projected stats: {e}")
         import traceback
         traceback.print_exc()
 
@@ -444,6 +710,9 @@ def main(season: int = 2025):
     df_ros = calculate_ros_projections(player_xg, season)
     if len(df_ros) > 0:
         store_ros_projections(df_ros)
+        
+        # Convert and store RoS stat projections
+        convert_and_store_ros_stats(df_ros, season)
     
     # Step 3: Calculate and store matchup projections
     print("\n" + "=" * 80)

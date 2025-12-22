@@ -3,8 +3,33 @@
 
 import pandas as pd
 import numpy as np
+from dotenv import load_dotenv
+from supabase import create_client, Client
+import os
 
-df = pd.read_csv('data/our_shots_2025.csv')
+load_dotenv()
+
+# Initialize Supabase
+supabase_url = os.getenv('VITE_SUPABASE_URL')
+supabase_key = os.getenv('SUPABASE_SERVICE_ROLE_KEY')
+supabase: Client = create_client(supabase_url, supabase_key)
+
+# Fetch data from database
+print("Fetching data from database...")
+all_data = []
+offset = 0
+batch_size = 1000
+while True:
+    response = supabase.table('raw_shots').select('*').eq('season', 2025).range(offset, offset + batch_size - 1).execute()
+    if not response.data:
+        break
+    all_data.extend(response.data)
+    if len(response.data) < batch_size:
+        break
+    offset += batch_size
+
+df = pd.DataFrame(all_data)
+print(f"Loaded {len(df)} shots from database")
 
 print("=" * 80)
 print("DATA QUALITY CHECK FOR OPTIMIZATION")

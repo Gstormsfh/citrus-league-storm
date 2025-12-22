@@ -34,19 +34,22 @@ if not supabase_url or not supabase_key:
 supabase: Client = create_client(supabase_url, supabase_key)
 
 
-def load_historical_shots_data():
+def load_historical_shots_data(season: int = 2025):
     """
-    Load historical shots data from raw_shots table.
+    Load historical shots data from raw_shots table for a specific season.
+    
+    Args:
+        season: Season year to filter (default: 2025)
     
     Returns:
         DataFrame with columns: goalie_id, is_goal, shooting_talent_adjusted_xg, 
-        flurry_adjusted_xg, xg_value, is_empty_net
+        flurry_adjusted_xg, xg_value, is_empty_net, season
     """
     print("=" * 80)
-    print("LOADING HISTORICAL SHOTS DATA")
+    print(f"LOADING HISTORICAL SHOTS DATA - SEASON {season}")
     print("=" * 80)
     
-    print("Loading from Supabase raw_shots table...")
+    print(f"Loading from Supabase raw_shots table (season={season})...")
     print("(Using pagination to fetch all records)")
     
     try:
@@ -57,8 +60,8 @@ def load_historical_shots_data():
         while True:
             response = supabase.table('raw_shots').select(
                 'goalie_id, goalie_name, is_goal, shooting_talent_adjusted_xg, flurry_adjusted_xg, xg_value, is_empty_net, '
-                'game_id, period, distance, angle, is_power_play, shot_type'
-            ).range(offset, offset + batch_size - 1).execute()
+                'game_id, period, distance, angle, is_power_play, shot_type, season'
+            ).eq('season', season).range(offset, offset + batch_size - 1).execute()
             
             if not response.data or len(response.data) == 0:
                 break
@@ -72,8 +75,11 @@ def load_historical_shots_data():
             print(f"  Fetched {len(all_shots):,} records so far...")
         
         if len(all_shots) == 0:
-            print("WARNING: No data found in database (0 rows returned)")
+            print(f"[WARNING]  WARNING: No data found in database for season {season} (0 rows returned)")
+            print("   Make sure the raw_shots table has data with season={season}")
             return None
+        
+        print(f"[OK] Loaded {len(all_shots):,} shots from season {season}")
         
         df = pd.DataFrame(all_shots)
         
@@ -232,18 +238,32 @@ def calculate_raw_gsax(df_shots):
     
     print(f"   Processing {len(df_filtered):,} shots")
     
-    # Check if season column exists, if not derive it
-    if 'season' not in df_filtered.columns and 'game_id' in df_filtered.columns:
-        from season_utils import derive_season_from_game_id
-        df_filtered['season'] = df_filtered['game_id'].apply(derive_season_from_game_id)
-        # Fill missing seasons with most common season or current year
-        if df_filtered['season'].isna().any():
-            most_common_season = df_filtered['season'].mode()[0] if len(df_filtered['season'].mode()) > 0 else 2025
-            df_filtered['season'] = df_filtered['season'].fillna(most_common_season)
-            print(f"   Derived season for {df_filtered['season'].notna().sum():,} shots")
+    # Validate all shots are from the expected season
+    expected_season = 2025  # 2025-26 season
+    if 'season' in df_filtered.columns:
+        non_expected = df_filtered[df_filtered['season'] != expected_season]
+        if len(non_expected) > 0:
+            print(f"[WARNING]  WARNING: {len(non_expected):,} shots are not from {expected_season} season. Filtering them out.")
+            df_filtered = df_filtered[df_filtered['season'] == expected_season].copy()
+            print(f"   After filtering: {len(df_filtered):,} shots from {expected_season} season")
+        
+        # Print season distribution for validation
+        season_counts = df_filtered['season'].value_counts()
+        print(f"\n   Season distribution:")
+        for season_val, count in season_counts.items():
+            print(f"      Season {season_val}: {count:,} shots")
+        
+        if len(season_counts) > 1:
+            print(f"[WARNING]  WARNING: Processing shots from multiple seasons!")
+        elif len(season_counts) == 1 and season_counts.index[0] != expected_season:
+            print(f"[WARNING]  WARNING: Processing shots from season {season_counts.index[0]}, not {expected_season}!")
+    else:
+        print("[WARNING]  WARNING: No season column found. Cannot validate season filter.")
+        print("   This may indicate data quality issues. Proceeding with caution.")
     
-    # Aggregate by goalie and season (include goalie_name if available)
-    groupby_cols = ['goalie_id', 'season'] if 'season' in df_filtered.columns else ['goalie_id']
+    # Aggregate by goalie_id only (we'll set season to 2025 for all records)
+    # This ensures we get one record per goalie, avoiding duplicates when forcing season=2025
+    groupby_cols = ['goalie_id']
     
     if 'goalie_name' in df_filtered.columns:
         goalie_stats = df_filtered.groupby(groupby_cols).agg(
@@ -262,9 +282,8 @@ def calculate_raw_gsax(df_shots):
         ).reset_index()
         goalie_stats['goalie_name'] = None
     
-    # Ensure season column exists (default to 2025 if not present)
-    if 'season' not in goalie_stats.columns:
-        goalie_stats['season'] = 2025
+    # Set season to 2025 for all records (2025-26 season)
+    goalie_stats['season'] = 2025
     
     # Calculate raw GSAx
     goalie_stats['raw_gsax'] = goalie_stats['total_xGA'] - goalie_stats['total_GA']
@@ -275,6 +294,67 @@ def calculate_raw_gsax(df_shots):
     print(f"   Total GA: {goalie_stats['total_GA'].sum():,}")
     print(f"   Average raw GSAx: {goalie_stats['raw_gsax'].mean():.2f}")
     print(f"   Raw GSAx range: [{goalie_stats['raw_gsax'].min():.2f}, {goalie_stats['raw_gsax'].max():.2f}]")
+    
+    # Sanity checks for world-class data quality
+    print(f"\n" + "=" * 80)
+    print("SANITY CHECKS")
+    print("=" * 80)
+    
+    # Check for unrealistic GSAx values (per-season should be -50 to +60)
+    high_gsax = goalie_stats[goalie_stats['raw_gsax'] > 60]
+    low_gsax = goalie_stats[goalie_stats['raw_gsax'] < -50]
+    
+    if len(high_gsax) > 0:
+        print(f"[WARNING]  WARNING: {len(high_gsax)} goalie(s) with raw GSAx > 60 (possible multi-season aggregation):")
+        for _, row in high_gsax.head(5).iterrows():
+            print(f"      Goalie {row['goalie_id']}: {row['raw_gsax']:.2f} GSAx, {row['total_shots_faced']} shots")
+    
+    if len(low_gsax) > 0:
+        print(f"[WARNING]  WARNING: {len(low_gsax)} goalie(s) with raw GSAx < -50 (check data quality)")
+    
+    # Check for unrealistic shot counts (per-season should be 200-3000)
+    high_shots = goalie_stats[goalie_stats['total_shots_faced'] > 3000]
+    low_shots = goalie_stats[goalie_stats['total_shots_faced'] < 50]
+    
+    if len(high_shots) > 0:
+        print(f"[WARNING]  WARNING: {len(high_shots)} goalie(s) with > 3000 shots (possible multi-season aggregation):")
+        for _, row in high_shots.head(5).iterrows():
+            print(f"      Goalie {row['goalie_id']}: {row['total_shots_faced']} shots, {row['raw_gsax']:.2f} GSAx")
+    
+    if len(low_shots) > 0:
+        print(f"   Note: {len(low_shots)} goalie(s) with < 50 shots (low sample size, will be regressed)")
+    
+    # Check save percentage range (should be 0.85-0.96)
+    goalie_stats['save_pct'] = 1.0 - (goalie_stats['total_GA'] / goalie_stats['total_shots_faced'])
+    extreme_sv_pct = goalie_stats[(goalie_stats['save_pct'] < 0.80) | (goalie_stats['save_pct'] > 0.98)]
+    
+    if len(extreme_sv_pct) > 0:
+        print(f"[WARNING]  WARNING: {len(extreme_sv_pct)} goalie(s) with extreme save % (< 0.80 or > 0.98):")
+        for _, row in extreme_sv_pct.head(5).iterrows():
+            print(f"      Goalie {row['goalie_id']}: {row['save_pct']:.4f} SV%, {row['total_shots_faced']} shots")
+    
+    # Check xGA per shot (should be 0.06-0.15)
+    goalie_stats['xga_per_shot'] = goalie_stats['total_xGA'] / goalie_stats['total_shots_faced']
+    extreme_xga_rate = goalie_stats[(goalie_stats['xga_per_shot'] < 0.05) | (goalie_stats['xga_per_shot'] > 0.20)]
+    
+    if len(extreme_xga_rate) > 0:
+        print(f"[WARNING]  WARNING: {len(extreme_xga_rate)} goalie(s) with extreme xGA per shot (< 0.05 or > 0.20):")
+        for _, row in extreme_xga_rate.head(5).iterrows():
+            print(f"      Goalie {row['goalie_id']}: {row['xga_per_shot']:.4f} xGA/shot, {row['total_shots_faced']} shots")
+    
+    # Print distribution statistics
+    print(f"\n   Distribution Statistics:")
+    print(f"      Raw GSAx: Median={goalie_stats['raw_gsax'].median():.2f}, "
+          f"75th percentile={goalie_stats['raw_gsax'].quantile(0.75):.2f}, "
+          f"95th percentile={goalie_stats['raw_gsax'].quantile(0.95):.2f}")
+    print(f"      Shots Faced: Median={goalie_stats['total_shots_faced'].median():.0f}, "
+          f"75th percentile={goalie_stats['total_shots_faced'].quantile(0.75):.0f}, "
+          f"95th percentile={goalie_stats['total_shots_faced'].quantile(0.95):.0f}")
+    print(f"      Save %: Median={goalie_stats['save_pct'].median():.4f}, "
+          f"Range=[{goalie_stats['save_pct'].min():.4f}, {goalie_stats['save_pct'].max():.4f}]")
+    
+    if len(high_gsax) == 0 and len(high_shots) == 0 and len(extreme_sv_pct) == 0:
+        print(f"\n[OK] All sanity checks passed! Data quality looks good.")
     
     return goalie_stats
 
@@ -319,6 +399,15 @@ def calculate_bayesian_regression(goalie_stats):
     print(f"   League save %: {league_sv_pct:.4f}")
     print(f"   League GSAx: {league_gsax:.2f} (should be ~ 0)")
     
+    # Validate league-level balance
+    if abs(league_gsax) > 100:
+        print(f"[WARNING]  WARNING: League GSAx is {league_gsax:.2f}, which is far from 0.")
+        print(f"   This may indicate data quality issues or multi-season aggregation.")
+    elif abs(league_gsax) > 50:
+        print(f"[WARNING]  Note: League GSAx is {league_gsax:.2f}, slightly off from 0 (may be normal for partial season).")
+    else:
+        print(f"[OK] League-level balance check passed (GSAx ≈ 0)")
+    
     # Prior strength constant
     # Reduced from 1000 to 500 to preserve more variance and improve stability correlations
     C = 500  # Shots needed for full stabilization
@@ -357,15 +446,19 @@ def calculate_bayesian_regression(goalie_stats):
     return goalie_stats
 
 
-def main():
-    """Main execution function."""
+def main(season: int = 2025):
+    """Main execution function.
+    
+    Args:
+        season: Season year to calculate GSAx for (default: 2025)
+    """
     print("\n" + "=" * 80)
-    print("GOALIE GSAX CALCULATION")
+    print(f"GOALIE GSAX CALCULATION - SEASON {season}")
     print("=" * 80)
     print(f"Started at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     
-    # Load data
-    df_shots = load_historical_shots_data()
+    # Load data for specified season
+    df_shots = load_historical_shots_data(season=season)
     if df_shots is None or len(df_shots) == 0:
         print("ERROR: Failed to load shots data")
         return
@@ -466,15 +559,15 @@ def upsert_to_database(goalie_stats, season: Optional[int] = None):
         # Prepare data for database
         records = []
         for _, row in goalie_stats.iterrows():
-            # Get season from row or use default
-            season_val = int(row.get('season', season if season else 2025))
+            # Force season to 2025 for 2025-26 season data
+            season_val = 2025
             
             record = {
                 'goalie_id': int(row['goalie_id']),
                 'season': season_val,
                 'total_shots_faced': int(row['total_shots_faced']),
-                'total_xGA': float(row['total_xGA']),
-                'total_GA': int(row['total_GA']),
+                'total_xga': float(row['total_xGA']),  # Database uses lowercase
+                'total_ga': int(row['total_GA']),  # Database uses lowercase
                 'raw_gsax': float(row['raw_gsax']),
                 'regressed_gsax': float(row['regressed_gsax']),
                 'league_sv_pct': float(row['league_sv_pct']) if pd.notna(row['league_sv_pct']) else None,

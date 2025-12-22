@@ -73,6 +73,9 @@ def fetch_shots_from_db(date_from=None, date_to=None, limit=None):
         while True:
             query = supabase.table('raw_shots').select('*')
             
+            # Filter by season=2025 (current season)
+            query = query.eq('season', 2025)
+            
             if date_from:
                 query = query.gte('created_at', date_from)
             if date_to:
@@ -284,15 +287,27 @@ def main():
         print("\n❌ No data available. Make sure you've run pull_season_data.py")
         return
     
-    # Prepare features
-    X = prepare_features(df, feature_names, encoder)
-    
-    # Make predictions
-    print("\n" + "=" * 80)
-    print("MAKING PREDICTIONS")
-    print("=" * 80)
-    predictions = model.predict(X)
-    df['predicted_xg'] = predictions
+    # Use xG values from database (already calibrated)
+    if 'xg_value' in df.columns:
+        print("\n" + "=" * 80)
+        print("USING CALIBRATED xG VALUES FROM DATABASE")
+        print("=" * 80)
+        df['predicted_xg'] = pd.to_numeric(df['xg_value'], errors='coerce').fillna(0.0)
+        print(f"✅ Using stored xG values from database (already calibrated)")
+    else:
+        # Fallback: prepare features and predict (but apply calibration)
+        print("\n" + "=" * 80)
+        print("MAKING PREDICTIONS (APPLYING CALIBRATION)")
+        print("=" * 80)
+        X = prepare_features(df, feature_names, encoder)
+        raw_predictions = model.predict(X)
+        # Apply same calibration as data_acquisition.py
+        CALIBRATION_FACTOR = 3.5
+        SCALE_FACTOR = 0.19
+        df['predicted_xg'] = np.power(raw_predictions, CALIBRATION_FACTOR)
+        df['predicted_xg'] = df['predicted_xg'].clip(upper=0.50)
+        df['predicted_xg'] = df['predicted_xg'] * SCALE_FACTOR
+        print(f"✅ Applied calibration (power={CALIBRATION_FACTOR}, scale={SCALE_FACTOR})")
     
     # Ensure is_goal is numeric
     if 'is_goal' in df.columns:

@@ -28,7 +28,7 @@ supabase_url = os.getenv('VITE_SUPABASE_URL')
 supabase_key = os.getenv('SUPABASE_SERVICE_ROLE_KEY')
 
 if not supabase_url or not supabase_key:
-    print("❌ Error: Supabase credentials not found in .env file")
+    print("[ERROR] Error: Supabase credentials not found in .env file")
     print("   Please ensure VITE_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are set")
     exit(1)
 
@@ -57,7 +57,7 @@ def load_goalie_gsax_data(season: int = 2025) -> Optional[pd.DataFrame]:
         )
         
         if not response.data or len(response.data) == 0:
-            print("⚠️  No GSAx data found. Please run calculate_goalie_gsax.py first.")
+            print("[WARNING] No GSAx data found. Please run calculate_goalie_gsax.py first.")
             return None
         
         df = pd.DataFrame(response.data)
@@ -70,13 +70,13 @@ def load_goalie_gsax_data(season: int = 2025) -> Optional[pd.DataFrame]:
         # Remove invalid rows
         df = df[df['goalie_id'].notna() & df['regressed_gsax'].notna()].copy()
         
-        print(f"✅ Loaded GSAx data for {len(df):,} goalies")
+        print(f"[OK] Loaded GSAx data for {len(df):,} goalies")
         print(f"   GSAx range: [{df['regressed_gsax'].min():.2f}, {df['regressed_gsax'].max():.2f}]")
         
         return df
         
     except Exception as e:
-        print(f"❌ Error loading GSAx data: {e}")
+        print(f"[ERROR] Error loading GSAx data: {e}")
         import traceback
         traceback.print_exc()
         return None
@@ -109,7 +109,7 @@ def calculate_goalie_factors(goalie_gsax: pd.DataFrame, goalie_games: Dict[int, 
     # Handle edge cases (zero games, division by zero)
     goalie_gsax.loc[goalie_gsax['games_played'] == 0, 'goalie_factor'] = 0.0
     
-    print(f"✅ Calculated factors for {len(goalie_gsax):,} goalies")
+    print(f"[OK] Calculated factors for {len(goalie_gsax):,} goalies")
     print(f"   Factor range: [{goalie_gsax['goalie_factor'].min():.4f}, {goalie_gsax['goalie_factor'].max():.4f}]")
     print(f"   Average factor: {goalie_gsax['goalie_factor'].mean():.4f}")
     
@@ -154,7 +154,7 @@ def get_goalie_games_played(season: int = 2025) -> Dict[int, int]:
             offset += batch_size
         
         if len(all_shots) == 0:
-            print("⚠️  No shots data found")
+            print("[WARNING] No shots data found")
             return {}
         
         df = pd.DataFrame(all_shots)
@@ -164,13 +164,13 @@ def get_goalie_games_played(season: int = 2025) -> Dict[int, int]:
         # Count unique games per goalie
         goalie_games = df.groupby('goalie_id')['game_id'].nunique().to_dict()
         
-        print(f"✅ Calculated games played for {len(goalie_games):,} goalies")
+        print(f"[OK] Calculated games played for {len(goalie_games):,} goalies")
         print(f"   Games range: [{min(goalie_games.values()) if goalie_games else 0}, {max(goalie_games.values()) if goalie_games else 0}]")
         
         return goalie_games
         
     except Exception as e:
-        print(f"⚠️  Error calculating games played: {e}")
+        print(f"[WARNING] Error calculating games played: {e}")
         print("   Using default of 1 game per goalie")
         return {}
 
@@ -257,7 +257,7 @@ def get_player_talent_adjusted_xg(season: int = 2025) -> Dict[int, float]:
             offset += batch_size
         
         if len(all_shots) == 0:
-            print("⚠️  No shots data found")
+            print("[WARNING] No shots data found")
             return {}
         
         df = pd.DataFrame(all_shots)
@@ -294,13 +294,13 @@ def get_player_talent_adjusted_xg(season: int = 2025) -> Dict[int, float]:
             player_xg['xg_per_game']
         ))
         
-        print(f"✅ Loaded xG data for {len(result_dict):,} players")
+        print(f"[OK] Loaded xG data for {len(result_dict):,} players")
         print(f"   Average xG per game: {player_xg['xg_per_game'].mean():.4f}")
         
         return result_dict
         
     except Exception as e:
-        print(f"❌ Error loading player xG data: {e}")
+        print(f"[ERROR] Error loading player xG data: {e}")
         import traceback
         traceback.print_exc()
         return {}
@@ -316,7 +316,7 @@ def main(season: int = 2025):
     # Load GSAx data
     goalie_gsax = load_goalie_gsax_data(season=season)
     if goalie_gsax is None:
-        print("❌ Failed to load GSAx data. Please run calculate_goalie_gsax.py first.")
+        print("[ERROR] Failed to load GSAx data. Please run calculate_goalie_gsax.py first.")
         return
     
     # Get goalie games played
@@ -331,8 +331,8 @@ def main(season: int = 2025):
     print("\n" + "=" * 80)
     print("PIPELINE READY")
     print("=" * 80)
-    print("✅ GSAx factors calculated and ready for use in projections")
-    print("✅ Player talent-adjusted xG loaded")
+    print("[OK] GSAx factors calculated and ready for use in projections")
+    print("[OK] Player talent-adjusted xG loaded")
     print("\nNext steps:")
     print("1. Use goalie_factors dictionary to look up goalie_factor by goalie_id")
     print("2. Calculate team xGF using calculate_team_xgf() with player_xg data")
@@ -511,7 +511,7 @@ def update_all_projections(
         response = supabase.table('nhl_games').select('game_id, home_team_id, away_team_id').execute()
         
         if not response.data:
-            print("⚠️  No games found")
+            print("[WARNING] No games found")
             return
         
         games = pd.DataFrame(response.data)
@@ -528,7 +528,7 @@ def update_all_projections(
         print("   (Requires team roster and goalie assignment data)")
         
     except Exception as e:
-        print(f"❌ Error updating projections: {e}")
+        print(f"[ERROR] Error updating projections: {e}")
         import traceback
         traceback.print_exc()
 
