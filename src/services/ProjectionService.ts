@@ -250,49 +250,50 @@ export function formatExplainabilityMessage(
   return null;
 }
 
-/**
- * Calculate total matchup projection for a player across all games in a week
- */
-export function calculateMatchupProjectionTotal(
-  projections: PlayerProjection[]
-): {
-  matchup_projected_xg: number;
-  matchup_projected_points: number;
-  gsax_factor_pct: number;
-  qoc_factor_pct: number;
-  explainability_message: string | null;
-} {
-  if (projections.length === 0) {
-    return {
-      matchup_projected_xg: 0,
-      matchup_projected_points: 0,
-      gsax_factor_pct: 0,
-      qoc_factor_pct: 0,
-      explainability_message: null,
-    };
-  }
+// DUPLICATE FUNCTION
+// /**
+//  * Calculate total matchup projection for a player across all games in a week
+//  */
+// export function calculateMatchupProjectionTotal(
+//   projections: PlayerProjection[]
+// ): {
+//   matchup_projected_xg: number;
+//   matchup_projected_points: number;
+//   gsax_factor_pct: number;
+//   qoc_factor_pct: number;
+//   explainability_message: string | null;
+// } {
+//   if (projections.length === 0) {
+//     return {
+//       matchup_projected_xg: 0,
+//       matchup_projected_points: 0,
+//       gsax_factor_pct: 0,
+//       qoc_factor_pct: 0,
+//       explainability_message: null,
+//     };
+//   }
 
-  // Sum final projected xG across all games
-  const matchup_projected_xg = projections.reduce(
-    (sum, p) => sum + p.final_projected_xg,
-    0
-  );
+//   // Sum final projected xG across all games
+//   const matchup_projected_xg = projections.reduce(
+//     (sum, p) => sum + p.final_projected_xg,
+//     0
+//   );
 
-  // Average the factors (or use the most significant one)
-  const avgGsaxFactor = projections.reduce((sum, p) => sum + p.gsax_factor_pct, 0) / projections.length;
-  const avgQocFactor = projections.reduce((sum, p) => sum + p.qoc_factor_pct, 0) / projections.length;
+//   // Average the factors (or use the most significant one)
+//   const avgGsaxFactor = projections.reduce((sum, p) => sum + p.gsax_factor_pct, 0) / projections.length;
+//   const avgQocFactor = projections.reduce((sum, p) => sum + p.qoc_factor_pct, 0) / projections.length;
 
-  // Use the first projection for explainability message (or combine messages)
-  const explainability_message = formatExplainabilityMessage(projections[0]);
+//   // Use the first projection for explainability message (or combine messages)
+//   const explainability_message = formatExplainabilityMessage(projections[0]);
 
-  return {
-    matchup_projected_xg,
-    matchup_projected_points: matchup_projected_xg * XG_TO_POINTS_FACTOR,
-    gsax_factor_pct: avgGsaxFactor,
-    qoc_factor_pct: avgQocFactor,
-    explainability_message,
-  };
-}
+//   return {
+//     matchup_projected_xg,
+//     matchup_projected_points: matchup_projected_xg * XG_TO_POINTS_FACTOR,
+//     gsax_factor_pct: avgGsaxFactor,
+//     qoc_factor_pct: avgQocFactor,
+//     explainability_message,
+//   };
+// }
 
 /**
  * Get projected stats for matchup projections
@@ -608,6 +609,7 @@ export function calculateMatchupProjectionTotal(
   return {
     matchup_projected_xg,
     matchup_projected_points: matchup_projected_xg * 20.0, // Legacy: hardcoded factor
+    // matchup_projected_points: matchup_projected_xg * XG_TO_POINTS_FACTOR, // from duplicate function
     gsax_factor_pct: avgGsaxFactor,
     qoc_factor_pct: avgQocFactor,
     explainability_message,

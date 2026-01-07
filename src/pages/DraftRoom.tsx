@@ -30,6 +30,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Users, Clock, Trophy, History, CheckCircle, Loader2, Zap, Play, Pause, Camera } from 'lucide-react';
 import PlayerStatsModal from '@/components/PlayerStatsModal';
 import { HockeyPlayer } from '@/components/roster/HockeyPlayerCard';
+import LoadingScreen from '@/components/LoadingScreen';
 
 // DraftPick interface is now imported from DraftService
 // Team interface is now imported from LeagueService
